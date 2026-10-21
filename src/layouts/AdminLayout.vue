@@ -7,8 +7,10 @@ import { useOrderStore } from '@/stores/order'
 import { useServiceRequestStore } from '@/stores/serviceRequest'
 import { useCatalogStore } from '@/stores/catalog'
 import { useTableStore } from '@/stores/table'
+import { useNotificationStore } from '@/stores/notification'
 import DemoBanner from '@/components/ui/DemoBanner.vue'
 import AppToast from '@/components/ui/AppToast.vue'
+import NotificationDropdown from '@/components/ui/NotificationDropdown.vue'
 import {
   LayoutDashboard,
   UtensilsCrossed,
@@ -39,6 +41,7 @@ const orderStore = useOrderStore()
 const serviceRequestStore = useServiceRequestStore()
 const catalogStore = useCatalogStore()
 const tableStore = useTableStore()
+const notificationStore = useNotificationStore()
 
 const isMobileSidebarOpen = ref(false)
 
@@ -67,7 +70,8 @@ const reloadContextData = async () => {
     orderStore.loadOrders(),
     catalogStore.loadCatalog(),
     tableStore.loadTables(),
-    serviceRequestStore.loadRequests()
+    serviceRequestStore.loadRequests(),
+    notificationStore.loadNotifications()
   ])
 }
 
@@ -170,13 +174,8 @@ onMounted(async () => {
           <ExternalLink :size="14" />
         </a>
 
-        <!-- Service Requests Alert Bell -->
-        <router-link to="/app/atendimento" class="topbar-icon-btn" title="Solicitações de Atendimento">
-          <BellRing :size="18" />
-          <span v-if="activeServiceRequestsCount > 0" class="badge-counter">
-            {{ activeServiceRequestsCount }}
-          </span>
-        </router-link>
+        <!-- Notifications Dropdown -->
+        <NotificationDropdown />
 
         <!-- Current User Display -->
         <div class="user-profile-widget">

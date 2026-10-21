@@ -4,6 +4,8 @@ import {
   initialRestaurants,
   initialUsers,
   initialTables,
+  initialTableSessions,
+  initialNotifications,
   initialCategories,
   initialProducts,
   initialOrders,
@@ -15,7 +17,7 @@ import {
   initialDigitalAccessList
 } from '@/mocks/initialData'
 
-const STORAGE_KEY = 'tapmenu_mock_database_v1'
+const STORAGE_KEY = 'tapmenu_mock_database_v2'
 
 function getInitialDatabase(): MockDatabase {
   return {
@@ -23,6 +25,8 @@ function getInitialDatabase(): MockDatabase {
     restaurants: JSON.parse(JSON.stringify(initialRestaurants)),
     users: JSON.parse(JSON.stringify(initialUsers)),
     tables: JSON.parse(JSON.stringify(initialTables)),
+    tableSessions: JSON.parse(JSON.stringify(initialTableSessions)),
+    notifications: JSON.parse(JSON.stringify(initialNotifications)),
     categories: JSON.parse(JSON.stringify(initialCategories)),
     products: JSON.parse(JSON.stringify(initialProducts)),
     orders: JSON.parse(JSON.stringify(initialOrders)),
@@ -57,6 +61,12 @@ export class MockStorageService {
         const parsed = JSON.parse(stored)
         // Basic schema check
         if (parsed.companies && parsed.restaurants && parsed.products && parsed.orders) {
+          if (!parsed.tableSessions) {
+            parsed.tableSessions = JSON.parse(JSON.stringify(initialTableSessions))
+          }
+          if (!parsed.notifications) {
+            parsed.notifications = JSON.parse(JSON.stringify(initialNotifications))
+          }
           return parsed as MockDatabase
         }
       }

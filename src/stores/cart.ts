@@ -3,6 +3,8 @@ import { ref, computed } from 'vue'
 import type { OrderItem, OrderType, PaymentStatus, Product, ProductVariant, ProductAddon, Restaurant, Table, PaymentMethod } from '@/types'
 import { useOrderStore } from './order'
 import { useToastStore } from './toast'
+import { useNotificationStore } from './notification'
+import { tableSessionService } from '@/services'
 
 export interface CartCustomization {
   selectedVariant?: ProductVariant
@@ -14,10 +16,12 @@ export interface CartCustomization {
 export const useCartStore = defineStore('cart', () => {
   const orderStore = useOrderStore()
   const toastStore = useToastStore()
+  const notificationStore = useNotificationStore()
 
   const items = ref<OrderItem[]>([])
   const activeRestaurant = ref<Restaurant | null>(null)
   const activeTable = ref<Table | null>(null)
+  const isCartOpen = ref(false)
 
   const itemCount = computed(() => {
     return items.value.reduce((sum, item) => sum + item.quantity, 0)
@@ -119,6 +123,7 @@ export const useCartStore = defineStore('cart', () => {
     customerPhone?: string
     notes?: string
     paymentMethod?: PaymentMethod
+    tableSessionId?: string
   }) => {
     if (items.value.length === 0) {
       throw new Error('O carrinho está vazio!')
@@ -127,11 +132,21 @@ export const useCartStore = defineStore('cart', () => {
       throw new Error('Restaurante não identificado.')
     }
 
+    let isAdditional = false
+    if (options.tableSessionId) {
+      const sess = await tableSessionService.getSessionById(options.tableSessionId)
+      if (sess && sess.orderIds && sess.orderIds.length > 0) {
+        isAdditional = true
+      }
+    }
+
     const orderData = {
       tenantId: activeRestaurant.value.tenantId,
       restaurantId: activeRestaurant.value.id,
       tableId: activeTable.value?.id,
       tableNumber: activeTable.value?.number || 'Balcão',
+      tableSessionId: options.tableSessionId,
+      isAdditional,
       type: (activeTable.value ? 'dine_in' : 'takeaway') as OrderType,
       status: 'received' as const,
       paymentStatus: 'pending' as PaymentStatus,
@@ -147,6 +162,25 @@ export const useCartStore = defineStore('cart', () => {
     }
 
     const order = await orderStore.createNewOrder(orderData)
+
+    // Link order to session if present
+    if (options.tableSessionId) {
+      await tableSessionService.addOrderToSession(options.tableSessionId, order.id)
+    }
+
+    // Create counter notification
+    await notificationStore.createNotification({
+      tenantId: activeRestaurant.value.tenantId,
+      restaurantId: activeRestaurant.value.id,
+      type: isAdditional ? 'additional_order' : 'new_order',
+      title: isAdditional ? 'Pedido adicional recebido' : 'Novo pedido recebido',
+      message: `${isAdditional ? 'Pedido adicional' : 'Pedido'} ${order.orderCode} — Mesa ${order.tableNumber || 'Balcão'} (${order.customerName}) — ${order.items.length} ${order.items.length === 1 ? 'item' : 'itens'} — Total: ${order.total.toLocaleString('pt-MZ')} MT`,
+      tableId: activeTable.value?.id,
+      tableNumber: activeTable.value?.number,
+      tableSessionId: options.tableSessionId,
+      orderId: order.id
+    })
+
     clearCart()
     return order
   }
@@ -155,6 +189,7 @@ export const useCartStore = defineStore('cart', () => {
     items,
     activeRestaurant,
     activeTable,
+    isCartOpen,
     itemCount,
     subtotal,
     taxAmount,

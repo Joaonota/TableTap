@@ -3,6 +3,8 @@ import type {
   Restaurant,
   User,
   Table,
+  TableSession,
+  Notification,
   Category,
   Product,
   Order,
@@ -107,3 +109,21 @@ export interface ISubscriptionRepository {
   getByTenant(tenantId: string): Promise<Subscription | null>
   updateSubscription(id: string, updates: Partial<Subscription>): Promise<Subscription>
 }
+
+export interface ITableSessionRepository {
+  getByRestaurant(restaurantId: string): Promise<TableSession[]>
+  getActiveByTable(tableId: string): Promise<TableSession | null>
+  getById(id: string): Promise<TableSession | null>
+  create(session: Omit<TableSession, 'id' | 'startedAt' | 'orderIds'>): Promise<TableSession>
+  update(id: string, updates: Partial<TableSession>): Promise<TableSession>
+  addOrder(sessionId: string, orderId: string): Promise<TableSession>
+  closeSession(sessionId: string): Promise<TableSession>
+}
+
+export interface INotificationRepository {
+  getByRestaurant(restaurantId: string): Promise<Notification[]>
+  create(notification: Omit<Notification, 'id' | 'createdAt'>): Promise<Notification>
+  markAsRead(id: string): Promise<Notification>
+  markAllAsRead(restaurantId: string): Promise<void>
+}
+

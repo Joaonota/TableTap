@@ -10,7 +10,9 @@ import {
   MockPaymentRepository,
   MockServiceRequestRepository,
   MockStaffRepository,
-  MockSubscriptionRepository
+  MockSubscriptionRepository,
+  MockTableSessionRepository,
+  MockNotificationRepository
 } from '@/repositories/mock'
 import { mockStorage } from '@/repositories/mock/mockStorage'
 import type {
@@ -18,6 +20,8 @@ import type {
   Company,
   Restaurant,
   Table,
+  TableSession,
+  Notification,
   Category,
   Product,
   Order,
@@ -38,6 +42,8 @@ const companyRepo = new MockCompanyRepository()
 const restaurantRepo = new MockRestaurantRepository()
 const userRepo = new MockUserRepository()
 const tableRepo = new MockTableRepository()
+const tableSessionRepo = new MockTableSessionRepository()
+const notificationRepo = new MockNotificationRepository()
 const categoryRepo = new MockCategoryRepository()
 const productRepo = new MockProductRepository()
 const orderRepo = new MockOrderRepository()
@@ -352,7 +358,65 @@ export const reportService = {
   }
 }
 
+// ================= TableSession Service =================
+export const tableSessionService = {
+  async getSessions(restaurantId: string): Promise<TableSession[]> {
+    return tableSessionRepo.getByRestaurant(restaurantId)
+  },
+  async getActiveSessionByTable(tableId: string): Promise<TableSession | null> {
+    return tableSessionRepo.getActiveByTable(tableId)
+  },
+  async getSessionById(id: string): Promise<TableSession | null> {
+    return tableSessionRepo.getById(id)
+  },
+  async startSession(data: {
+    tenantId: string
+    restaurantId: string
+    tableId: string
+    customerName: string
+    partySize?: number
+    notes?: string
+  }): Promise<TableSession> {
+    const session = await tableSessionRepo.create({
+      tenantId: data.tenantId,
+      restaurantId: data.restaurantId,
+      tableId: data.tableId,
+      customerName: data.customerName,
+      partySize: data.partySize,
+      status: 'active',
+      notes: data.notes
+    })
+    return session
+  },
+  async addOrderToSession(sessionId: string, orderId: string): Promise<TableSession> {
+    return tableSessionRepo.addOrder(sessionId, orderId)
+  },
+  async updateSessionStatus(sessionId: string, status: TableSession['status']): Promise<TableSession> {
+    return tableSessionRepo.update(sessionId, { status })
+  },
+  async closeSession(sessionId: string): Promise<TableSession> {
+    return tableSessionRepo.closeSession(sessionId)
+  }
+}
+
+// ================= Notification Service =================
+export const notificationService = {
+  async getNotifications(restaurantId: string): Promise<Notification[]> {
+    return notificationRepo.getByRestaurant(restaurantId)
+  },
+  async createNotification(notification: Omit<Notification, 'id' | 'createdAt'>): Promise<Notification> {
+    return notificationRepo.create(notification)
+  },
+  async markAsRead(id: string): Promise<Notification> {
+    return notificationRepo.markAsRead(id)
+  },
+  async markAllAsRead(restaurantId: string): Promise<void> {
+    return notificationRepo.markAllAsRead(restaurantId)
+  }
+}
+
 // Reset Database Utility
 export const resetDatabase = (): void => {
   mockStorage.reset()
 }
+

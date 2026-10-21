@@ -35,7 +35,7 @@ const toastStore = useToastStore()
 
           <button
             class="view-order-btn"
-            @click="$emit('open-cart')"
+            @click="cartStore.isCartOpen = true"
           >
             <span>Ver Pedido</span>
             <ArrowRight :size="16" />

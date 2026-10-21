@@ -2,13 +2,18 @@
 import { ref, computed, onMounted } from 'vue'
 import { useTableStore } from '@/stores/table'
 import { useTenantStore } from '@/stores/tenant'
+import { useOrderStore } from '@/stores/order'
+import { useServiceRequestStore } from '@/stores/serviceRequest'
+import { useNotificationStore } from '@/stores/notification'
 import { useToastStore } from '@/stores/toast'
-import type { Table, TableStatus } from '@/types'
+import { tableSessionService, orderService } from '@/services'
+import type { Table, TableStatus, TableSession, Order, ServiceRequest, OrderStatus, ServiceRequestStatus, PaymentMethod } from '@/types'
+
 import AppButton from '@/components/ui/AppButton.vue'
 import AppBadge from '@/components/ui/AppBadge.vue'
 import AppModal from '@/components/ui/AppModal.vue'
-import AppInput from '@/components/ui/AppInput.vue'
-import AppSelect from '@/components/ui/AppSelect.vue'
+import TableDetailModal from '@/components/tables/TableDetailModal.vue'
+
 import {
   Grid,
   List,
@@ -19,40 +24,219 @@ import {
   Edit2,
   Trash2,
   CheckCircle2,
-  Copy,
-  Printer
+  Clock,
+  BellRing,
+  Receipt,
+  UtensilsCrossed,
+  Layers,
+  AlertTriangle
 } from 'lucide-vue-next'
 
 const tableStore = useTableStore()
 const tenantStore = useTenantStore()
+const orderStore = useOrderStore()
+const serviceRequestStore = useServiceRequestStore()
+const notificationStore = useNotificationStore()
 const toastStore = useToastStore()
 
 const viewMode = ref<'grid' | 'table'>('grid')
-const isEditModalOpen = ref(false)
-const isQrModalOpen = ref(false)
-const selectedTable = ref<Table | null>(null)
-const generatedQrDataUrl = ref('')
+const statusFilter = ref<string>('all')
+const areaFilter = ref<string>('all')
 
-// Form state
+// Table Edit / Add Modal
+const isEditModalOpen = ref(false)
 const formId = ref<string | undefined>(undefined)
 const formNumber = ref('')
 const formName = ref('')
 const formArea = ref<any>('Sala Principal')
 const formCapacity = ref(4)
 
+// QR Code Modal
+const isQrModalOpen = ref(false)
+const selectedTableForQr = ref<Table | null>(null)
+const generatedQrDataUrl = ref('')
+
+// Table Detail / Session Modal
+const isDetailModalOpen = ref(false)
+const activeDetailTable = ref<Table | null>(null)
+const activeDetailSession = ref<TableSession | null>(null)
+const activeDetailOrders = ref<Order[]>([])
+const activeDetailRequests = ref<ServiceRequest[]>([])
+const isClosingSession = ref(false)
+
 const areaOptions = [
-  { label: 'Sala Principal', value: 'Sala Principal' },
-  { label: 'Esplanada', value: 'Esplanada' },
-  { label: 'Varanda', value: 'Varanda' },
-  { label: 'Bar', value: 'Bar' },
-  { label: 'Piso 1', value: 'Piso 1' },
-  { label: 'Privado', value: 'Privado' }
+  'Sala Principal',
+  'Esplanada',
+  'Varanda',
+  'Bar',
+  'Piso 1',
+  'Privado'
 ]
 
+const originUrl = typeof window !== 'undefined' ? window.location.origin : ''
+
 onMounted(async () => {
-  await tableStore.loadTables()
+  await reloadAll()
 })
 
+const reloadAll = async () => {
+  await Promise.all([
+    tableStore.loadTables(),
+    orderStore.loadOrders(),
+    serviceRequestStore.loadRequests(),
+    notificationStore.loadNotifications()
+  ])
+}
+
+// Counter Summary Metrics
+const metrics = computed(() => {
+  const tables = tableStore.tables
+  return {
+    total: tables.length,
+    free: tables.filter(t => t.status === 'free').length,
+    occupied: tables.filter(t => t.status === 'occupied').length,
+    hasOrder: tables.filter(t => t.status === 'has_order').length,
+    waitingService: tables.filter(t => t.status === 'waiting_service').length,
+    waitingBill: tables.filter(t => t.status === 'waiting_bill').length,
+    unavailable: tables.filter(t => t.status === 'unavailable').length
+  }
+})
+
+// Filtered Tables
+const filteredTables = computed(() => {
+  return tableStore.tables.filter(tbl => {
+    const matchesStatus =
+      statusFilter.value === 'all' ||
+      (statusFilter.value === 'active' ? (tbl.status === 'occupied' || tbl.status === 'has_order' || tbl.status === 'waiting_service' || tbl.status === 'waiting_bill') : tbl.status === statusFilter.value)
+
+    const matchesArea = areaFilter.value === 'all' || tbl.area === areaFilter.value
+    return matchesStatus && matchesArea
+  })
+})
+
+const getTablePendingRequests = (tableId: string) => {
+  return serviceRequestStore.requests.filter(
+    r => r.tableId === tableId && (r.status === 'new' || r.status === 'in_progress')
+  )
+}
+
+const getTableActiveOrdersCount = (tableId: string) => {
+  return orderStore.orders.filter(
+    o => o.tableId === tableId && o.status !== 'delivered' && o.status !== 'cancelled'
+  ).length
+}
+
+const getElapsedMinutes = (startedAt?: string) => {
+  if (!startedAt) return ''
+  const diffMs = Date.now() - new Date(startedAt).getTime()
+  const mins = Math.max(1, Math.floor(diffMs / 60000))
+  if (mins < 60) return `há ${mins}m`
+  const hours = Math.floor(mins / 60)
+  const rem = mins % 60
+  return `há ${hours}h ${rem}m`
+}
+
+// Open Detail Modal
+const openTableDetail = async (tbl: Table) => {
+  activeDetailTable.value = tbl
+  isDetailModalOpen.value = true
+
+  // Load active session from mock repository
+  const session = await tableSessionService.getActiveSessionByTable(tbl.id)
+  activeDetailSession.value = session
+
+  if (session && tenantStore.currentRestaurant) {
+    const allOrders = await orderService.getOrders(tenantStore.currentRestaurant.id)
+    activeDetailOrders.value = allOrders.filter(
+      o => session.orderIds.includes(o.id) || o.tableSessionId === session.id
+    )
+  } else {
+    activeDetailOrders.value = []
+  }
+
+  // Load service requests for this table
+  activeDetailRequests.value = serviceRequestStore.requests.filter(r => r.tableId === tbl.id)
+}
+
+// Quick status change safeguard
+const handleQuickStatusChange = async (tbl: Table, newStatus: TableStatus) => {
+  if (newStatus === 'free' && (tbl.status === 'occupied' || tbl.status === 'has_order' || tbl.status === 'waiting_service' || tbl.status === 'waiting_bill')) {
+    // Check if session exists
+    const session = await tableSessionService.getActiveSessionByTable(tbl.id)
+    if (session && session.status !== 'closed') {
+      toastStore.warning(
+        'Sessão em Andamento',
+        `A Mesa ${tbl.number} possui uma sessão ativa de ${session.customerName}. Por favor, clique em "Ver Detalhes" para fechar a conta e encerrar a sessão de forma segura.`
+      )
+      return
+    }
+  }
+
+  await tableStore.updateTableStatus(tbl.id, newStatus)
+}
+
+// Session Order Status Update from modal
+const handleUpdateOrderStatus = async (payload: { orderId: string; status: OrderStatus }) => {
+  try {
+    await orderStore.updateOrderStatus(payload.orderId, payload.status, 'Balcão')
+    if (activeDetailTable.value) {
+      await openTableDetail(activeDetailTable.value)
+    }
+  } catch (e) {
+    console.error('Erro ao atualizar status do pedido', e)
+  }
+}
+
+// Service Request status update from modal
+const handleUpdateRequestStatus = async (payload: { requestId: string; status: ServiceRequestStatus }) => {
+  try {
+    await serviceRequestStore.updateRequestStatus(payload.requestId, payload.status)
+    if (activeDetailTable.value) {
+      await openTableDetail(activeDetailTable.value)
+      await tableStore.loadTables()
+    }
+  } catch (e) {
+    console.error('Erro ao atualizar atendimento', e)
+  }
+}
+
+// Payment Registration from modal
+const handleRegisterPayment = async (payload: { method: PaymentMethod }) => {
+  toastStore.success('Pagamento Registado', `Pagamento via ${payload.method.toUpperCase()} simulado com sucesso.`)
+}
+
+// Close Session from modal
+const handleCloseSession = async () => {
+  if (!activeDetailTable.value || !activeDetailSession.value || !tenantStore.currentRestaurant) return
+  isClosingSession.value = true
+  try {
+    const tableNum = activeDetailTable.value.number
+    const custName = activeDetailSession.value.customerName
+
+    await tableSessionService.closeSession(activeDetailSession.value.id)
+
+    // Notify counter
+    await notificationStore.createNotification({
+      tenantId: tenantStore.currentRestaurant.tenantId,
+      restaurantId: tenantStore.currentRestaurant.id,
+      type: 'table_occupied',
+      title: 'Sessão Encerrada & Mesa Livre',
+      message: `A sessão da Mesa ${tableNum} (${custName}) foi encerrada e a mesa está agora livre.`,
+      tableId: activeDetailTable.value.id,
+      tableNumber: tableNum
+    })
+
+    toastStore.success('Sessão Encerrada!', `Mesa ${tableNum} foi libertada com sucesso. Histórico preservado.`)
+    isDetailModalOpen.value = false
+    await reloadAll()
+  } catch (e) {
+    toastStore.error('Erro ao encerrar sessão', (e as Error).message)
+  } finally {
+    isClosingSession.value = false
+  }
+}
+
+// Add Table
 const openAddModal = () => {
   formId.value = undefined
   formNumber.value = String(tableStore.tables.length + 1).padStart(2, '0')
@@ -93,39 +277,26 @@ const handleDeleteTable = async (id: string) => {
 }
 
 const openQrModal = async (tbl: Table) => {
-  selectedTable.value = tbl
+  selectedTableForQr.value = tbl
   const fullUrl = `${window.location.origin}${tbl.publicUrl}`
   generatedQrDataUrl.value = await tableStore.generateQrCode(fullUrl)
   isQrModalOpen.value = true
-}
-
-const copyUrl = (tbl: Table) => {
-  const fullUrl = `${window.location.origin}${tbl.publicUrl}`
-  navigator.clipboard.writeText(fullUrl)
-  toastStore.success('Link Copiado', 'Endereço da mesa copiado para a área de transferência!')
-}
-
-const handleQuickStatusChange = async (tbl: Table, status: TableStatus) => {
-  await tableStore.updateTableStatus(tbl.id, status)
-}
-
-const originUrl = typeof window !== 'undefined' ? window.location.origin : ''
-const printDisplay = () => {
-  window.print()
 }
 </script>
 
 <template>
   <div class="tables-page">
+    <!-- Header -->
     <div class="tables-header">
       <div>
-        <h1 class="page-title">Gestão de Mesas & Espaços</h1>
-        <p class="page-subtitle">Configure mesas, capacidade de clientes e aceda aos respetivos links e QR Codes</p>
+        <h1 class="page-title">Balcão de Mesas & Atendimento</h1>
+        <p class="page-subtitle">Monitore a ocupação em tempo real, pedidos ativos, solicitações de garçom e encerramento de contas.</p>
       </div>
 
       <div class="header-actions">
         <div class="view-toggle">
           <button
+            type="button"
             class="toggle-btn"
             :class="{ 'is-active': viewMode === 'grid' }"
             @click="viewMode = 'grid'"
@@ -134,6 +305,7 @@ const printDisplay = () => {
             <span>Grelha</span>
           </button>
           <button
+            type="button"
             class="toggle-btn"
             :class="{ 'is-active': viewMode === 'table' }"
             @click="viewMode = 'table'"
@@ -147,86 +319,159 @@ const printDisplay = () => {
           <template #icon-left>
             <Plus :size="16" />
           </template>
-          Adicionar Mesa
+          Nova Mesa
         </AppButton>
+      </div>
+    </div>
+
+    <!-- Operational Metrics Summary Bar -->
+    <div class="metrics-grid">
+      <div class="metric-card" :class="{ 'is-active': statusFilter === 'all' }" @click="statusFilter = 'all'">
+        <span class="m-val">{{ metrics.total }}</span>
+        <span class="m-lbl">Total de Mesas</span>
+      </div>
+
+      <div class="metric-card success" :class="{ 'is-active': statusFilter === 'free' }" @click="statusFilter = 'free'">
+        <span class="m-val">{{ metrics.free }}</span>
+        <span class="m-lbl">Livres</span>
+      </div>
+
+      <div class="metric-card primary" :class="{ 'is-active': statusFilter === 'occupied' }" @click="statusFilter = 'occupied'">
+        <span class="m-val">{{ metrics.occupied }}</span>
+        <span class="m-lbl">Ocupadas</span>
+      </div>
+
+      <div class="metric-card warning" :class="{ 'is-active': statusFilter === 'has_order' }" @click="statusFilter = 'has_order'">
+        <span class="m-val">{{ metrics.hasOrder }}</span>
+        <span class="m-lbl">Com Pedidos</span>
+      </div>
+
+      <div class="metric-card danger" :class="{ 'is-active': statusFilter === 'waiting_service' }" @click="statusFilter = 'waiting_service'">
+        <span class="m-val">{{ metrics.waitingService }}</span>
+        <span class="m-lbl">Chama Garçom</span>
+      </div>
+
+      <div class="metric-card amber" :class="{ 'is-active': statusFilter === 'waiting_bill' }" @click="statusFilter = 'waiting_bill'">
+        <span class="m-val">{{ metrics.waitingBill }}</span>
+        <span class="m-lbl">Pede Conta</span>
+      </div>
+    </div>
+
+    <!-- Filters Bar -->
+    <div class="filter-controls-bar">
+      <div class="filter-group">
+        <label for="statusFilterSelect" class="filter-label">Estado:</label>
+        <select id="statusFilterSelect" v-model="statusFilter" class="filter-select">
+          <option value="all">Todos os Estados</option>
+          <option value="active">Todas em Atendimento Ativo</option>
+          <option value="free">Livre</option>
+          <option value="occupied">Ocupada</option>
+          <option value="has_order">Com Pedido Ativo</option>
+          <option value="waiting_service">Aguardar Garçom</option>
+          <option value="waiting_bill">Aguardar Conta</option>
+          <option value="unavailable">Indisponível</option>
+        </select>
+      </div>
+
+      <div class="filter-group">
+        <label for="areaFilterSelect" class="filter-label">Espaço / Área:</label>
+        <select id="areaFilterSelect" v-model="areaFilter" class="filter-select">
+          <option value="all">Todas as Áreas</option>
+          <option v-for="area in areaOptions" :key="area" :value="area">{{ area }}</option>
+        </select>
       </div>
     </div>
 
     <!-- Grid View -->
     <div v-if="viewMode === 'grid'" class="tables-grid">
       <div
-        v-for="tbl in tableStore.tables"
+        v-for="tbl in filteredTables"
         :key="tbl.id"
         class="table-card"
         :class="`status-${tbl.status}`"
+        @click="openTableDetail(tbl)"
       >
+        <!-- Card Top -->
         <div class="card-top">
           <div class="table-number-box">
             <span class="t-prefix">MESA</span>
             <span class="t-num">{{ tbl.number }}</span>
           </div>
 
-          <AppBadge
-            :variant="
-              tbl.status === 'free' ? 'success' :
-              tbl.status === 'occupied' ? 'primary' :
-              tbl.status === 'has_order' ? 'warning' :
-              tbl.status === 'waiting_bill' ? 'danger' :
-              tbl.status === 'waiting_service' ? 'danger' : 'neutral'
-            "
-          >
-            {{
-              tbl.status === 'free' ? 'Livre' :
-              tbl.status === 'occupied' ? 'Ocupada' :
-              tbl.status === 'has_order' ? 'Com Pedido' :
-              tbl.status === 'waiting_service' ? 'Chama Garçom' :
-              tbl.status === 'waiting_bill' ? 'Pede Conta' : 'Indisponível'
-            }}
-          </AppBadge>
+          <div class="top-badges">
+            <AppBadge
+              :variant="
+                tbl.status === 'free' ? 'success' :
+                tbl.status === 'occupied' ? 'primary' :
+                tbl.status === 'has_order' ? 'warning' :
+                tbl.status === 'waiting_bill' ? 'danger' :
+                tbl.status === 'waiting_service' ? 'danger' : 'neutral'
+              "
+            >
+              {{
+                tbl.status === 'free' ? 'Livre' :
+                tbl.status === 'occupied' ? 'Ocupada' :
+                tbl.status === 'has_order' ? 'Com Pedido' :
+                tbl.status === 'waiting_service' ? 'Chama Garçom' :
+                tbl.status === 'waiting_bill' ? 'Pede Conta' : 'Indisponível'
+              }}
+            </AppBadge>
+          </div>
         </div>
 
+        <!-- Table Info -->
         <div class="table-info">
           <div class="t-name">{{ tbl.name }}</div>
           <div class="t-meta">
             <span>{{ tbl.area }}</span> •
-            <span><Users :size="13" class="inline-icon" /> Até {{ tbl.capacity }} pessoas</span>
+            <span><Users :size="12" class="inline-icon" /> Até {{ tbl.capacity }}p</span>
           </div>
         </div>
 
-        <!-- Quick Status Selector -->
-        <div class="quick-status-row">
-          <select
-            :value="tbl.status"
-            class="status-select"
-            @change="handleQuickStatusChange(tbl, ($event.target as HTMLSelectElement).value as TableStatus)"
-          >
-            <option value="free">Marcar como Livre</option>
-            <option value="occupied">Marcar Ocupada</option>
-            <option value="has_order">Com Pedido Ativo</option>
-            <option value="waiting_service">Aguardar Garçom</option>
-            <option value="waiting_bill">Aguardar Conta</option>
-            <option value="unavailable">Indisponível</option>
-          </select>
+        <!-- Session Highlights (If Occupied) -->
+        <div v-if="tbl.activeCustomerName" class="table-occupant-box">
+          <div class="occupant-line">
+            <span class="occ-label">Responsável:</span>
+            <strong class="occ-name">{{ tbl.activeCustomerName }}</strong>
+          </div>
+          <div class="occupant-timing">
+            <span v-if="tbl.partySize">{{ tbl.partySize }} pessoas • </span>
+            <span><Clock :size="11" class="inline-icon" /> {{ getElapsedMinutes(tbl.sessionStartedAt) }}</span>
+          </div>
         </div>
 
-        <div class="table-actions-row">
-          <button class="t-action-btn" title="Gerar e Ver QR Code" @click="openQrModal(tbl)">
-            <QrCode :size="16" />
-            <span>QR Code</span>
+        <!-- Pending alerts if waiter call / bill -->
+        <div v-if="getTablePendingRequests(tbl.id).length > 0" class="pending-alert-badge">
+          <BellRing :size="14" class="ring-icon" />
+          <span>{{ getTablePendingRequests(tbl.id).length }} solicitação pendente</span>
+        </div>
+
+        <!-- Action Row -->
+        <div class="table-card-actions" @click.stop>
+          <AppButton variant="secondary" size="sm" class="detail-btn" @click="openTableDetail(tbl)">
+            Ver Detalhes
+          </AppButton>
+
+          <button type="button" class="t-action-btn" title="QR Code" @click="openQrModal(tbl)">
+            <QrCode :size="15" />
           </button>
 
-          <a :href="tbl.publicUrl" target="_blank" class="t-action-btn" title="Abrir Menu do Cliente">
-            <ExternalLink :size="16" />
-            <span>Menu</span>
+          <a :href="tbl.publicUrl" target="_blank" class="t-action-btn" title="Menu Público">
+            <ExternalLink :size="15" />
           </a>
 
-          <button class="t-icon-btn" title="Editar Mesa" @click="openEditModal(tbl)">
-            <Edit2 :size="14" />
-          </button>
-
-          <button class="t-icon-btn danger" title="Remover Mesa" @click="handleDeleteTable(tbl.id)">
-            <Trash2 :size="14" />
-          </button>
+          <select
+            :value="tbl.status"
+            class="status-select-sm"
+            @change="handleQuickStatusChange(tbl, ($event.target as HTMLSelectElement).value as TableStatus)"
+          >
+            <option value="free">Livre</option>
+            <option value="occupied">Ocupada</option>
+            <option value="has_order">Com Pedido</option>
+            <option value="waiting_service">Garçom</option>
+            <option value="waiting_bill">Conta</option>
+            <option value="unavailable">Indisponível</option>
+          </select>
         </div>
       </div>
     </div>
@@ -241,12 +486,12 @@ const printDisplay = () => {
             <th>Área</th>
             <th>Lotação</th>
             <th>Estado Atual</th>
-            <th>Acesso Digital</th>
-            <th class="text-right">Ações</th>
+            <th>Responsável</th>
+            <th>Ações</th>
           </tr>
         </thead>
         <tbody>
-          <tr v-for="tbl in tableStore.tables" :key="tbl.id">
+          <tr v-for="tbl in filteredTables" :key="tbl.id">
             <td><strong>Mesa {{ tbl.number }}</strong></td>
             <td>{{ tbl.name }}</td>
             <td>{{ tbl.area }}</td>
@@ -256,28 +501,27 @@ const printDisplay = () => {
                 :variant="
                   tbl.status === 'free' ? 'success' :
                   tbl.status === 'occupied' ? 'primary' :
-                  tbl.status === 'has_order' ? 'warning' : 'neutral'
+                  tbl.status === 'has_order' ? 'warning' :
+                  tbl.status === 'waiting_bill' ? 'danger' :
+                  tbl.status === 'waiting_service' ? 'danger' : 'neutral'
                 "
               >
-                {{ tbl.status }}
+                {{ tbl.status.toUpperCase() }}
               </AppBadge>
             </td>
             <td>
-              <button class="link-btn" @click="openQrModal(tbl)">
-                <QrCode :size="14" />
-                <span>Ver QR Code</span>
-              </button>
+              <span v-if="tbl.activeCustomerName" class="font-bold text-primary">
+                {{ tbl.activeCustomerName }}
+              </span>
+              <span v-else class="text-muted">—</span>
             </td>
-            <td class="text-right">
-              <div class="row-btns">
-                <a :href="tbl.publicUrl" target="_blank" class="icon-link" title="Testar Menu">
-                  <ExternalLink :size="15" />
-                </a>
-                <button class="icon-link" title="Editar" @click="openEditModal(tbl)">
-                  <Edit2 :size="15" />
-                </button>
-                <button class="icon-link danger" title="Eliminar" @click="handleDeleteTable(tbl.id)">
-                  <Trash2 :size="15" />
+            <td>
+              <div class="row-actions">
+                <AppButton variant="secondary" size="sm" @click="openTableDetail(tbl)">
+                  Gerir Mesa
+                </AppButton>
+                <button type="button" class="icon-btn-plain" title="QR Code" @click="openQrModal(tbl)">
+                  <QrCode :size="16" />
                 </button>
               </div>
             </td>
@@ -286,80 +530,66 @@ const printDisplay = () => {
       </table>
     </div>
 
-    <!-- Create / Edit Table Modal -->
+    <!-- Table Detail / Active Session Modal -->
+    <TableDetailModal
+      :is-open="isDetailModalOpen"
+      :table="activeDetailTable"
+      :session="activeDetailSession"
+      :orders="activeDetailOrders"
+      :requests="activeDetailRequests"
+      :is-submitting="isClosingSession"
+      @close="isDetailModalOpen = false"
+      @update-order-status="handleUpdateOrderStatus"
+      @update-request-status="handleUpdateRequestStatus"
+      @register-payment="handleRegisterPayment"
+      @close-session="handleCloseSession"
+    />
+
+    <!-- Add/Edit Table Modal -->
     <AppModal
       :is-open="isEditModalOpen"
-      :title="formId ? 'Editar Mesa' : 'Adicionar Nova Mesa'"
+      :title="formId ? 'Editar Mesa' : 'Nova Mesa'"
       @close="isEditModalOpen = false"
     >
-      <form class="modal-form" @submit.prevent="handleSaveTable">
-        <div class="form-row">
-          <AppInput
-            v-model="formNumber"
-            label="Número da Mesa"
-            placeholder="Ex: 01, 02, M1..."
-            required
-          />
-          <AppInput
-            v-model="formCapacity"
-            label="Capacidade (Pessoas)"
-            type="number"
-            required
-          />
+      <div class="form-container">
+        <div class="form-group">
+          <label for="formTableNum" class="input-label">Número da Mesa *</label>
+          <input id="formTableNum" v-model="formNumber" type="text" placeholder="Ex: 09" class="form-input" />
         </div>
-
-        <AppInput
-          v-model="formName"
-          label="Nome / Descrição da Mesa (Opcional)"
-          placeholder="Ex: Mesa Janela Vista Jardim"
-        />
-
-        <AppSelect
-          v-model="formArea"
-          label="Área do Restaurante"
-          :options="areaOptions"
-          required
-        />
-      </form>
-
+        <div class="form-group">
+          <label for="formTableName" class="input-label">Nome / Identificador</label>
+          <input id="formTableName" v-model="formName" type="text" placeholder="Ex: Mesa Janela" class="form-input" />
+        </div>
+        <div class="form-group">
+          <label for="formTableArea" class="input-label">Área / Espaço</label>
+          <select id="formTableArea" v-model="formArea" class="form-input">
+            <option v-for="a in areaOptions" :key="a" :value="a">{{ a }}</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="formTableCap" class="input-label">Capacidade (Pessoas)</label>
+          <input id="formTableCap" v-model="formCapacity" type="number" min="1" max="20" class="form-input" />
+        </div>
+      </div>
       <template #footer>
         <AppButton variant="secondary" @click="isEditModalOpen = false">Cancelar</AppButton>
         <AppButton variant="primary" @click="handleSaveTable">Guardar Mesa</AppButton>
       </template>
     </AppModal>
 
-    <!-- QR Code Modal Local Generation -->
+    <!-- QR Code Modal -->
     <AppModal
       :is-open="isQrModalOpen"
-      :title="`Código QR — Mesa ${selectedTable?.number}`"
-      :subtitle="selectedTable?.name || tenantStore.currentRestaurant?.name"
-      maxWidth="420px"
+      :title="`QR Code — Mesa ${selectedTableForQr?.number}`"
       @close="isQrModalOpen = false"
     >
-      <div v-if="selectedTable" class="qr-modal-content">
-        <div class="qr-frame">
-          <img v-if="generatedQrDataUrl" :src="generatedQrDataUrl" alt="QR Code Mesa" class="qr-image" />
-          <div class="qr-branding">
-            <strong>TapMenu</strong> • Aproxime a Câmara
-          </div>
-        </div>
-
-        <div class="qr-url-box">
-          <span class="url-text">{{ originUrl }}{{ selectedTable.publicUrl }}</span>
-          <button class="copy-btn" title="Copiar Link" @click="copyUrl(selectedTable)">
-            <Copy :size="15" />
-          </button>
-        </div>
-
-        <div class="qr-modal-actions">
-          <AppButton variant="outline" class="w-full" @click="printDisplay">
-            <template #icon-left>
-              <Printer :size="16" />
-            </template>
-            Imprimir Display de Mesa
-          </AppButton>
-        </div>
+      <div v-if="selectedTableForQr" class="qr-modal-content">
+        <img :src="generatedQrDataUrl" alt="QR Code" class="qr-image" />
+        <p class="qr-url-text">{{ `${originUrl}${selectedTableForQr.publicUrl}` }}</p>
       </div>
+      <template #footer>
+        <AppButton variant="secondary" @click="isQrModalOpen = false">Fechar</AppButton>
+      </template>
     </AppModal>
   </div>
 </template>
@@ -380,12 +610,14 @@ const printDisplay = () => {
 }
 
 .page-title {
-  font-size: 1.75rem;
+  margin: 0;
+  font-size: 1.5rem;
   font-weight: 800;
-  color: var(--color-neutral-900);
+  color: var(--text-main);
 }
 
 .page-subtitle {
+  margin: 0.25rem 0 0 0;
   font-size: 0.875rem;
   color: var(--text-muted);
 }
@@ -398,54 +630,153 @@ const printDisplay = () => {
 
 .view-toggle {
   display: flex;
-  background: var(--color-neutral-100);
-  border: 1px solid var(--border-subtle);
+  background-color: #f1f5f9;
   border-radius: var(--radius-md);
-  padding: 0.2rem;
+  padding: 0.25rem;
+  border: 1px solid var(--border-color);
 }
 
 .toggle-btn {
-  display: inline-flex;
+  display: flex;
   align-items: center;
   gap: 0.35rem;
-  background: transparent;
+  padding: 0.35rem 0.75rem;
   border: none;
-  font-size: 0.75rem;
+  background: none;
+  font-size: 0.8125rem;
   font-weight: 600;
-  color: var(--color-neutral-600);
-  padding: 0.35rem 0.65rem;
+  color: var(--text-muted);
   border-radius: var(--radius-sm);
   cursor: pointer;
 }
 
 .toggle-btn.is-active {
-  background: #ffffff;
-  color: var(--color-primary-800);
-  box-shadow: var(--shadow-xs);
+  background-color: #ffffff;
+  color: var(--text-main);
+  box-shadow: var(--shadow-sm);
 }
 
-/* Grid */
+/* Metrics Grid */
+.metrics-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: 0.75rem;
+}
+
+.metric-card {
+  background-color: #ffffff;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  padding: 0.875rem 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.metric-card:hover,
+.metric-card.is-active {
+  border-color: var(--color-primary-600);
+  box-shadow: 0 0 0 2px rgba(30, 64, 175, 0.12);
+  transform: translateY(-1px);
+}
+
+.metric-card .m-val {
+  font-size: 1.5rem;
+  font-weight: 800;
+  font-family: var(--font-heading);
+  color: var(--text-main);
+}
+
+.metric-card .m-lbl {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+}
+
+.metric-card.success .m-val { color: var(--color-success-600); }
+.metric-card.primary .m-val { color: var(--color-primary-800); }
+.metric-card.warning .m-val { color: var(--color-warning-600); }
+.metric-card.danger .m-val { color: var(--color-danger-600); }
+.metric-card.amber .m-val { color: #d97706; }
+
+/* Filter Controls */
+.filter-controls-bar {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+  background-color: #ffffff;
+  padding: 0.875rem 1.25rem;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border-color);
+  flex-wrap: wrap;
+}
+
+.filter-group {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.filter-label {
+  font-size: 0.8125rem;
+  font-weight: 700;
+  color: var(--text-main);
+}
+
+.filter-select {
+  padding: 0.4rem 0.75rem;
+  border: 1.5px solid var(--border-color);
+  border-radius: var(--radius-md);
+  font-size: 0.8125rem;
+  outline: none;
+  background-color: #f8fafc;
+}
+
+/* Tables Grid */
 .tables-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
-  gap: 1.25rem;
+  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  gap: 1rem;
 }
 
 .table-card {
-  background: #ffffff;
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-lg);
-  padding: 1.25rem;
-  box-shadow: var(--shadow-sm);
+  background-color: #ffffff;
+  border: 1.5px solid var(--border-color);
+  border-radius: var(--radius-xl);
+  padding: 1.125rem;
   display: flex;
   flex-direction: column;
   gap: 0.875rem;
-  transition: transform var(--transition-fast), box-shadow var(--transition-fast);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  box-shadow: var(--shadow-sm);
 }
 
 .table-card:hover {
   transform: translateY(-2px);
   box-shadow: var(--shadow-md);
+  border-color: var(--color-primary-400);
+}
+
+.table-card.status-occupied {
+  border-left: 4px solid var(--color-primary-600);
+}
+
+.table-card.status-has_order {
+  border-left: 4px solid var(--color-warning-500);
+}
+
+.table-card.status-waiting_service {
+  border-left: 4px solid var(--color-danger-500);
+  background: linear-gradient(180deg, #ffffff 0%, #fef2f2 100%);
+}
+
+.table-card.status-waiting_bill {
+  border-left: 4px solid #d97706;
+  background: linear-gradient(180deg, #ffffff 0%, #fffbeb 100%);
 }
 
 .card-top {
@@ -457,7 +788,7 @@ const printDisplay = () => {
 .table-number-box {
   display: flex;
   align-items: baseline;
-  gap: 0.25rem;
+  gap: 0.35rem;
 }
 
 .t-prefix {
@@ -467,23 +798,22 @@ const printDisplay = () => {
 }
 
 .t-num {
-  font-size: 1.5rem;
+  font-size: 1.35rem;
   font-weight: 800;
   font-family: var(--font-heading);
-  color: var(--color-neutral-900);
-  line-height: 1;
+  color: var(--text-main);
 }
 
 .table-info {
   display: flex;
   flex-direction: column;
-  gap: 0.25rem;
+  gap: 0.125rem;
 }
 
 .t-name {
   font-size: 0.9375rem;
-  font-weight: 600;
-  color: var(--color-neutral-800);
+  font-weight: 700;
+  color: var(--text-main);
 }
 
 .t-meta {
@@ -492,212 +822,187 @@ const printDisplay = () => {
 }
 
 .inline-icon {
+  display: inline;
   vertical-align: middle;
 }
 
-.quick-status-row {
-  margin-top: 0.25rem;
+.table-occupant-box {
+  background-color: #f1f5f9;
+  border-radius: var(--radius-md);
+  padding: 0.5rem 0.65rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
 }
 
-.status-select {
-  width: 100%;
-  padding: 0.35rem 0.5rem;
-  font-size: 0.75rem;
-  font-weight: 600;
-  border: 1px solid var(--border-medium);
-  border-radius: var(--radius-sm);
-  background: var(--color-neutral-50);
-  outline: none;
-  cursor: pointer;
-}
-
-.table-actions-row {
+.occupant-line {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
-  padding-top: 0.75rem;
-  border-top: 1px solid var(--border-subtle);
-}
-
-.t-action-btn {
-  flex: 1;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
   gap: 0.35rem;
-  padding: 0.45rem 0.5rem;
-  background: var(--color-neutral-50);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-sm);
-  font-size: 0.75rem;
-  font-weight: 600;
-  color: var(--color-neutral-700);
-  text-decoration: none;
-  cursor: pointer;
-  transition: all var(--transition-fast);
+  font-size: 0.8125rem;
 }
 
-.t-action-btn:hover {
-  background: var(--color-primary-50);
-  border-color: var(--color-primary-200);
+.occ-label {
+  color: var(--text-muted);
+  font-size: 0.75rem;
+}
+
+.occ-name {
   color: var(--color-primary-800);
 }
 
-.t-icon-btn {
-  width: 28px;
-  height: 28px;
+.occupant-timing {
+  font-size: 0.6875rem;
+  color: var(--text-muted);
+}
+
+.pending-alert-badge {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  background-color: var(--color-danger-50);
+  border: 1px solid var(--color-danger-200);
+  color: var(--color-danger-700);
+  font-size: 0.6875rem;
+  font-weight: 700;
+  padding: 0.25rem 0.5rem;
   border-radius: var(--radius-sm);
-  background: var(--color-neutral-50);
-  border: 1px solid var(--border-subtle);
+}
+
+.ring-icon {
+  animation: shake 1s infinite ease-in-out;
+}
+
+@keyframes shake {
+  0%, 100% { transform: rotate(0); }
+  25% { transform: rotate(-10deg); }
+  75% { transform: rotate(10deg); }
+}
+
+.table-card-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin-top: auto;
+  padding-top: 0.5rem;
+  border-top: 1px solid var(--border-color);
+}
+
+.detail-btn {
+  flex: 1;
+}
+
+.t-action-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-color);
+  background-color: #ffffff;
   display: flex;
   align-items: center;
   justify-content: center;
+  color: var(--text-main);
   cursor: pointer;
-  color: var(--color-neutral-600);
 }
 
-.t-icon-btn:hover {
-  background: var(--color-neutral-200);
+.t-action-btn:hover {
+  background-color: var(--color-slate-100);
 }
 
-.t-icon-btn.danger:hover {
-  background: var(--color-danger-50);
-  color: var(--color-danger-600);
+.status-select-sm {
+  font-size: 0.6875rem;
+  padding: 0.25rem;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  background-color: #ffffff;
+  max-width: 80px;
 }
 
-/* Table View */
-.table-view-card {
-  padding: 0;
-  overflow: hidden;
-}
-
+/* Data Table */
 .data-table {
   width: 100%;
   border-collapse: collapse;
+}
+
+.data-table th,
+.data-table td {
+  padding: 0.875rem 1rem;
   text-align: left;
+  border-bottom: 1px solid var(--border-color);
   font-size: 0.875rem;
 }
 
 .data-table th {
-  background: var(--color-neutral-50);
-  padding: 0.75rem 1rem;
-  font-size: 0.75rem;
+  background-color: #f8fafc;
   font-weight: 700;
-  color: var(--color-neutral-600);
-  border-bottom: 1px solid var(--border-medium);
+  color: var(--text-muted);
 }
 
-.data-table td {
-  padding: 0.875rem 1rem;
-  border-bottom: 1px solid var(--border-subtle);
-}
-
-.link-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.35rem;
-  background: transparent;
-  border: none;
-  color: var(--color-primary-700);
-  font-weight: 600;
-  font-size: 0.8125rem;
-  cursor: pointer;
-}
-
-.row-btns {
+.row-actions {
   display: flex;
-  justify-content: flex-end;
+  align-items: center;
   gap: 0.5rem;
 }
 
-.icon-link {
-  color: var(--color-neutral-600);
-  padding: 0.25rem;
+.icon-btn-plain {
+  border: none;
+  background: none;
+  cursor: pointer;
+  color: var(--text-muted);
 }
 
-.icon-link:hover {
-  color: var(--color-primary-800);
+.icon-btn-plain:hover {
+  color: var(--text-main);
 }
 
-.icon-link.danger:hover {
-  color: var(--color-danger-600);
-}
-
-.text-right {
-  text-align: right;
-}
-
-/* Modal Form */
-.modal-form {
+.form-container {
   display: flex;
   flex-direction: column;
   gap: 1rem;
 }
 
-.form-row {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 1rem;
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
 }
 
-/* QR Modal */
+.input-label {
+  font-size: 0.8125rem;
+  font-weight: 700;
+}
+
+.form-input {
+  width: 100%;
+  padding: 0.65rem 0.875rem;
+  border: 1.5px solid var(--border-color);
+  border-radius: var(--radius-md);
+  font-size: 0.875rem;
+  outline: none;
+}
+
 .qr-modal-content {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 1.25rem;
-}
-
-.qr-frame {
-  background: #ffffff;
-  border: 1px solid var(--border-medium);
-  border-radius: var(--radius-xl);
-  padding: 1.5rem;
+  gap: 1rem;
   text-align: center;
-  box-shadow: var(--shadow-sm);
 }
 
 .qr-image {
-  width: 240px;
-  height: 240px;
-  display: block;
-  margin: 0 auto 0.75rem;
-}
-
-.qr-branding {
-  font-size: 0.8125rem;
-  color: var(--text-muted);
-}
-
-.qr-url-box {
-  width: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  background: var(--color-neutral-50);
-  border: 1px solid var(--border-medium);
+  width: 220px;
+  height: 220px;
+  border: 1px solid var(--border-color);
   border-radius: var(--radius-md);
-  padding: 0.5rem 0.75rem;
 }
 
-.url-text {
+.qr-url-text {
   font-size: 0.75rem;
-  font-family: monospace;
-  color: var(--color-neutral-700);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  color: var(--text-muted);
+  word-break: break-all;
 }
 
-.copy-btn {
-  background: transparent;
-  border: none;
-  color: var(--color-primary-800);
-  cursor: pointer;
-  padding: 0.25rem;
-}
-
-.qr-modal-actions {
-  width: 100%;
+.originUrl {
+  font-size: 0.75rem;
 }
 </style>

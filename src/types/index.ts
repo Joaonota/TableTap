@@ -85,8 +85,32 @@ export interface Table {
   qrCodeUrl?: string
   nfcTagId?: string
   activeOrderId?: string
+  activeSessionId?: string
+  activeCustomerName?: string
+  partySize?: number
+  sessionStartedAt?: string
   lastActivityAt?: string
   isActive: boolean
+}
+
+export type TableSessionStatus =
+  | 'active'
+  | 'awaiting_bill'
+  | 'closing'
+  | 'closed'
+
+export interface TableSession {
+  id: string
+  tenantId: string
+  restaurantId: string
+  tableId: string
+  customerName: string
+  partySize?: number
+  status: TableSessionStatus
+  startedAt: string
+  closedAt?: string
+  notes?: string
+  orderIds: string[]
 }
 
 export type TableStatus =
@@ -227,6 +251,8 @@ export interface Order {
   restaurantId: string
   tableId?: string
   tableNumber?: string
+  tableSessionId?: string
+  isAdditional?: boolean
   orderCode: string // e.g. #ORD-1042
   type: OrderType
   status: OrderStatus
@@ -280,13 +306,40 @@ export interface ServiceRequest {
   restaurantId: string
   tableId: string
   tableNumber: string
+  tableSessionId?: string
+  customerName?: string
   type: ServiceRequestType
   status: ServiceRequestStatus
   notes?: string
+  assignedTo?: string
   assignedToUserId?: string
   assignedToName?: string
   createdAt: string
   resolvedAt?: string
+}
+
+export type NotificationType =
+  | 'table_occupied'
+  | 'new_order'
+  | 'additional_order'
+  | 'waiter_call'
+  | 'bill_requested'
+  | 'service_request'
+
+export interface Notification {
+  id: string
+  tenantId: string
+  restaurantId: string
+  type: NotificationType
+  title: string
+  message: string
+  tableId?: string
+  tableNumber?: string
+  tableSessionId?: string
+  orderId?: string
+  serviceRequestId?: string
+  createdAt: string
+  readAt?: string
 }
 
 export interface StaffMember {

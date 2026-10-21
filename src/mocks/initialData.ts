@@ -3,6 +3,8 @@ import type {
   Restaurant,
   User,
   Table,
+  TableSession,
+  Notification,
   Category,
   Product,
   Order,
@@ -19,6 +21,8 @@ export interface MockDatabase {
   restaurants: Restaurant[]
   users: User[]
   tables: Table[]
+  tableSessions: TableSession[]
+  notifications: Notification[]
   categories: Category[]
   products: Product[]
   orders: Order[]
@@ -337,6 +341,10 @@ export const initialTables: Table[] = [
     publicUrl: '/menu/sabores-maputo/01',
     nfcTagId: 'NFC-SMP-01',
     activeOrderId: 'ord-101',
+    activeSessionId: 'sess-101',
+    activeCustomerName: 'João Cossa',
+    partySize: 2,
+    sessionStartedAt: '2026-10-16T11:00:00Z',
     lastActivityAt: '2026-10-16T11:20:00Z',
     isActive: true
   },
@@ -352,6 +360,10 @@ export const initialTables: Table[] = [
     publicUrl: '/menu/sabores-maputo/02',
     nfcTagId: 'NFC-SMP-02',
     activeOrderId: 'ord-102',
+    activeSessionId: 'sess-102',
+    activeCustomerName: 'Dra. Marta Chissano',
+    partySize: 2,
+    sessionStartedAt: '2026-10-16T11:20:00Z',
     lastActivityAt: '2026-10-16T11:32:00Z',
     isActive: true
   },
@@ -381,6 +393,10 @@ export const initialTables: Table[] = [
     publicUrl: '/menu/sabores-maputo/04',
     nfcTagId: 'NFC-SMP-04',
     activeOrderId: 'ord-104',
+    activeSessionId: 'sess-104',
+    activeCustomerName: 'Paulo Tembe',
+    partySize: 4,
+    sessionStartedAt: '2026-10-16T10:40:00Z',
     lastActivityAt: '2026-10-16T11:15:00Z',
     isActive: true
   },
@@ -1683,3 +1699,85 @@ export const initialDigitalAccessList: DigitalAccess[] = [
     updatedAt: '2024-01-17T09:00:00Z'
   }
 ]
+
+export const initialTableSessions: TableSession[] = [
+  {
+    id: 'sess-101',
+    tenantId: 'tenant-1',
+    restaurantId: 'rest-1',
+    tableId: 'tbl-1',
+    customerName: 'João Cossa',
+    partySize: 2,
+    status: 'active',
+    startedAt: '2026-10-16T11:00:00Z',
+    notes: 'Mesa de aniversário',
+    orderIds: ['ord-101']
+  },
+  {
+    id: 'sess-102',
+    tenantId: 'tenant-1',
+    restaurantId: 'rest-1',
+    tableId: 'tbl-2',
+    customerName: 'Dra. Marta Chissano',
+    partySize: 2,
+    status: 'active',
+    startedAt: '2026-10-16T11:20:00Z',
+    notes: 'Almoço de negócios',
+    orderIds: ['ord-102']
+  },
+  {
+    id: 'sess-104',
+    tenantId: 'tenant-1',
+    restaurantId: 'rest-1',
+    tableId: 'tbl-4',
+    customerName: 'Paulo Tembe',
+    partySize: 4,
+    status: 'awaiting_bill',
+    startedAt: '2026-10-16T10:40:00Z',
+    orderIds: ['ord-104']
+  }
+]
+
+export const initialNotifications: Notification[] = [
+  {
+    id: 'notif-1',
+    tenantId: 'tenant-1',
+    restaurantId: 'rest-1',
+    type: 'table_occupied',
+    title: 'Nova mesa ocupada',
+    message: 'Mesa 01 ocupada por João Cossa (2 pessoas)',
+    tableId: 'tbl-1',
+    tableNumber: '01',
+    tableSessionId: 'sess-101',
+    createdAt: '2026-10-16T11:00:00Z',
+    readAt: '2026-10-16T11:05:00Z'
+  },
+  {
+    id: 'notif-2',
+    tenantId: 'tenant-1',
+    restaurantId: 'rest-1',
+    type: 'new_order',
+    title: 'Novo pedido recebido',
+    message: 'Pedido #ORD-101 na Mesa 01 (João Cossa) - 3 itens - 1.480 MT',
+    tableId: 'tbl-1',
+    tableNumber: '01',
+    tableSessionId: 'sess-101',
+    orderId: 'ord-101',
+    createdAt: '2026-10-16T11:10:00Z',
+    readAt: '2026-10-16T11:12:00Z'
+  },
+  {
+    id: 'notif-3',
+    tenantId: 'tenant-1',
+    restaurantId: 'rest-1',
+    type: 'bill_requested',
+    title: 'Pedido de Conta',
+    message: 'Mesa 04 (Paulo Tembe) solicitou a conta - Total: 3.250 MT',
+    tableId: 'tbl-4',
+    tableNumber: '04',
+    tableSessionId: 'sess-104',
+    orderId: 'ord-104',
+    createdAt: '2026-10-16T11:15:00Z'
+  }
+]
+

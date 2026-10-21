@@ -11,13 +11,17 @@ import type {
   IPaymentRepository,
   IServiceRequestRepository,
   IStaffRepository,
-  ISubscriptionRepository
+  ISubscriptionRepository,
+  ITableSessionRepository,
+  INotificationRepository
 } from '../interfaces'
 import type {
   Company,
   Restaurant,
   User,
   Table,
+  TableSession,
+  Notification,
   Category,
   Product,
   Order,
@@ -539,3 +543,141 @@ export class MockSubscriptionRepository implements ISubscriptionRepository {
     return { ...db.subscriptions[index] }
   }
 }
+
+export class MockTableSessionRepository implements ITableSessionRepository {
+  async getByRestaurant(restaurantId: string): Promise<TableSession[]> {
+    return mockStorage.getDb().tableSessions.filter(s => s.restaurantId === restaurantId)
+  }
+
+  async getActiveByTable(tableId: string): Promise<TableSession | null> {
+    const active = mockStorage.getDb().tableSessions.find(
+      s => s.tableId === tableId && (s.status === 'active' || s.status === 'awaiting_bill' || s.status === 'closing')
+    )
+    return active ? { ...active } : null
+  }
+
+  async getById(id: string): Promise<TableSession | null> {
+    const item = mockStorage.getDb().tableSessions.find(s => s.id === id)
+    return item ? { ...item } : null
+  }
+
+  async create(session: Omit<TableSession, 'id' | 'startedAt' | 'orderIds'>): Promise<TableSession> {
+    const newSession: TableSession = {
+      ...session,
+      id: `sess-${Date.now()}`,
+      startedAt: new Date().toISOString(),
+      orderIds: []
+    }
+    const db = mockStorage.getDb()
+    db.tableSessions.unshift(newSession)
+
+    // Update table status and references
+    const tblIndex = db.tables.findIndex(t => t.id === session.tableId)
+    if (tblIndex !== -1) {
+      db.tables[tblIndex] = {
+        ...db.tables[tblIndex],
+        status: 'occupied',
+        activeSessionId: newSession.id,
+        activeCustomerName: newSession.customerName,
+        partySize: newSession.partySize,
+        sessionStartedAt: newSession.startedAt
+      }
+    }
+    mockStorage.commit()
+    return newSession
+  }
+
+  async update(id: string, updates: Partial<TableSession>): Promise<TableSession> {
+    const db = mockStorage.getDb()
+    const index = db.tableSessions.findIndex(s => s.id === id)
+    if (index === -1) throw new Error(`Sessão ${id} não encontrada`)
+    db.tableSessions[index] = { ...db.tableSessions[index], ...updates }
+    mockStorage.commit()
+    return { ...db.tableSessions[index] }
+  }
+
+  async addOrder(sessionId: string, orderId: string): Promise<TableSession> {
+    const db = mockStorage.getDb()
+    const index = db.tableSessions.findIndex(s => s.id === sessionId)
+    if (index === -1) throw new Error(`Sessão ${sessionId} não encontrada`)
+    if (!db.tableSessions[index].orderIds.includes(orderId)) {
+      db.tableSessions[index].orderIds.push(orderId)
+    }
+    // Update table status to has_order if active
+    const tableId = db.tableSessions[index].tableId
+    const tblIndex = db.tables.findIndex(t => t.id === tableId)
+    if (tblIndex !== -1 && db.tables[tblIndex].status === 'occupied') {
+      db.tables[tblIndex].status = 'has_order'
+      db.tables[tblIndex].activeOrderId = orderId
+    }
+    mockStorage.commit()
+    return { ...db.tableSessions[index] }
+  }
+
+  async closeSession(sessionId: string): Promise<TableSession> {
+    const db = mockStorage.getDb()
+    const index = db.tableSessions.findIndex(s => s.id === sessionId)
+    if (index === -1) throw new Error(`Sessão ${sessionId} não encontrada`)
+    
+    const closed: TableSession = {
+      ...db.tableSessions[index],
+      status: 'closed',
+      closedAt: new Date().toISOString()
+    }
+    db.tableSessions[index] = closed
+
+    // Free the table
+    const tblIndex = db.tables.findIndex(t => t.id === closed.tableId)
+    if (tblIndex !== -1) {
+      db.tables[tblIndex] = {
+        ...db.tables[tblIndex],
+        status: 'free',
+        activeSessionId: undefined,
+        activeCustomerName: undefined,
+        activeOrderId: undefined,
+        partySize: undefined,
+        sessionStartedAt: undefined
+      }
+    }
+    mockStorage.commit()
+    return { ...closed }
+  }
+}
+
+export class MockNotificationRepository implements INotificationRepository {
+  async getByRestaurant(restaurantId: string): Promise<Notification[]> {
+    return mockStorage.getDb().notifications.filter(n => n.restaurantId === restaurantId)
+  }
+
+  async create(notification: Omit<Notification, 'id' | 'createdAt'>): Promise<Notification> {
+    const newNotif: Notification = {
+      ...notification,
+      id: `notif-${Date.now()}-${Math.random().toString(36).substring(2, 5)}`,
+      createdAt: new Date().toISOString()
+    }
+    mockStorage.getDb().notifications.unshift(newNotif)
+    mockStorage.commit()
+    return newNotif
+  }
+
+  async markAsRead(id: string): Promise<Notification> {
+    const db = mockStorage.getDb()
+    const index = db.notifications.findIndex(n => n.id === id)
+    if (index === -1) throw new Error(`Notificação ${id} não encontrada`)
+    db.notifications[index].readAt = new Date().toISOString()
+    mockStorage.commit()
+    return { ...db.notifications[index] }
+  }
+
+  async markAllAsRead(restaurantId: string): Promise<void> {
+    const db = mockStorage.getDb()
+    const now = new Date().toISOString()
+    db.notifications.forEach(n => {
+      if (n.restaurantId === restaurantId && !n.readAt) {
+        n.readAt = now
+      }
+    })
+    mockStorage.commit()
+  }
+}
+
