@@ -417,6 +417,7 @@ export type NfcTimelineEventType =
   | 'write_completed'
   | 'verified'
   | 'locked'
+  | 'unlocked'
   | 'write_rejected'
 
 export interface NfcTimelineEvent {

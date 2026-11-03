@@ -688,6 +688,38 @@ export const useNfcStore = defineStore('nfc', () => {
     return { success: true, tag: target }
   }
 
+  // Simulation: Unlock/Unprotect NFC Tag for future modifications
+  const unlockTag = (tagId: string, actor: string = 'Administrador TapMenu'): { success: boolean; tag?: NfcTag; message?: string } => {
+    const target = getTagById(tagId)
+    if (!target) {
+      return { success: false, message: 'Etiqueta não encontrada' }
+    }
+
+    if (!target.isLocked) {
+      return { success: true, tag: target, message: 'A etiqueta já se encontra desprotegida.' }
+    }
+
+    const now = new Date().toISOString()
+    target.isLocked = false
+    target.status = target.writtenAt ? 'programmed' : 'unprogrammed'
+    target.lockedAt = undefined
+
+    // Add unlocking event to timeline
+    target.timeline.unshift({
+      id: `evt-${Date.now()}-unlock`,
+      tagId: target.id,
+      type: 'unlocked',
+      title: 'Etiqueta desprotegida',
+      description: 'Proteção de escrita removida com autorização de administrador (PWD AUTH). Modo Read/Write reativado para futuras alterações.',
+      timestamp: now,
+      actor
+    })
+
+    saveToStorage()
+    toastStore.success('Etiqueta Desprotegida!', `A Mesa ${target.tableNumber} pode agora ser regravada ou editada.`)
+    return { success: true, tag: target }
+  }
+
   // Record a refused modification attempt on a locked tag
   const recordRefusedModification = (tagId: string, reason?: string, actor: string = 'Terminal de Serviço'): void => {
     const target = getTagById(tagId)
@@ -751,8 +783,10 @@ export const useNfcStore = defineStore('nfc', () => {
     getTagByTable,
     writeTag,
     lockTag,
+    unlockTag,
     recordRefusedModification,
     allTimelineEvents,
     metrics
   }
 })
+

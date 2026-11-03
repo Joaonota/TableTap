@@ -1,6 +1,6 @@
 <script setup lang="ts">
 interface Props {
-  variant?: 'primary' | 'secondary' | 'success' | 'danger' | 'outline' | 'ghost'
+  variant?: 'primary' | 'secondary' | 'success' | 'warning' | 'danger' | 'outline' | 'ghost'
   size?: 'sm' | 'md' | 'lg'
   disabled?: boolean
   loading?: boolean
@@ -103,6 +103,16 @@ defineEmits<{
 }
 .app-btn--success:hover:not(:disabled) {
   background-color: var(--color-success-700);
+  transform: translateY(-1px);
+}
+
+.app-btn--warning {
+  background-color: #f59e0b;
+  color: #ffffff;
+  box-shadow: 0 1px 2px rgba(245, 158, 11, 0.2);
+}
+.app-btn--warning:hover:not(:disabled) {
+  background-color: #d97706;
   transform: translateY(-1px);
 }
 
