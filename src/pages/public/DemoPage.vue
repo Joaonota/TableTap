@@ -243,8 +243,40 @@ import {
 }
 
 @media (max-width: 650px) {
-  .demo-step-row {
-    flex-direction: column;
+    .demo-steps-container,
+    .demo-step-row {
+      min-width: 0;
+    }
+
+    .demo-step-row {
+      flex-direction: column;
+    }
+
+    .demo-header {
+      margin-bottom: 2.5rem;
+    }
+
+    .demo-title {
+      font-size: 2rem;
+    }
+
+    .demo-subtitle {
+      font-size: 1rem;
+    }
+
+    .step-content-card {
+      padding: 1.25rem;
+      min-width: 0;
+      width: 100%;
+    }
+
+    .step-header {
+      flex-wrap: wrap;
+      gap: 0.5rem;
+    }
+
+    .step-actions {
+      flex-wrap: wrap;
+    }
   }
-}
-</style>
+  </style>

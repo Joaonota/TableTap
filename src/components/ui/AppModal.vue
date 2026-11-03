@@ -7,20 +7,28 @@ interface Props {
   title?: string
   subtitle?: string
   maxWidth?: string
+  preventClose?: boolean
 }
 
 const props = withDefaults(defineProps<Props>(), {
   isOpen: false,
-  maxWidth: '540px'
+  maxWidth: '540px',
+  preventClose: false
 })
 
 const emit = defineEmits<{
   (e: 'close'): void
 }>()
 
+const requestClose = () => {
+  if (!props.preventClose) {
+    emit('close')
+  }
+}
+
 const handleKeydown = (e: KeyboardEvent) => {
   if (e.key === 'Escape' && props.isOpen) {
-    emit('close')
+    requestClose()
   }
 }
 
@@ -31,14 +39,19 @@ onUnmounted(() => window.removeEventListener('keydown', handleKeydown))
 <template>
   <Teleport to="body">
     <Transition name="modal-fade">
-      <div v-if="isOpen" class="modal-backdrop" @click.self="$emit('close')">
+      <div v-if="isOpen" class="modal-backdrop" @click.self="requestClose">
         <div class="modal-dialog" :style="{ maxWidth: maxWidth }">
           <div v-if="title || $slots.header" class="modal-header">
             <div>
               <h3 class="modal-title">{{ title }}</h3>
               <p v-if="subtitle" class="modal-subtitle">{{ subtitle }}</p>
             </div>
-            <button class="modal-close-btn" aria-label="Fechar modal" @click="$emit('close')">
+            <button
+              v-if="!preventClose"
+              class="modal-close-btn"
+              aria-label="Fechar modal"
+              @click="requestClose"
+            >
               <X :size="20" />
             </button>
           </div>
@@ -71,6 +84,7 @@ onUnmounted(() => window.removeEventListener('keydown', handleKeydown))
 
 .modal-dialog {
   width: 100%;
+  min-width: 0;
   background: #ffffff;
   border-radius: var(--radius-xl);
   box-shadow: var(--shadow-xl);
@@ -94,6 +108,7 @@ onUnmounted(() => window.removeEventListener('keydown', handleKeydown))
   font-size: 1.125rem;
   font-weight: 700;
   color: var(--color-neutral-900);
+  overflow-wrap: anywhere;
 }
 
 .modal-subtitle {
@@ -122,6 +137,7 @@ onUnmounted(() => window.removeEventListener('keydown', handleKeydown))
 
 .modal-body {
   padding: 1.5rem;
+  min-width: 0;
   overflow-y: auto;
 }
 
@@ -133,6 +149,42 @@ onUnmounted(() => window.removeEventListener('keydown', handleKeydown))
   align-items: center;
   justify-content: flex-end;
   gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.modal-close-btn {
+  flex-shrink: 0;
+}
+
+@media (max-width: 480px) {
+  .modal-backdrop {
+    padding: 0.75rem;
+  }
+
+  .modal-dialog {
+    max-height: 92vh;
+    border-radius: var(--radius-lg);
+  }
+
+  .modal-header {
+    padding: 1rem;
+  }
+
+  .modal-body {
+    padding: 1rem;
+  }
+
+  .modal-footer {
+    padding: 0.875rem 1rem;
+    flex-direction: column-reverse;
+    align-items: stretch;
+  }
+
+  .modal-footer :deep(.app-btn) {
+    width: 100%;
+    white-space: normal;
+    line-height: 1.25;
+  }
 }
 
 /* Animations */

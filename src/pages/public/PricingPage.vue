@@ -110,11 +110,11 @@ onMounted(async () => {
 }
 
 .pricing-grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 2rem;
-  align-items: stretch;
-}
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 2rem;
+    align-items: stretch;
+  }
 
 .plan-card {
   background: #ffffff;
@@ -252,8 +252,34 @@ onMounted(async () => {
 }
 
 @media (max-width: 900px) {
-  .pricing-grid {
-    grid-template-columns: 1fr;
+    .pricing-grid {
+      grid-template-columns: minmax(0, 1fr);
+    }
+
+    .plan-card {
+      min-width: 0;
+    }
   }
-}
-</style>
+
+  @media (max-width: 600px) {
+    .pricing-page {
+      padding: 2.5rem 1rem 4rem;
+    }
+
+    .plan-card {
+      padding: 1.75rem 1.25rem;
+    }
+
+    .pricing-header {
+      margin-bottom: 2.5rem;
+    }
+
+    .pricing-title {
+      font-size: 2rem;
+    }
+
+    .pricing-subtitle {
+      font-size: 1rem;
+    }
+  }
+  </style>

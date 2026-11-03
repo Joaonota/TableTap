@@ -194,7 +194,7 @@ const handleDeleteCategory = async (id: string) => {
 
 .categories-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(min(280px, 100%), 1fr));
   gap: 1.25rem;
 }
 
@@ -294,5 +294,15 @@ const handleDeleteCategory = async (id: string) => {
   display: flex;
   flex-direction: column;
   gap: 1rem;
+}
+
+@media (max-width: 420px) {
+  .cat-cover {
+    height: 120px;
+  }
+
+  .cat-content {
+    padding: 0.875rem;
+  }
 }
 </style>

@@ -258,7 +258,7 @@ const handleAdvanceStatus = async (order: Order) => {
 /* Grid */
 .kds-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(min(320px, 100%), 1fr));
   gap: 1.25rem;
 }
 
@@ -465,5 +465,44 @@ const handleAdvanceStatus = async (order: Order) => {
 .empty-kds p {
   font-size: 0.9375rem;
   color: #9ca3af;
+}
+
+@media (max-width: 640px) {
+  .kds-toolbar {
+    align-items: stretch;
+    gap: 0.75rem;
+    padding: 0.75rem 0.875rem;
+  }
+
+  .station-filters {
+    flex-wrap: wrap;
+  }
+
+  .station-btn {
+    flex: 1 1 auto;
+    justify-content: center;
+    padding: 0.5rem 0.7rem;
+    font-size: 0.8125rem;
+  }
+
+  .kds-legend {
+    flex-wrap: wrap;
+    gap: 0.625rem;
+  }
+
+  .kds-grid {
+    gap: 0.875rem;
+  }
+
+  .ticket-header,
+  .ticket-body,
+  .ticket-footer {
+    padding: 0.875rem 1rem;
+  }
+
+  .empty-kds {
+    padding: 3.5rem 1rem;
+    margin: 1.5rem auto;
+  }
 }
 </style>

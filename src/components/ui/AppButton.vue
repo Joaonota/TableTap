@@ -145,4 +145,12 @@ defineEmits<{
 @keyframes spin {
   to { transform: rotate(360deg); }
 }
+
+@media (max-width: 480px) {
+  .app-btn {
+    white-space: normal;
+    line-height: 1.25;
+    max-width: 100%;
+  }
+}
 </style>

@@ -55,16 +55,17 @@ const toastStore = useToastStore()
   display: flex;
   flex-direction: column;
   position: relative;
-  padding-bottom: 5rem;
+  padding-bottom: calc(6.5rem + env(safe-area-inset-bottom, 0px));
 }
 
 .customer-main {
   flex: 1;
+  min-width: 0;
 }
 
 .floating-cart-bar {
   position: fixed;
-  bottom: 1rem;
+  bottom: calc(1rem + env(safe-area-inset-bottom, 0px));
   left: 1rem;
   right: 1rem;
   max-width: 500px;
@@ -147,5 +148,30 @@ const toastStore = useToastStore()
 .cart-slide-leave-to {
   opacity: 0;
   transform: translateY(2rem);
+}
+
+@media (max-width: 420px) {
+  .floating-cart-bar {
+    left: 0.75rem;
+    right: 0.75rem;
+  }
+
+  .cart-bar-inner {
+    padding: 0.75rem 0.875rem;
+    gap: 0.625rem;
+  }
+
+  .cart-bar-count {
+    font-size: 0.75rem;
+  }
+
+  .total-amount {
+    font-size: 1rem;
+  }
+
+  .view-order-btn {
+    padding: 0.6rem 0.9rem;
+    font-size: 0.8125rem;
+  }
 }
 </style>

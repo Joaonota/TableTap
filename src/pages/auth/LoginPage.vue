@@ -357,4 +357,28 @@ const handleForgotPassword = () => {
   flex-direction: column;
   gap: 1rem;
 }
+
+@media (max-width: 560px) {
+  .login-page {
+    padding: 1.5rem 1rem;
+  }
+
+  .login-card {
+    padding: 1.75rem 1.25rem;
+  }
+
+  .login-title {
+    font-size: 1.375rem;
+  }
+}
+
+@media (max-width: 400px) {
+  .profiles-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .login-page {
+    padding: 1rem 0.75rem;
+  }
+}
 </style>

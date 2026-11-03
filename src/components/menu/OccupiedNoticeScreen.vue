@@ -87,11 +87,25 @@ const emit = defineEmits<{
 
 <style scoped>
 .occupied-screen-wrapper {
-  min-height: calc(100vh - 4rem);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 1.5rem;
+    min-height: calc(100vh - 4rem);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1.5rem;
+  }
+
+@media (max-width: 480px) {
+  .occupied-screen-wrapper {
+    padding: 1rem;
+  }
+
+  .occupied-card {
+    padding: 1.5rem 1.25rem;
+  }
+
+  .card-title {
+    font-size: 1.25rem;
+  }
 }
 
 .occupied-card {

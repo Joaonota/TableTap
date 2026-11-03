@@ -301,6 +301,8 @@ const printSheet = () => window.print()
   display: flex;
   align-items: center;
   justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.75rem;
 }
 
 .page-title {
@@ -553,13 +555,22 @@ const printSheet = () => window.print()
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 0.5rem;
   width: 100%;
+  min-width: 0;
   background: var(--color-neutral-50);
   border: 1px solid var(--border-medium);
   border-radius: var(--radius-md);
   padding: 0.5rem 0.75rem;
   font-size: 0.75rem;
   font-family: monospace;
+}
+
+.modal-url-display span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .btn-copy-sm {
@@ -621,5 +632,58 @@ const printSheet = () => window.print()
   font-family: monospace;
   font-size: 0.75rem;
   overflow-x: auto;
+}
+
+.field-val {
+  word-break: break-word;
+}
+
+@media (max-width: 640px) {
+  .info-alert-card {
+    padding: 1rem;
+    gap: 0.75rem;
+  }
+
+  .card-header {
+    padding: 1rem;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+  }
+
+  .data-table {
+    min-width: 820px;
+  }
+
+  .history-item {
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+
+  .history-left {
+    min-width: 0;
+    flex: 1 1 200px;
+  }
+
+  .history-url {
+    word-break: break-all;
+  }
+}
+
+@media (max-width: 480px) {
+  .qr-render-frame {
+    padding: 1rem;
+    width: 100%;
+  }
+
+  .qr-canvas {
+    width: 100%;
+    max-width: 220px;
+    height: auto;
+    aspect-ratio: 1;
+  }
+
+  .nfc-history-card {
+    padding: 1rem;
+  }
 }
 </style>

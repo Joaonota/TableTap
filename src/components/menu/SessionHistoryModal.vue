@@ -332,4 +332,32 @@ const getStatusBadge = (status: Order['status']) => {
   font-weight: 800;
   color: var(--text-main);
 }
+
+@media (max-width: 480px) {
+  .history-summary-box {
+    padding: 1rem;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+
+  .order-card-header {
+    flex-wrap: wrap;
+    gap: 0.375rem;
+  }
+
+  .order-card-footer {
+    flex-wrap: wrap;
+    gap: 0.25rem;
+  }
+
+  .item-name {
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+
+  .item-price {
+    margin-left: auto;
+    white-space: nowrap;
+  }
+}
 </style>

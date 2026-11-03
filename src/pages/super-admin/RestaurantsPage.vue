@@ -37,7 +37,8 @@ const getCompanyName = (tenantId: string) => {
     </div>
 
     <div class="super-card table-card">
-      <table class="super-table">
+      <div class="table-scroll">
+        <table class="super-table">
         <thead>
           <tr>
             <th>Restaurante</th>
@@ -85,7 +86,8 @@ const getCompanyName = (tenantId: string) => {
             </td>
           </tr>
         </tbody>
-      </table>
+        </table>
+      </div>
     </div>
   </div>
 </template>
@@ -101,6 +103,8 @@ const getCompanyName = (tenantId: string) => {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.75rem;
 }
 
 .page-title {
@@ -167,5 +171,29 @@ const getCompanyName = (tenantId: string) => {
 
 .menu-link:hover {
   text-decoration: underline;
+}
+
+.table-scroll {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.table-scroll .super-table {
+  min-width: 860px;
+}
+
+@media (max-width: 640px) {
+  .page-title {
+    font-size: 1.375rem;
+  }
+
+  .page-subtitle {
+    font-size: 0.8125rem;
+  }
+
+  .super-card {
+    padding: 0.75rem;
+  }
 }
 </style>

@@ -605,8 +605,63 @@ const maxSalesAmount = () => {
 }
 
 @media (max-width: 650px) {
-  .metrics-grid {
-    grid-template-columns: 1fr;
+    .metrics-grid {
+      grid-template-columns: 1fr;
+    }
+
+    .dashboard-main-grid {
+      grid-template-columns: minmax(0, 1fr);
+    }
+
+    .chart-card,
+    .top-products-card,
+    .recent-orders-card {
+      min-width: 0;
+    }
   }
-}
-</style>
+
+  @media (max-width: 480px) {
+    .header-actions {
+      flex-wrap: wrap;
+      width: 100%;
+    }
+
+    .header-actions > * {
+      flex: 1 1 auto;
+    }
+
+    .bar-chart-container {
+      gap: 0.375rem;
+    }
+
+    .chart-bar-col {
+      min-width: 0;
+    }
+
+    .bar-val,
+    .bar-label {
+      font-size: 0.625rem;
+    }
+
+    .card-header {
+      flex-wrap: wrap;
+      gap: 0.5rem;
+    }
+
+    .top-product-item {
+      min-width: 0;
+    }
+
+    .prod-details {
+      min-width: 0;
+    }
+
+    .prod-name {
+      overflow-wrap: anywhere;
+    }
+
+    .recent-orders-card {
+      padding: 1rem;
+    }
+  }
+  </style>

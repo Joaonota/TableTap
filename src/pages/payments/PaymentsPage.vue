@@ -325,8 +325,8 @@ const handleRefundPayment = async (pay: Payment) => {
 
 .search-wrap {
   position: relative;
-  flex: 1;
-  min-width: 260px;
+  flex: 1 1 240px;
+  min-width: 0;
 }
 
 .search-icon {
@@ -484,5 +484,30 @@ const handleRefundPayment = async (pay: Payment) => {
   text-align: center;
   padding: 4rem;
   color: var(--text-muted);
+}
+
+@media (max-width: 640px) {
+  .filters-card {
+    align-items: stretch;
+    gap: 0.75rem;
+  }
+
+  .selects-wrap {
+    width: 100%;
+    flex-wrap: wrap;
+  }
+
+  .filter-select {
+    flex: 1 1 140px;
+    min-width: 0;
+  }
+
+  .data-table {
+    min-width: 760px;
+  }
+
+  .empty-state {
+    padding: 2.5rem 1rem;
+  }
 }
 </style>

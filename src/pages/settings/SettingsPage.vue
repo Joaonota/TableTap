@@ -442,4 +442,14 @@ const handleReset = () => {
     grid-template-columns: 1fr;
   }
 }
+
+@media (max-width: 560px) {
+  .fields-row {
+    grid-template-columns: 1fr;
+  }
+
+  .danger-body {
+    width: 100%;
+  }
+}
 </style>

@@ -31,6 +31,15 @@
   --color-danger-500: #ef4444;
   --color-danger-600: #dc2626;
 
+  /* Amber (aliases used by menu/service components) */
+  --color-amber-50: #fffbeb;
+  --color-amber-100: #fef3c7;
+  --color-amber-200: #fde68a;
+  --color-amber-300: #fcd34d;
+  --color-amber-600: #d97706;
+  --color-amber-800: #92400e;
+  --color-amber-900: #78350f;
+
   /* Neutral Slate */
   --color-neutral-0: #ffffff;
   --color-neutral-50: #f8fafc;
@@ -44,6 +53,26 @@
   --color-neutral-800: #1e293b;
   --color-neutral-900: #0f172a;
 
+  /* Slate aliases (legacy components reference this naming) */
+  --color-slate-50: var(--color-neutral-50);
+  --color-slate-100: var(--color-neutral-100);
+  --color-slate-200: var(--color-neutral-200);
+  --color-slate-400: var(--color-neutral-400);
+  --color-slate-700: var(--color-neutral-700);
+  --color-slate-800: var(--color-neutral-800);
+
+  /* Extended success shades */
+  --color-success-200: #a7f3d0;
+  --color-success-300: #6ee7b7;
+  --color-success-400: #34d399;
+  --color-success-800: #065f46;
+
+  /* Extended danger shades */
+  --color-danger-200: #fecaca;
+  --color-danger-300: #fca5a5;
+  --color-danger-700: #b91c1c;
+  --color-danger-900: #7f1d1d;
+
   /* Functional Tokens */
   --bg-page: var(--color-neutral-50);
   --bg-surface: #ffffff;
@@ -51,6 +80,7 @@
   --bg-surface-active: var(--color-neutral-100);
   --border-subtle: var(--color-neutral-200);
   --border-medium: var(--color-neutral-300);
+  --border-color: var(--color-neutral-200);
   --text-main: var(--color-neutral-900);
   --text-muted: var(--color-neutral-500);
   --text-subtle: var(--color-neutral-400);

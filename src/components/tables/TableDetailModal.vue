@@ -879,9 +879,137 @@ const handleConfirmClose = () => {
   color: var(--color-danger-900);
 }
 
-.confirm-btns-row {
-  display: flex;
-  justify-content: center;
-  gap: 0.75rem;
-}
-</style>
+  .confirm-btns-row {
+    display: flex;
+    justify-content: center;
+    gap: 0.75rem;
+  }
+
+  .detail-tabs {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+
+  .detail-tabs::-webkit-scrollbar {
+    display: none;
+  }
+
+  .tab-btn {
+    flex: 0 0 auto;
+    white-space: nowrap;
+  }
+
+  .req-left {
+    min-width: 0;
+    flex: 1;
+  }
+
+  .req-title-row {
+    flex-wrap: wrap;
+  }
+
+  @media (max-width: 560px) {
+    .detail-tabs {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      overflow: visible;
+    }
+
+    .tab-btn {
+      min-width: 0;
+      justify-content: center;
+      padding: 0.5rem 0.375rem;
+      font-size: 0.75rem;
+      white-space: normal;
+      text-align: center;
+      line-height: 1.2;
+    }
+
+    .banner-top,
+    .customer-name-row,
+    .banner-bottom,
+    .order-header-line,
+    .bill-amount-row,
+    .request-item-card {
+      flex-wrap: wrap;
+      gap: 0.5rem;
+    }
+
+    .banner-bottom {
+      justify-content: flex-start;
+    }
+
+    .customer-name {
+      font-size: 1.0625rem;
+      overflow-wrap: anywhere;
+    }
+
+    .timing-box {
+      width: 100%;
+      justify-content: space-between;
+    }
+
+    .items-list-box {
+      max-height: none;
+    }
+
+    .item-line {
+      display: grid;
+      grid-template-columns: 1.5rem minmax(0, 1fr) auto;
+      align-items: baseline;
+      column-gap: 0.5rem;
+      row-gap: 0.125rem;
+    }
+
+    .item-qty {
+      grid-column: 1;
+      grid-row: 1;
+    }
+
+    .item-title {
+      grid-column: 2;
+      grid-row: 1;
+      overflow-wrap: break-word;
+    }
+
+    .item-sub {
+      grid-column: 2 / 4;
+      grid-row: 2;
+      margin-top: -0.125rem;
+    }
+
+    .item-tot {
+      grid-column: 3;
+      grid-row: 1;
+      text-align: right;
+      white-space: nowrap;
+    }
+
+    .order-footer-line {
+      flex-wrap: wrap;
+      gap: 0.5rem;
+    }
+
+    .bill-val {
+      font-size: 1.125rem;
+    }
+
+    .payment-buttons-grid {
+      grid-template-columns: repeat(2, 1fr);
+    }
+
+    .req-actions {
+      width: 100%;
+      justify-content: flex-end;
+    }
+
+    .confirm-btns-row {
+      flex-direction: column-reverse;
+    }
+
+    .confirm-btns-row > * {
+      width: 100%;
+    }
+  }
+  </style>

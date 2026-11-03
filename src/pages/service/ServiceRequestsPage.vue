@@ -208,6 +208,8 @@ const handleStatusChange = async (req: ServiceRequest, newStatus: ServiceRequest
   border-radius: var(--radius-md);
   padding: 0.25rem;
   gap: 0.25rem;
+  flex-wrap: wrap;
+  max-width: 100%;
 }
 
 .pill-btn {
@@ -220,6 +222,8 @@ const handleStatusChange = async (req: ServiceRequest, newStatus: ServiceRequest
   color: var(--color-neutral-600);
   cursor: pointer;
   transition: all var(--transition-fast);
+  flex: 1 1 auto;
+  white-space: nowrap;
 }
 
 .pill-btn.is-active {
@@ -231,7 +235,7 @@ const handleStatusChange = async (req: ServiceRequest, newStatus: ServiceRequest
 /* Grid */
 .requests-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(min(280px, 100%), 1fr));
   gap: 1.25rem;
 }
 

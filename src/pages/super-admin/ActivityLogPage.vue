@@ -178,11 +178,12 @@ const logs = ref<PlatformAuditLog[]>([
 }
 
 .log-header-line {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  font-size: 0.8125rem;
-}
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.8125rem;
+    flex-wrap: wrap;
+  }
 
 .log-action {
   font-weight: 700;
@@ -211,5 +212,24 @@ const logs = ref<PlatformAuditLog[]>([
   font-size: 0.75rem;
   color: #94a3b8;
   margin-top: 0.25rem;
+  flex-wrap: wrap;
+}
+
+@media (max-width: 560px) {
+  .page-title {
+    font-size: 1.375rem;
+  }
+
+  .page-subtitle {
+    font-size: 0.8125rem;
+  }
+
+  .super-card {
+    padding: 0.875rem;
+  }
+
+  .log-time {
+    margin-left: auto;
+  }
 }
 </style>

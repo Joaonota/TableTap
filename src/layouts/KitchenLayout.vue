@@ -153,5 +153,51 @@ onUnmounted(() => {
 .kds-main {
   flex: 1;
   padding: 1.5rem;
+  min-width: 0;
+}
+
+@media (max-width: 768px) {
+  .kds-header {
+    height: auto;
+    min-height: 64px;
+    padding: 0.75rem 1rem;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+  }
+  .kds-title {
+    font-size: 1.05rem;
+  }
+  .kds-clock {
+    font-size: 1rem;
+    padding: 0.3rem 0.65rem;
+  }
+  .kds-header-right {
+    gap: 0.75rem;
+  }
+  .kds-main {
+    padding: 1rem;
+  }
+}
+
+@media (max-width: 520px) {
+  .kds-badge {
+    width: 36px;
+    height: 36px;
+  }
+  .kds-title {
+    font-size: 0.9375rem;
+  }
+  .kds-subtitle {
+    font-size: 0.75rem;
+  }
+  .exit-kds-btn span {
+    display: none;
+  }
+  .exit-kds-btn {
+    padding: 0.6rem;
+  }
+  .kds-main {
+    padding: 0.75rem;
+  }
 }
 </style>

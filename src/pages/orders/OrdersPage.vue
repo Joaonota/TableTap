@@ -588,8 +588,8 @@ const handlePrintReceipt = () => {
 
 .search-input-wrap {
   position: relative;
-  flex: 1;
-  min-width: 260px;
+  flex: 1 1 240px;
+  min-width: 0;
 }
 
 .search-icon {
@@ -612,9 +612,11 @@ const handlePrintReceipt = () => {
 .selects-group {
   display: flex;
   gap: 0.5rem;
+  flex-wrap: wrap;
 }
 
 .filter-select {
+  min-width: 0;
   padding: 0.5rem 0.85rem;
   border: 1px solid var(--border-medium);
   border-radius: var(--radius-md);
@@ -965,5 +967,49 @@ const handlePrintReceipt = () => {
   text-align: center;
   padding: 3rem;
   color: var(--text-muted);
+}
+
+@media (max-width: 640px) {
+  .orders-header,
+  .header-actions,
+  .filters-bar {
+    width: 100%;
+  }
+
+  .header-actions {
+    justify-content: space-between;
+  }
+
+  .filters-bar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .selects-group {
+    width: 100%;
+  }
+
+  .filter-select {
+    flex: 1 1 140px;
+  }
+
+  .kanban-board {
+    grid-auto-flow: column;
+    grid-auto-columns: minmax(240px, 82%);
+    grid-template-columns: none;
+    scroll-snap-type: x proximity;
+  }
+
+  .kanban-col {
+    scroll-snap-align: start;
+  }
+
+  .modal-item-row {
+    gap: 0.75rem;
+  }
+
+  .empty-state {
+    padding: 2rem 1rem;
+  }
 }
 </style>

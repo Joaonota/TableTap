@@ -662,6 +662,7 @@ onMounted(async () => {
 
 .admin-main {
   flex: 1;
+  min-width: 0;
   padding: 1.5rem 2rem;
   max-width: 1440px;
   width: 100%;
@@ -677,6 +678,21 @@ onMounted(async () => {
   .mobile-menu-toggle {
     display: block;
   }
+  .admin-topbar {
+    padding: 0 1rem;
+  }
+  .topbar-left {
+    gap: 0.75rem;
+  }
+  .topbar-right {
+    gap: 0.5rem;
+  }
+  .public-menu-link span {
+    display: none;
+  }
+  .public-menu-link {
+    padding: 0.45rem;
+  }
   .admin-sidebar {
     position: fixed;
     top: 0;
@@ -686,6 +702,7 @@ onMounted(async () => {
     transform: translateX(-100%);
     transition: transform var(--transition-normal);
     box-shadow: var(--shadow-xl);
+    overflow-y: auto;
   }
   .admin-sidebar.is-mobile-open {
     transform: translateX(0);
@@ -695,6 +712,37 @@ onMounted(async () => {
   }
   .admin-main {
     padding: 1rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .admin-topbar {
+    padding: 0 0.75rem;
+  }
+  .topbar-left {
+    gap: 0.5rem;
+  }
+  .brand-badge {
+    width: 28px;
+    height: 28px;
+  }
+  .brand-name {
+    font-size: 1rem;
+  }
+  .user-profile-widget {
+    padding-left: 0.5rem;
+  }
+  .admin-main {
+    padding: 0.875rem 0.75rem;
+  }
+}
+
+@media (max-width: 360px) {
+  .brand-name {
+    display: none;
+  }
+  .public-menu-link {
+    display: none;
   }
 }
 </style>

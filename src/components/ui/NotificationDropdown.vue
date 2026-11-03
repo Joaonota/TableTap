@@ -259,8 +259,13 @@ const handleNotificationClick = async (notif: Notification) => {
 
 @media (max-width: 480px) {
   .notif-popover {
-    width: calc(100vw - 2rem);
-    right: -60px;
+    width: calc(100vw - 1.5rem);
+    max-width: 360px;
+    right: -0.25rem;
+  }
+
+  .popover-list {
+    max-height: min(380px, 60vh);
   }
 }
 

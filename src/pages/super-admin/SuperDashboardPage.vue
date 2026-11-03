@@ -110,7 +110,8 @@ const totalMrr = () => {
           </router-link>
         </div>
 
-        <table class="super-table">
+        <div class="table-scroll">
+          <table class="super-table">
           <thead>
             <tr>
               <th>Empresa</th>
@@ -139,6 +140,7 @@ const totalMrr = () => {
             </tr>
           </tbody>
         </table>
+        </div>
       </div>
 
       <!-- Subscriptions Card -->
@@ -324,12 +326,62 @@ const totalMrr = () => {
   gap: 0.75rem;
 }
 
+.table-scroll {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.table-scroll .super-table {
+  min-width: 640px;
+}
+
+.super-tables-grid {
+  min-width: 0;
+}
+
+.super-tables-grid > * {
+  min-width: 0;
+}
+
 @media (max-width: 1100px) {
-  .super-metrics-grid {
-    grid-template-columns: repeat(2, 1fr);
+    .super-metrics-grid {
+      grid-template-columns: repeat(2, 1fr);
+    }
+    .super-tables-grid {
+      grid-template-columns: 1fr;
+    }
   }
-  .super-tables-grid {
+
+@media (max-width: 560px) {
+  .super-header {
+    align-items: flex-start;
+  }
+
+  .super-title {
+    font-size: 1.375rem;
+  }
+
+  .super-subtitle {
+    font-size: 0.8125rem;
+  }
+
+  .super-metrics-grid {
     grid-template-columns: 1fr;
+    gap: 0.875rem;
+  }
+
+  .super-metric-card {
+    padding: 1rem;
+  }
+
+  .super-card {
+    padding: 0.875rem;
+  }
+
+  .sub-item {
+    flex-wrap: wrap;
+    gap: 0.375rem;
   }
 }
 </style>

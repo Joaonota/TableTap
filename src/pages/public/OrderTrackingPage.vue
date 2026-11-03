@@ -425,8 +425,47 @@ const currentStepIndex = computed(() => {
 }
 
 @media (max-width: 600px) {
-  .node-label {
-    display: none;
+    .node-label {
+      display: none;
+    }
+
+    .tracking-page {
+      padding: 1.5rem 0.75rem 3rem;
+    }
+
+    .tracking-card {
+      padding: 1.25rem;
+    }
+
+    .tracking-header,
+    .order-hero-banner,
+    .summary-item,
+    .total-row {
+      flex-wrap: wrap;
+      gap: 0.5rem;
+    }
+
+    .hero-status-title {
+      font-size: 1.125rem;
+    }
+
+    .item-left {
+      min-width: 0;
+      flex: 1 1 0;
+    }
+
+    .item-name {
+      overflow-wrap: anywhere;
+    }
+
+    .item-price {
+      margin-left: 0.5rem;
+      white-space: nowrap;
+    }
+
+    .tracking-footer {
+      flex-direction: column;
+      align-items: stretch;
+    }
   }
-}
-</style>
+  </style>

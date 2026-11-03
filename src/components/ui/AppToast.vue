@@ -37,7 +37,7 @@ const toastStore = useToastStore()
 <style scoped>
 .toast-container {
   position: fixed;
-  bottom: 1.5rem;
+  bottom: calc(1.5rem + env(safe-area-inset-bottom, 0px));
   right: 1.5rem;
   z-index: 10000;
   display: flex;
@@ -46,6 +46,15 @@ const toastStore = useToastStore()
   max-width: 380px;
   width: calc(100% - 3rem);
   pointer-events: none;
+}
+
+@media (max-width: 480px) {
+  .toast-container {
+    right: 0.75rem;
+    bottom: calc(0.75rem + env(safe-area-inset-bottom, 0px));
+    width: calc(100% - 1.5rem);
+    max-width: none;
+  }
 }
 
 .toast-item {

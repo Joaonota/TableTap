@@ -138,6 +138,8 @@ const isMenuOpen = ref(false)
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 1rem;
+  min-width: 0;
 }
 
 .brand {
@@ -338,6 +340,40 @@ const isMenuOpen = ref(false)
   }
   .login-link {
     display: none;
+  }
+}
+
+@media (max-width: 480px) {
+  .header-container {
+    padding: 0.75rem 1rem;
+    gap: 0.5rem;
+  }
+
+  .brand-title {
+    font-size: 1.0625rem;
+  }
+
+  .header-actions {
+    gap: 0.5rem;
+  }
+
+  .cta-btn {
+    padding: 0.55rem 0.75rem;
+  }
+
+  .cta-btn span {
+    display: none;
+  }
+
+  .mobile-nav-drawer {
+    padding: 0.875rem 1rem 1.25rem;
+    max-height: calc(100vh - 64px);
+    overflow-y: auto;
+  }
+
+  .public-footer {
+    padding: 3rem 1rem 1.5rem;
+    margin-top: 3rem;
   }
 }
 </style>

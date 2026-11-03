@@ -142,6 +142,8 @@ const handleResetData = async () => {
   align-items: center;
   gap: 0.375rem;
   flex: 1;
+  min-width: 0;
+  flex-wrap: wrap;
 }
 
 .demo-highlight {
@@ -190,6 +192,49 @@ const handleResetData = async () => {
 
 @media (max-width: 900px) {
   .demo-info {
+    display: none;
+  }
+
+  .demo-text {
+    flex: 0 1 auto;
+    white-space: nowrap;
+  }
+
+  .demo-actions {
+    margin-left: auto;
+  }
+}
+
+@media (max-width: 620px) {
+  .demo-text {
+    flex: 1;
+    white-space: normal;
+  }
+
+  .demo-actions {
+    width: 100%;
+    margin-left: 0;
+    flex-wrap: wrap;
+  }
+
+  .user-switcher {
+    flex: 1 1 180px;
+    min-width: 0;
+  }
+
+  .switcher-select {
+    width: 100%;
+    min-width: 0;
+    text-overflow: ellipsis;
+  }
+}
+
+@media (max-width: 380px) {
+  .demo-banner {
+    padding: 0.5rem 0.75rem;
+  }
+
+  .demo-badge {
     display: none;
   }
 }

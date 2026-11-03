@@ -205,7 +205,21 @@ import {
     gap: 2rem;
   }
   .page-title {
-    font-size: 2rem;
+      font-size: 2rem;
+    }
   }
-}
-</style>
+
+  @media (max-width: 600px) {
+    .page-title {
+      font-size: 1.75rem;
+    }
+
+    .page-subtitle {
+      font-size: 0.9375rem;
+    }
+
+    .rounded-img {
+      height: 240px;
+    }
+  }
+  </style>

@@ -698,15 +698,51 @@ const toggleFaq = (index: number) => {
 }
 
 @media (max-width: 900px) {
-  .hero-title {
-    font-size: 2.25rem;
+    .hero-title {
+      font-size: 2.25rem;
+    }
+    .steps-grid, .benefits-grid {
+      grid-template-columns: 1fr;
+    }
+    .mockup-overlay-badge {
+      bottom: 1rem;
+      left: 1rem;
+    }
+    .hero-stats {
+      flex-wrap: wrap;
+      gap: 1rem 1.5rem;
+      padding: 1rem 1.25rem;
+      margin-bottom: 2.5rem;
+      justify-content: flex-start;
+    }
+    .mockup-url {
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
   }
-  .steps-grid, .benefits-grid {
-    grid-template-columns: 1fr;
+
+  @media (max-width: 600px) {
+    .hero-title {
+      font-size: 2rem;
+    }
+    .hero-subtitle {
+      font-size: 1rem;
+    }
+    .hero-cta-group {
+      flex-direction: column;
+      align-items: stretch;
+    }
+    .final-cta-card {
+      padding: 2.5rem 1.25rem;
+    }
+    .cta-heading {
+      font-size: 1.5rem;
+    }
+    .cta-buttons {
+      flex-direction: column;
+      align-items: stretch;
+    }
   }
-  .mockup-overlay-badge {
-    bottom: 1rem;
-    left: 1rem;
-  }
-}
-</style>
+  </style>

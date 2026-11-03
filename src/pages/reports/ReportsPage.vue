@@ -212,28 +212,30 @@ const exportReportsCsv = () => {
         <span class="badge badge-neutral">Top 5 Mais Vendidos</span>
       </div>
 
-      <table class="report-table">
-        <thead>
-          <tr>
-            <th>Posição</th>
-            <th>Nome do Prato / Bebida</th>
-            <th>Doses Vendidas</th>
-            <th>Faturamento Gerado</th>
-            <th>Contribuição</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-for="(p, idx) in topProducts" :key="p.name">
-            <td><strong>#{{ idx + 1 }}</strong></td>
-            <td>{{ p.name }}</td>
-            <td><strong>{{ p.quantity }}</strong> unidades</td>
-            <td><strong>{{ p.revenue.toLocaleString('pt-MZ') }} MT</strong></td>
-            <td>
-              <AppBadge variant="success">Alta Margem</AppBadge>
-            </td>
-          </tr>
-        </tbody>
-      </table>
+      <div class="table-scroll">
+        <table class="report-table">
+          <thead>
+            <tr>
+              <th>Posição</th>
+              <th>Nome do Prato / Bebida</th>
+              <th>Doses Vendidas</th>
+              <th>Faturamento Gerado</th>
+              <th>Contribuição</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="(p, idx) in topProducts" :key="p.name">
+              <td><strong>#{{ idx + 1 }}</strong></td>
+              <td>{{ p.name }}</td>
+              <td><strong>{{ p.quantity }}</strong> unidades</td>
+              <td><strong>{{ p.revenue.toLocaleString('pt-MZ') }} MT</strong></td>
+              <td>
+                <AppBadge variant="success">Alta Margem</AppBadge>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
     </div>
   </div>
 </template>
@@ -454,6 +456,59 @@ const exportReportsCsv = () => {
 @media (max-width: 600px) {
   .metrics-grid {
     grid-template-columns: 1fr;
+  }
+
+  .page-top-header,
+  .header-actions {
+    width: 100%;
+  }
+
+  .page-top-header {
+    flex-wrap: wrap;
+  }
+
+  .header-actions {
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+
+  .reports-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .reports-grid > * {
+    min-width: 0;
+  }
+
+  .chart-bars {
+    gap: 0.5rem;
+  }
+
+  .bar-column {
+    min-width: 0;
+  }
+
+  .bar-value,
+  .bar-name {
+    font-size: 0.625rem;
+  }
+
+  .card-header {
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+
+  .period-select-wrap {
+    flex: 1;
+  }
+
+  .report-table {
+    min-width: 560px;
+  }
+
+  .top-table-card {
+    padding: 1rem;
   }
 }
 </style>

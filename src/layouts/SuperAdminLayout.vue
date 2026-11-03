@@ -231,6 +231,7 @@ const isMobileSidebarOpen = ref(false)
 .super-body {
   display: flex;
   flex: 1;
+  min-width: 0;
 }
 
 .super-sidebar {
@@ -282,6 +283,7 @@ const isMobileSidebarOpen = ref(false)
 
 .super-main {
   flex: 1;
+  min-width: 0;
   padding: 2rem;
   background-color: #090d16;
   max-width: 1440px;
@@ -292,6 +294,21 @@ const isMobileSidebarOpen = ref(false)
   .mobile-toggle {
     display: block;
   }
+  .super-header {
+    padding: 0 1rem;
+  }
+  .header-left {
+    gap: 0.625rem;
+  }
+  .brand-sub {
+    display: none;
+  }
+  .back-to-app-btn span {
+    display: none;
+  }
+  .back-to-app-btn {
+    padding: 0.5rem;
+  }
   .super-sidebar {
     position: fixed;
     top: 64px;
@@ -300,12 +317,29 @@ const isMobileSidebarOpen = ref(false)
     z-index: 99;
     transform: translateX(-100%);
     transition: transform 0.2s ease;
+    overflow-y: auto;
   }
   .super-sidebar.is-open {
     transform: translateX(0);
   }
   .super-main {
     padding: 1rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .super-header {
+    padding: 0 0.75rem;
+  }
+  .brand-title {
+    font-size: 0.9375rem;
+  }
+  .icon-wrap {
+    width: 30px;
+    height: 30px;
+  }
+  .super-main {
+    padding: 0.875rem 0.75rem;
   }
 }
 </style>

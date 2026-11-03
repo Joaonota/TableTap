@@ -369,8 +369,8 @@ const handleDeleteProduct = async (id: string) => {
 
 .search-box {
   position: relative;
-  flex: 1;
-  min-width: 260px;
+  flex: 1 1 240px;
+  min-width: 0;
 }
 
 .search-icon {
@@ -612,5 +612,30 @@ const handleDeleteProduct = async (id: string) => {
   text-align: center;
   padding: 4rem;
   color: var(--text-muted);
+}
+
+@media (max-width: 640px) {
+  .filters-card {
+    align-items: stretch;
+    gap: 0.75rem;
+  }
+
+  .search-box,
+  .category-select {
+    flex: 1 1 100%;
+    width: 100%;
+  }
+
+  .data-table {
+    min-width: 760px;
+  }
+
+  .form-row {
+    grid-template-columns: 1fr;
+  }
+
+  .empty-state {
+    padding: 2.5rem 1rem;
+  }
 }
 </style>

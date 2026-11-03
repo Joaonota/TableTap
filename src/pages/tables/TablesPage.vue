@@ -478,7 +478,8 @@ const openQrModal = async (tbl: Table) => {
 
     <!-- Table View -->
     <div v-else class="app-card table-view-card">
-      <table class="data-table">
+      <div class="table-wrapper">
+        <table class="data-table">
         <thead>
           <tr>
             <th>Número</th>
@@ -528,6 +529,7 @@ const openQrModal = async (tbl: Table) => {
           </tr>
         </tbody>
       </table>
+      </div>
     </div>
 
     <!-- Table Detail / Active Session Modal -->
@@ -738,7 +740,7 @@ const openQrModal = async (tbl: Table) => {
 /* Tables Grid */
 .tables-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(min(250px, 100%), 1fr));
   gap: 1rem;
 }
 
@@ -886,6 +888,7 @@ const openQrModal = async (tbl: Table) => {
   margin-top: auto;
   padding-top: 0.5rem;
   border-top: 1px solid var(--border-color);
+  flex-wrap: wrap;
 }
 
 .detail-btn {
@@ -1004,5 +1007,55 @@ const openQrModal = async (tbl: Table) => {
 
 .originUrl {
   font-size: 0.75rem;
+}
+
+.table-wrapper {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.table-wrapper .data-table {
+  min-width: 720px;
+}
+
+@media (max-width: 640px) {
+  .tables-header,
+  .header-actions,
+  .filter-controls-bar {
+    width: 100%;
+  }
+
+  .filter-controls-bar {
+    align-items: stretch;
+    gap: 0.75rem;
+  }
+
+  .filter-group {
+    flex: 1 1 160px;
+  }
+
+  .filter-select {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .qr-image {
+    width: 100%;
+    max-width: 220px;
+    height: auto;
+    aspect-ratio: 1;
+  }
+}
+
+@media (max-width: 420px) {
+  .detail-btn {
+    flex: 1 1 100%;
+  }
+
+  .status-select-sm {
+    flex: 1;
+    max-width: none;
+  }
 }
 </style>

@@ -115,13 +115,17 @@ const suggestions = computed(() => {
 
 .suggestions-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(min(220px, 100%), 1fr));
   gap: 0.75rem;
 }
 
 @media (max-width: 480px) {
   .suggestions-grid {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .suggestion-card {
+    min-width: 0;
   }
 }
 

@@ -404,3 +404,52 @@ export interface DashboardMetrics {
   activeServiceRequests: number
   unavailableProductsCount: number
 }
+
+// ==========================================
+// NFC MANAGEMENT & SIMULATION TYPES
+// ==========================================
+
+export type NfcTagStatus = 'unprogrammed' | 'programmed' | 'locked'
+
+export type NfcTimelineEventType =
+  | 'created'
+  | 'write_started'
+  | 'write_completed'
+  | 'verified'
+  | 'locked'
+  | 'write_rejected'
+
+export interface NfcTimelineEvent {
+  id: string
+  tagId: string
+  type: NfcTimelineEventType
+  title: string
+  description: string
+  timestamp: string
+  actor?: string
+}
+
+export interface NfcTag {
+  id: string
+  uid: string
+  tagType: string
+  tenantId: string
+  restaurantId: string
+  restaurantName: string
+  tableId: string
+  tableNumber: string
+  targetUrl: string
+  status: NfcTagStatus
+  isLocked: boolean
+  writtenAt?: string
+  lockedAt?: string
+  createdAt: string
+  scanCount: number
+  lastScannedAt?: string
+  ndefRecordType?: string
+  ndefPrefix?: string
+  ndefPayload?: string
+  ndefSize?: number
+  timeline: NfcTimelineEvent[]
+}
+
