@@ -13,8 +13,14 @@ import type {
   StaffMember,
   Plan,
   Subscription,
-  DigitalAccess
+  DigitalAccess,
+  CustomerReview
 } from '@/types'
+import {
+  generateHistoricalOrders,
+  generateHistoricalPayments,
+  generateHistoricalReviews
+} from './historicalData'
 
 export interface MockDatabase {
   companies: Company[]
@@ -32,6 +38,7 @@ export interface MockDatabase {
   plans: Plan[]
   subscriptions: Subscription[]
   digitalAccessList: DigitalAccess[]
+  reviews: CustomerReview[]
 }
 
 export const initialCompanies: Company[] = [
@@ -103,7 +110,9 @@ export const initialRestaurants: Restaurant[] = [
       requireTableForOrder: true,
       serviceFeePercent: 10,
       themeAccentColor: '#1e40af',
-      enabledPaymentMethods: ['mpesa', 'emola', 'card', 'cash']
+      enabledPaymentMethods: ['mpesa', 'emola', 'card', 'cash'],
+      googleReviewUrl: 'https://maps.google.com/?q=Sabores+de+Mocambique+Maputo',
+      enableGoogleReviewInvite: true
     },
     createdAt: '2024-01-16T10:00:00Z'
   },
@@ -133,7 +142,9 @@ export const initialRestaurants: Restaurant[] = [
       requireTableForOrder: true,
       serviceFeePercent: 5,
       themeAccentColor: '#059669',
-      enabledPaymentMethods: ['mpesa', 'emola', 'card', 'cash']
+      enabledPaymentMethods: ['mpesa', 'emola', 'card', 'cash'],
+      googleReviewUrl: 'https://maps.google.com/?q=Sabores+Matola',
+      enableGoogleReviewInvite: true
     },
     createdAt: '2024-02-01T10:00:00Z'
   },
@@ -163,7 +174,9 @@ export const initialRestaurants: Restaurant[] = [
       requireTableForOrder: true,
       serviceFeePercent: 10,
       themeAccentColor: '#2563eb',
-      enabledPaymentMethods: ['mpesa', 'emola', 'card', 'cash']
+      enabledPaymentMethods: ['mpesa', 'emola', 'card', 'cash'],
+      googleReviewUrl: 'https://maps.google.com/?q=Sabores+Beira',
+      enableGoogleReviewInvite: true
     },
     createdAt: '2024-03-10T10:00:00Z'
   },

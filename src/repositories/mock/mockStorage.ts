@@ -16,6 +16,7 @@ import {
   initialSubscriptions,
   initialDigitalAccessList
 } from '@/mocks/initialData'
+import { generateHistoricalReviews } from '@/mocks/historicalData'
 
 const STORAGE_KEY = 'tapmenu_mock_database_v2'
 
@@ -35,7 +36,8 @@ function getInitialDatabase(): MockDatabase {
     staff: JSON.parse(JSON.stringify(initialStaff)),
     plans: JSON.parse(JSON.stringify(initialPlans)),
     subscriptions: JSON.parse(JSON.stringify(initialSubscriptions)),
-    digitalAccessList: JSON.parse(JSON.stringify(initialDigitalAccessList))
+    digitalAccessList: JSON.parse(JSON.stringify(initialDigitalAccessList)),
+    reviews: generateHistoricalReviews()
   }
 }
 

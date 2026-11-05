@@ -5,6 +5,7 @@ import { orderService } from '@/services'
 import type { Order, OrderStatus } from '@/types'
 import AppButton from '@/components/ui/AppButton.vue'
 import AppBadge from '@/components/ui/AppBadge.vue'
+import AppLogo from '@/components/ui/AppLogo.vue'
 import {
   CheckCircle2,
   Clock,
@@ -74,6 +75,10 @@ const currentStepIndex = computed(() => {
           <ArrowLeft :size="18" />
           <span>Voltar ao Menu</span>
         </button>
+
+        <div class="tracking-brand">
+          <AppLogo :size="22" />
+        </div>
 
         <div class="order-code-badge">
           <span>{{ order.orderCode }}</span>
@@ -193,6 +198,14 @@ const currentStepIndex = computed(() => {
   align-items: center;
   justify-content: space-between;
   margin-bottom: 1.5rem;
+}
+
+.tracking-brand {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
 }
 
 .back-link-btn {

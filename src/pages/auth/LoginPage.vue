@@ -7,8 +7,9 @@ import { useToastStore } from '@/stores/toast'
 import AppButton from '@/components/ui/AppButton.vue'
 import AppInput from '@/components/ui/AppInput.vue'
 import AppModal from '@/components/ui/AppModal.vue'
+import AppLogo from '@/components/ui/AppLogo.vue'
 import type { User } from '@/types'
-import { UtensilsCrossed, ShieldCheck, UserCheck, KeyRound, ArrowRight } from 'lucide-vue-next'
+import { ShieldCheck, UserCheck, KeyRound, ArrowRight } from 'lucide-vue-next'
 
 const router = useRouter()
 const authStore = useAuthStore()
@@ -77,10 +78,7 @@ const handleForgotPassword = () => {
     <div class="login-card">
       <div class="login-header">
         <router-link to="/" class="login-brand">
-          <div class="brand-badge">
-            <UtensilsCrossed :size="20" />
-          </div>
-          <span>TapMenu</span>
+          <AppLogo :size="38" />
         </router-link>
         <h1 class="login-title">Aceder à Plataforma</h1>
         <p class="login-subtitle">Selecione uma conta demonstrativa para simular permissões.</p>
@@ -211,22 +209,7 @@ const handleForgotPassword = () => {
   align-items: center;
   gap: 0.5rem;
   text-decoration: none;
-  font-family: var(--font-heading);
-  font-size: 1.25rem;
-  font-weight: 800;
-  color: var(--color-neutral-900);
   margin-bottom: 1rem;
-}
-
-.brand-badge {
-  width: 34px;
-  height: 34px;
-  border-radius: var(--radius-md);
-  background: var(--color-primary-800);
-  color: #ffffff;
-  display: flex;
-  align-items: center;
-  justify-content: center;
 }
 
 .login-title {

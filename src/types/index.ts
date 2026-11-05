@@ -68,6 +68,8 @@ export interface Restaurant {
     serviceFeePercent: number
     themeAccentColor: string
     enabledPaymentMethods: PaymentMethod[]
+    googleReviewUrl?: string
+    enableGoogleReviewInvite?: boolean
   }
   createdAt: string
 }
@@ -453,4 +455,162 @@ export interface NfcTag {
   ndefSize?: number
   timeline: NfcTimelineEvent[]
 }
+
+// ==========================================
+// CUSTOMER EXPERIENCE & REVIEWS TYPES
+// ==========================================
+
+export type WaitTimeRating = 'very_fast' | 'adequate' | 'slow' | 'very_slow'
+export type ReviewStatus = 'pending' | 'analyzed' | 'resolved'
+
+export interface CustomerReview {
+  id: string
+  tenantId: string
+  restaurantId: string
+  restaurantName: string
+  tableId: string
+  tableNumber: string
+  tableSessionId?: string
+  orderId?: string
+  customerName?: string
+  customerPhone?: string
+  overallRating: number // 1 to 5
+  foodRating: number // 1 to 5
+  serviceRating: number // 1 to 5
+  ambienceRating: number // 1 to 5
+  waitTimeRating: WaitTimeRating
+  comment?: string
+  status: ReviewStatus
+  isNegativeAlert: boolean // overallRating <= 2
+  managerNotes?: string
+  correctiveAction?: string
+  resolvedAt?: string
+  resolvedBy?: string
+  createdAt: string
+}
+
+// ==========================================
+// BUSINESS INTELLIGENCE (BI) TYPES
+// ==========================================
+
+export type BiPeriodType =
+  | 'today'
+  | 'last7days'
+  | 'last30days'
+  | 'thisMonth'
+  | 'lastMonth'
+  | 'last90days'
+  | 'custom'
+
+export interface BiIndicator {
+  label: string
+  value: number
+  formattedValue: string
+  previousValue: number
+  formattedPreviousValue: string
+  percentageChange: number
+  trend: 'up' | 'down' | 'neutral'
+  isPositive: boolean
+  description: string
+}
+
+export interface BiExecutiveSummary {
+  revenue: BiIndicator
+  orders: BiIndicator
+  averageTicket: BiIndicator
+  customersServed: BiIndicator
+  productsSold: BiIndicator
+  revenuePerTable: BiIndicator
+  cancellationRate: BiIndicator
+  confirmedVsPaidPercent: number
+  totalPaidRevenue: number
+}
+
+export interface ProductPerformance {
+  productId: string
+  productName: string
+  categoryName: string
+  imageUrl?: string
+  price: number
+  quantitySold: number
+  revenue: number
+  percentageOfTotal: number
+  previousQuantity: number
+  previousRevenue: number
+  trendPercent: number
+  isUnderperforming?: boolean
+  recommendation?: string
+}
+
+export interface HourlySalesData {
+  hour: number // 0 to 23
+  label: string // e.g. "12h"
+  orderCount: number
+  revenue: number
+  periodTag: 'Pequeno-almoço' | 'Almoço' | 'Tarde' | 'Jantar' | 'Noite'
+  isPeak: boolean
+}
+
+export interface DayOfWeekSalesData {
+  dayIndex: number
+  dayName: string
+  orderCount: number
+  revenue: number
+  averageTicket: number
+  isBestDay: boolean
+}
+
+export interface TablePerformance {
+  tableId: string
+  tableNumber: string
+  tableName?: string
+  area: string
+  capacity: number
+  sessionCount: number
+  orderCount: number
+  totalRevenue: number
+  averageTicket: number
+  averageOccupancyMinutes: number
+  revenuePerSession: number
+}
+
+export interface BranchComparisonData {
+  restaurantId: string
+  restaurantName: string
+  city: string
+  totalRevenue: number
+  totalOrders: number
+  averageTicket: number
+  topProductName: string
+  topProductRevenue: number
+  averagePreparationMinutes: number
+  cancellationRate: number
+  averageRating: number
+  positiveReviewPercent: number
+  revenueGrowthPercent: number
+  rank: number
+}
+
+export interface DemandForecastItem {
+  date: string
+  formattedDate: string
+  dayName: string
+  historicalAverageOrders: number
+  predictedOrders: number
+  predictedRevenue: number
+  confidenceLevel: number
+  topPredictedProducts: { name: string; quantity: number }[]
+  peakPredictedHour: string
+}
+
+export interface SmartInsight {
+  id: string
+  title: string
+  description: string
+  indicatorSource: string
+  periodAnalyzed: string
+  category: 'opportunity' | 'attention' | 'positive'
+  actionUrl?: string
+}
+
 

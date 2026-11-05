@@ -506,6 +506,7 @@ const handlePrintReceipt = () => {
         <div class="receipt-footer">
           <p>Obrigado pela sua preferência!</p>
           <p>Documento processado por computador.</p>
+          <img class="receipt-logo" src="/logo/logo.PNG" alt="TapMenu" />
           <p class="receipt-powered">TapMenu SaaS • Moçambique</p>
         </div>
       </div>
@@ -956,6 +957,13 @@ const handlePrintReceipt = () => {
   text-align: center;
   font-size: 0.75rem;
   color: #64748b;
+}
+
+.receipt-logo {
+  display: block;
+  height: 26px;
+  width: auto;
+  margin: 0.4rem auto 0;
 }
 
 .receipt-powered {

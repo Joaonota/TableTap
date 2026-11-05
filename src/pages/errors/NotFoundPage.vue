@@ -1,13 +1,14 @@
 <script setup lang="ts">
 import AppButton from '@/components/ui/AppButton.vue'
-import { ArrowLeft, UtensilsCrossed } from 'lucide-vue-next'
+import AppLogo from '@/components/ui/AppLogo.vue'
+import { ArrowLeft } from 'lucide-vue-next'
 </script>
 
 <template>
   <div class="error-page container">
     <div class="error-card">
-      <div class="error-icon-box">
-        <UtensilsCrossed :size="48" />
+      <div class="error-brand">
+        <AppLogo :size="40" />
       </div>
 
       <h1 class="error-code">404</h1>
@@ -59,12 +60,7 @@ import { ArrowLeft, UtensilsCrossed } from 'lucide-vue-next'
   align-items: center;
 }
 
-.error-icon-box {
-  width: 80px;
-  height: 80px;
-  border-radius: 50%;
-  background: var(--color-primary-50);
-  color: var(--color-primary-800);
+.error-brand {
   display: flex;
   align-items: center;
   justify-content: center;

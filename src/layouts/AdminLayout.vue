@@ -11,6 +11,7 @@ import { useNotificationStore } from '@/stores/notification'
 import DemoBanner from '@/components/ui/DemoBanner.vue'
 import AppToast from '@/components/ui/AppToast.vue'
 import NotificationDropdown from '@/components/ui/NotificationDropdown.vue'
+import AppLogo from '@/components/ui/AppLogo.vue'
 import {
   LayoutDashboard,
   UtensilsCrossed,
@@ -111,10 +112,7 @@ onMounted(async () => {
         </button>
 
         <router-link to="/app/dashboard" class="brand-logo">
-          <div class="brand-badge">
-            <UtensilsCrossed :size="18" />
-          </div>
-          <span class="brand-name">TapMenu</span>
+          <AppLogo :size="26" />
         </router-link>
 
         <!-- Multi-tenant selectors -->
@@ -410,25 +408,7 @@ onMounted(async () => {
   align-items: center;
   gap: 0.625rem;
   text-decoration: none;
-}
-
-.brand-badge {
-  width: 32px;
-  height: 32px;
-  border-radius: var(--radius-md);
-  background: linear-gradient(135deg, var(--color-primary-800) 0%, var(--color-primary-600) 100%);
-  color: #ffffff;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.brand-name {
-  font-family: var(--font-heading);
-  font-size: 1.125rem;
-  font-weight: 800;
-  color: var(--color-neutral-900);
-  letter-spacing: -0.02em;
+  flex-shrink: 0;
 }
 
 .tenant-context-selectors {
@@ -722,12 +702,8 @@ onMounted(async () => {
   .topbar-left {
     gap: 0.5rem;
   }
-  .brand-badge {
-    width: 28px;
-    height: 28px;
-  }
-  .brand-name {
-    font-size: 1rem;
+  .brand-logo :deep(img) {
+    height: 20px !important;
   }
   .user-profile-widget {
     padding-left: 0.5rem;
@@ -738,7 +714,7 @@ onMounted(async () => {
 }
 
 @media (max-width: 360px) {
-  .brand-name {
+  .brand-logo {
     display: none;
   }
   .public-menu-link {

@@ -4,7 +4,8 @@ import { useRouter } from 'vue-router'
 import { useTenantStore } from '@/stores/tenant'
 import DemoBanner from '@/components/ui/DemoBanner.vue'
 import AppToast from '@/components/ui/AppToast.vue'
-import { ChefHat, ArrowLeft, Clock } from 'lucide-vue-next'
+import AppLogo from '@/components/ui/AppLogo.vue'
+import { ArrowLeft, Clock } from 'lucide-vue-next'
 
 const router = useRouter()
 const tenantStore = useTenantStore()
@@ -34,9 +35,7 @@ onUnmounted(() => {
     <!-- KDS Top Header -->
     <header class="kds-header">
       <div class="kds-header-left">
-        <div class="kds-badge">
-          <ChefHat :size="22" />
-        </div>
+        <AppLogo :size="28" chip />
         <div>
           <h1 class="kds-title">Kitchen Display System (KDS)</h1>
           <p class="kds-subtitle">{{ tenantStore.currentRestaurant?.name || 'Cozinha Central' }}</p>
@@ -87,17 +86,6 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   gap: 1rem;
-}
-
-.kds-badge {
-  width: 44px;
-  height: 44px;
-  background: #dc2626;
-  border-radius: var(--radius-md);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: #ffffff;
 }
 
 .kds-title {
@@ -180,10 +168,6 @@ onUnmounted(() => {
 }
 
 @media (max-width: 520px) {
-  .kds-badge {
-    width: 36px;
-    height: 36px;
-  }
   .kds-title {
     font-size: 0.9375rem;
   }

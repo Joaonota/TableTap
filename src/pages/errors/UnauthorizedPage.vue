@@ -1,11 +1,15 @@
 <script setup lang="ts">
 import AppButton from '@/components/ui/AppButton.vue'
+import AppLogo from '@/components/ui/AppLogo.vue'
 import { ShieldAlert, ArrowLeft } from 'lucide-vue-next'
 </script>
 
 <template>
   <div class="unauthorized-page container">
     <div class="unauthorized-card">
+      <div class="error-brand">
+        <AppLogo :size="36" />
+      </div>
       <div class="icon-circle">
         <ShieldAlert :size="48" />
       </div>
@@ -55,6 +59,13 @@ import { ShieldAlert, ArrowLeft } from 'lucide-vue-next'
   display: flex;
   flex-direction: column;
   align-items: center;
+}
+
+.error-brand {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 1.25rem;
 }
 
 .icon-circle {

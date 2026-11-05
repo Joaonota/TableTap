@@ -4,8 +4,8 @@ import { useRouter, useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import DemoBanner from '@/components/ui/DemoBanner.vue'
 import AppToast from '@/components/ui/AppToast.vue'
+import AppLogo from '@/components/ui/AppLogo.vue'
 import {
-  ShieldAlert,
   Building2,
   Store,
   Users,
@@ -36,9 +36,7 @@ const isMobileSidebarOpen = ref(false)
           <X v-else :size="20" />
         </button>
         <div class="super-badge-brand">
-          <div class="icon-wrap">
-            <ShieldAlert :size="20" />
-          </div>
+          <AppLogo :size="26" chip />
           <div>
             <div class="brand-title">TapMenu Master SaaS</div>
             <div class="brand-sub">Consola de Gestão Global</div>
@@ -184,17 +182,6 @@ const isMobileSidebarOpen = ref(false)
   display: flex;
   align-items: center;
   gap: 0.75rem;
-}
-
-.icon-wrap {
-  width: 36px;
-  height: 36px;
-  background: linear-gradient(135deg, #7c3aed 0%, #4f46e5 100%);
-  border-radius: var(--radius-md);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: #ffffff;
 }
 
 .brand-title {

@@ -3,7 +3,8 @@ import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import DemoBanner from '@/components/ui/DemoBanner.vue'
 import AppToast from '@/components/ui/AppToast.vue'
-import { UtensilsCrossed, Menu, X, ArrowRight } from 'lucide-vue-next'
+import AppLogo from '@/components/ui/AppLogo.vue'
+import { Menu, X, ArrowRight } from 'lucide-vue-next'
 
 const router = useRouter()
 const isMenuOpen = ref(false)
@@ -17,10 +18,7 @@ const isMenuOpen = ref(false)
     <header class="public-header">
       <div class="header-container">
         <router-link to="/" class="brand">
-          <div class="brand-icon">
-            <UtensilsCrossed :size="20" />
-          </div>
-          <span class="brand-title">TapMenu</span>
+          <AppLogo :size="30" />
         </router-link>
 
         <nav class="desktop-nav">
@@ -65,10 +63,7 @@ const isMenuOpen = ref(false)
         <div class="footer-grid">
           <div class="footer-brand-col">
             <div class="brand">
-              <div class="brand-icon">
-                <UtensilsCrossed :size="18" />
-              </div>
-              <span class="brand-title">TapMenu</span>
+              <AppLogo :size="34" chip />
             </div>
             <p class="footer-desc">
               A plataforma SaaS de menus digitais, pedidos inteligentes e atendimento por NFC e QR Code concebida para revolucionar a restauração em Moçambique e além.
@@ -147,24 +142,6 @@ const isMenuOpen = ref(false)
   align-items: center;
   gap: 0.625rem;
   text-decoration: none;
-}
-
-.brand-icon {
-  width: 36px;
-  height: 36px;
-  border-radius: var(--radius-md);
-  background: linear-gradient(135deg, var(--color-primary-800) 0%, var(--color-primary-600) 100%);
-  color: #ffffff;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.brand-title {
-  font-family: var(--font-heading);
-  font-size: 1.25rem;
-  font-weight: 800;
-  color: var(--color-neutral-900);
 }
 
 .desktop-nav {
@@ -349,8 +326,8 @@ const isMenuOpen = ref(false)
     gap: 0.5rem;
   }
 
-  .brand-title {
-    font-size: 1.0625rem;
+  .brand {
+    gap: 0.375rem;
   }
 
   .header-actions {

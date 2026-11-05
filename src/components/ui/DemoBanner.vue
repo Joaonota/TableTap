@@ -9,6 +9,7 @@ import { useToastStore } from '@/stores/toast'
 import { resetDatabase } from '@/services'
 import { RotateCcw, UserCheck, ShieldAlert, Sparkles } from 'lucide-vue-next'
 import AppButton from './AppButton.vue'
+import AppLogo from './AppLogo.vue'
 
 const authStore = useAuthStore()
 const tenantStore = useTenantStore()
@@ -57,6 +58,9 @@ const handleResetData = async () => {
 <template>
   <div class="demo-banner">
     <div class="demo-banner-content">
+      <div class="demo-brand">
+        <AppLogo :size="16" chip />
+      </div>
       <div class="demo-badge">
         <Sparkles :size="14" />
         <span>MODO DEMO</span>
@@ -232,6 +236,16 @@ const handleResetData = async () => {
 @media (max-width: 380px) {
   .demo-banner {
     padding: 0.5rem 0.75rem;
+  }
+
+.demo-brand {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+  .demo-brand {
+    display: none;
   }
 
   .demo-badge {
