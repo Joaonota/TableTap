@@ -1,792 +1,485 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import type { NfcTag, NfcTimelineEvent, NfcTagStatus } from '@/types'
+import type {
+  NfcTag,
+  NfcTimelineEvent,
+  NfcTimelineEventType,
+  NfcOperationType,
+  NFCWriteOutcome,
+  ParsedNfcRead
+} from '@/types'
+import { useAuthStore } from './auth'
 import { useToastStore } from './toast'
+import { normalizeMenuUrl } from '@/services/nfc/nfcUrl'
 
-const STORAGE_KEY = 'tapmenu_nfc_tags_store_v1'
+/**
+ * Registo local REAL de etiquetas NFC (persistido em localStorage).
+ *
+ * Diferenças face à versão anterior (simulada):
+ *  - Nada de UIDs inventados — `serialNumber` só é preenchido se o browser
+ *    fornecer o identificador físico (Web NFC nem sempre o fornece).
+ *  - Nada de gravações/pretenções físicas falsas — os registos da linha
+ *    temporal refletem apenas operações que aconteceram de facto.
+ *  - Proteção é LÓGICA (no sistema). A Web NFC API não permite bloqueio
+ *    físico por hardware — a UI indica-o explicitamente.
+ */
 
-export const generateRealisticNfcUid = (): string => {
-  // NXP NTAG chips standard 7-byte UID starting with 0x04
-  const bytes = [0x04]
-  for (let i = 0; i < 6; i++) {
-    bytes.push(Math.floor(Math.random() * 256))
-  }
-  return bytes.map(b => b.toString(16).padStart(2, '0').toUpperCase()).join(':')
+const REGISTRY_KEY = 'tapmenu_nfc_registry_v2'
+const LEGACY_KEY = 'tapmenu_nfc_tags_store_v1'
+
+const NDEF_URI_TYPE = 'NDEF URI (Well-Known RTD)'
+
+function nowIso(): string {
+  return new Date().toISOString()
 }
 
-export const calculateNdefUriSize = (url: string): number => {
-  // NDEF URI Record overhead: 1 byte header, 1 byte type len, 1 byte payload len, 1 byte URI identifier, type (1 byte), URI payload
-  return 5 + new TextEncoder().encode(url.replace(/^https?:\/\//, '')).length
+function newId(prefix: string): string {
+  return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`
 }
 
-const initialTags: NfcTag[] = [
-  {
-    id: 'nfc-tag-1',
-    uid: '04:5A:21:8B:10:9C:80',
-    tagType: 'NXP NTAG213 (180 Bytes)',
-    tenantId: 'tenant-1',
-    restaurantId: 'rest-1',
-    restaurantName: 'Sabores Maputo',
-    tableId: 'tbl-1',
-    tableNumber: '01',
-    targetUrl: '/menu/sabores-maputo/01',
-    status: 'locked',
-    isLocked: true,
-    createdAt: '2026-10-15T09:00:00Z',
-    writtenAt: '2026-10-15T09:05:00Z',
-    lockedAt: '2026-10-15T09:12:00Z',
-    scanCount: 142,
-    lastScannedAt: '2026-10-16T11:15:00Z',
-    ndefRecordType: 'URI (Well-Known Type \'U\' - 0x55)',
-    ndefPrefix: '0x04 (https://)',
-    ndefPayload: 'https://tapmenu.co.mz/menu/sabores-maputo/01',
-    ndefSize: 64,
-    timeline: [
-      {
-        id: 'evt-1-1',
-        tagId: 'nfc-tag-1',
-        type: 'created',
-        title: 'Etiqueta criada',
-        description: 'Etiqueta virgem identificada e associada à Mesa 01.',
-        timestamp: '2026-10-15T09:00:00Z',
-        actor: 'Admin Rui Mondlane'
-      },
-      {
-        id: 'evt-1-2',
-        tagId: 'nfc-tag-1',
-        type: 'write_started',
-        title: 'Gravação iniciada',
-        description: 'Sintonia RF com leitor e alocação de páginas NDEF 04 a 19.',
-        timestamp: '2026-10-15T09:04:30Z',
-        actor: 'TapMenu NFC Studio'
-      },
-      {
-        id: 'evt-1-3',
-        tagId: 'nfc-tag-1',
-        type: 'write_completed',
-        title: 'Gravação concluída',
-        description: 'Registo NDEF URI gravado: /menu/sabores-maputo/01 (64 bytes).',
-        timestamp: '2026-10-15T09:05:00Z',
-        actor: 'TapMenu NFC Studio'
-      },
-      {
-        id: 'evt-1-4',
-        tagId: 'nfc-tag-1',
-        type: 'verified',
-        title: 'Conteúdo verificado',
-        description: 'Checksum CRC32 validado — Leitura de teste bem-sucedida sem erros de paridade.',
-        timestamp: '2026-10-15T09:05:45Z',
-        actor: 'TapMenu NFC Studio'
-      },
-      {
-        id: 'evt-1-5',
-        tagId: 'nfc-tag-1',
-        type: 'locked',
-        title: 'Etiqueta bloqueada',
-        description: 'Lock-bits estáticos e dinâmicos OTP ativados. Tag em modo permanente Read-Only.',
-        timestamp: '2026-10-15T09:12:00Z',
-        actor: 'Admin Rui Mondlane'
-      }
-    ]
-  },
-  {
-    id: 'nfc-tag-2',
-    uid: '04:8E:9F:3C:44:12:80',
-    tagType: 'NXP NTAG213 (180 Bytes)',
-    tenantId: 'tenant-1',
-    restaurantId: 'rest-1',
-    restaurantName: 'Sabores Maputo',
-    tableId: 'tbl-2',
-    tableNumber: '02',
-    targetUrl: '/menu/sabores-maputo/02',
-    status: 'programmed',
-    isLocked: false,
-    createdAt: '2026-10-15T09:30:00Z',
-    writtenAt: '2026-10-15T09:35:00Z',
-    scanCount: 98,
-    lastScannedAt: '2026-10-16T11:32:00Z',
-    ndefRecordType: 'URI (Well-Known Type \'U\' - 0x55)',
-    ndefPrefix: '0x04 (https://)',
-    ndefPayload: 'https://tapmenu.co.mz/menu/sabores-maputo/02',
-    ndefSize: 64,
-    timeline: [
-      {
-        id: 'evt-2-1',
-        tagId: 'nfc-tag-2',
-        type: 'created',
-        title: 'Etiqueta criada',
-        description: 'Etiqueta física registada para a Mesa 02 da Sala Principal.',
-        timestamp: '2026-10-15T09:30:00Z',
-        actor: 'Admin Rui Mondlane'
-      },
-      {
-        id: 'evt-2-2',
-        tagId: 'nfc-tag-2',
-        type: 'write_started',
-        title: 'Gravação iniciada',
-        description: 'Comunicação NFC estabelecida a 106 kbit/s.',
-        timestamp: '2026-10-15T09:34:40Z',
-        actor: 'TapMenu NFC Studio'
-      },
-      {
-        id: 'evt-2-3',
-        tagId: 'nfc-tag-2',
-        type: 'write_completed',
-        title: 'Gravação concluída',
-        description: 'URL de mesa gravada no bloco de dados NDEF com 64 bytes.',
-        timestamp: '2026-10-15T09:35:00Z',
-        actor: 'TapMenu NFC Studio'
-      },
-      {
-        id: 'evt-2-4',
-        tagId: 'nfc-tag-2',
-        type: 'verified',
-        title: 'Conteúdo verificado',
-        description: 'Leitura de retorno validada com código HTTP 200.',
-        timestamp: '2026-10-15T09:35:30Z',
-        actor: 'TapMenu NFC Studio'
-      }
-    ]
-  },
-  {
-    id: 'nfc-tag-3',
-    uid: '04:71:A3:D8:52:3B:80',
-    tagType: 'NXP NTAG215 (540 Bytes)',
-    tenantId: 'tenant-1',
-    restaurantId: 'rest-1',
-    restaurantName: 'Sabores Maputo',
-    tableId: 'tbl-3',
-    tableNumber: '03',
-    targetUrl: '/menu/sabores-maputo/03',
-    status: 'programmed',
-    isLocked: false,
-    createdAt: '2026-10-15T10:00:00Z',
-    writtenAt: '2026-10-15T10:05:00Z',
-    scanCount: 115,
-    lastScannedAt: '2026-10-16T10:45:00Z',
-    ndefRecordType: 'URI (Well-Known Type \'U\' - 0x55)',
-    ndefPrefix: '0x04 (https://)',
-    ndefPayload: 'https://tapmenu.co.mz/menu/sabores-maputo/03',
-    ndefSize: 64,
-    timeline: [
-      {
-        id: 'evt-3-1',
-        tagId: 'nfc-tag-3',
-        type: 'created',
-        title: 'Etiqueta criada',
-        description: 'Etiqueta NTAG215 associada à Mesa 03.',
-        timestamp: '2026-10-15T10:00:00Z',
-        actor: 'Admin Rui Mondlane'
-      },
-      {
-        id: 'evt-3-2',
-        tagId: 'nfc-tag-3',
-        type: 'write_started',
-        title: 'Gravação iniciada',
-        description: 'Preparação do NDEF Message Container.',
-        timestamp: '2026-10-15T10:04:20Z',
-        actor: 'TapMenu NFC Studio'
-      },
-      {
-        id: 'evt-3-3',
-        tagId: 'nfc-tag-3',
-        type: 'write_completed',
-        title: 'Gravação concluída',
-        description: 'URL gravada com sucesso.',
-        timestamp: '2026-10-15T10:05:00Z',
-        actor: 'TapMenu NFC Studio'
-      },
-      {
-        id: 'evt-3-4',
-        tagId: 'nfc-tag-3',
-        type: 'verified',
-        title: 'Conteúdo verificado',
-        description: 'Leitura de teste efetuada com sucesso.',
-        timestamp: '2026-10-15T10:05:25Z',
-        actor: 'TapMenu NFC Studio'
-      }
-    ]
-  },
-  {
-    id: 'nfc-tag-4',
-    uid: '04:1B:64:E0:9F:8A:80',
-    tagType: 'NXP NTAG213 (180 Bytes)',
-    tenantId: 'tenant-1',
-    restaurantId: 'rest-1',
-    restaurantName: 'Sabores Maputo',
-    tableId: 'tbl-4',
-    tableNumber: '04',
-    targetUrl: '/menu/sabores-maputo/04',
-    status: 'locked',
-    isLocked: true,
-    createdAt: '2026-10-15T10:15:00Z',
-    writtenAt: '2026-10-15T10:18:00Z',
-    lockedAt: '2026-10-15T10:20:00Z',
-    scanCount: 84,
-    lastScannedAt: '2026-10-16T10:15:00Z',
-    ndefRecordType: 'URI (Well-Known Type \'U\' - 0x55)',
-    ndefPrefix: '0x04 (https://)',
-    ndefPayload: 'https://tapmenu.co.mz/menu/sabores-maputo/04',
-    ndefSize: 64,
-    timeline: [
-      {
-        id: 'evt-4-1',
-        tagId: 'nfc-tag-4',
-        type: 'created',
-        title: 'Etiqueta criada',
-        description: 'Etiqueta associada à Mesa 04 da Esplanada.',
-        timestamp: '2026-10-15T10:15:00Z',
-        actor: 'Admin Rui Mondlane'
-      },
-      {
-        id: 'evt-4-2',
-        tagId: 'nfc-tag-4',
-        type: 'write_started',
-        title: 'Gravação iniciada',
-        description: 'Inicialização de gravação NDEF.',
-        timestamp: '2026-10-15T10:17:30Z',
-        actor: 'TapMenu NFC Studio'
-      },
-      {
-        id: 'evt-4-3',
-        tagId: 'nfc-tag-4',
-        type: 'write_completed',
-        title: 'Gravação concluída',
-        description: 'URL do menu gravada com sucesso.',
-        timestamp: '2026-10-15T10:18:00Z',
-        actor: 'TapMenu NFC Studio'
-      },
-      {
-        id: 'evt-4-4',
-        tagId: 'nfc-tag-4',
-        type: 'verified',
-        title: 'Conteúdo verificado',
-        description: 'Dados validados com leitor de bancada.',
-        timestamp: '2026-10-15T10:18:40Z',
-        actor: 'TapMenu NFC Studio'
-      },
-      {
-        id: 'evt-4-5',
-        tagId: 'nfc-tag-4',
-        type: 'locked',
-        title: 'Etiqueta bloqueada',
-        description: 'Proteção permanente ativada contra alterações.',
-        timestamp: '2026-10-15T10:20:00Z',
-        actor: 'Admin Rui Mondlane'
-      },
-      {
-        id: 'evt-4-6',
-        tagId: 'nfc-tag-4',
-        type: 'write_rejected',
-        title: 'Tentativa de alteração recusada',
-        description: 'Tentativa de sobrescrita de URL rejeitada pelo sistema de segurança. A etiqueta está bloqueada e protegida contra escrita.',
-        timestamp: '2026-10-16T14:22:10Z',
-        actor: 'Terminal Móvel de Serviço'
-      }
-    ]
-  },
-  {
-    id: 'nfc-tag-5',
-    uid: '04:C3:77:1A:60:55:80',
-    tagType: 'NXP NTAG213 (180 Bytes)',
-    tenantId: 'tenant-1',
-    restaurantId: 'rest-1',
-    restaurantName: 'Sabores Maputo',
-    tableId: 'tbl-5',
-    tableNumber: '05',
-    targetUrl: '/menu/sabores-maputo/05',
-    status: 'unprogrammed',
-    isLocked: false,
-    createdAt: '2026-10-16T08:00:00Z',
-    scanCount: 0,
-    timeline: [
-      {
-        id: 'evt-5-1',
-        tagId: 'nfc-tag-5',
-        type: 'created',
-        title: 'Etiqueta criada',
-        description: 'Etiqueta virgem alocada para a Mesa 05. Aguarda gravação inicial.',
-        timestamp: '2026-10-16T08:00:00Z',
-        actor: 'Admin Rui Mondlane'
-      }
-    ]
-  },
-  {
-    id: 'nfc-tag-6',
-    uid: '04:2D:99:EE:31:88:80',
-    tagType: 'NXP NTAG213 (180 Bytes)',
-    tenantId: 'tenant-1',
-    restaurantId: 'rest-1',
-    restaurantName: 'Sabores Maputo',
-    tableId: 'tbl-6',
-    tableNumber: '06',
-    targetUrl: '/menu/sabores-maputo/06',
-    status: 'unprogrammed',
-    isLocked: false,
-    createdAt: '2026-10-16T08:15:00Z',
-    scanCount: 0,
-    timeline: [
-      {
-        id: 'evt-6-1',
-        tagId: 'nfc-tag-6',
-        type: 'created',
-        title: 'Etiqueta criada',
-        description: 'Etiqueta virgem alocada para a Mesa 06 (Varanda Lounge).',
-        timestamp: '2026-10-16T08:15:00Z',
-        actor: 'Admin Rui Mondlane'
-      }
-    ]
-  },
-  {
-    id: 'nfc-tag-7',
-    uid: '04:3F:82:54:D0:6B:80',
-    tagType: 'NXP NTAG213 (180 Bytes)',
-    tenantId: 'tenant-1',
-    restaurantId: 'rest-2',
-    restaurantName: 'Sabores Matola',
-    tableId: 'tbl-201',
-    tableNumber: 'M1',
-    targetUrl: '/menu/sabores-matola/M1',
-    status: 'locked',
-    isLocked: true,
-    createdAt: '2026-10-14T11:00:00Z',
-    writtenAt: '2026-10-14T11:05:00Z',
-    lockedAt: '2026-10-14T11:10:00Z',
-    scanCount: 65,
-    lastScannedAt: '2026-10-16T09:40:00Z',
-    ndefRecordType: 'URI (Well-Known Type \'U\' - 0x55)',
-    ndefPrefix: '0x04 (https://)',
-    ndefPayload: 'https://tapmenu.co.mz/menu/sabores-matola/M1',
-    ndefSize: 62,
-    timeline: [
-      {
-        id: 'evt-7-1',
-        tagId: 'nfc-tag-7',
-        type: 'created',
-        title: 'Etiqueta criada',
-        description: 'Etiqueta registada na filial Sabores Matola.',
-        timestamp: '2026-10-14T11:00:00Z',
-        actor: 'Gerente Matola'
-      },
-      {
-        id: 'evt-7-2',
-        tagId: 'nfc-tag-7',
-        type: 'write_started',
-        title: 'Gravação iniciada',
-        description: 'Gravação iniciada no ponto de acesso M1.',
-        timestamp: '2026-10-14T11:04:30Z',
-        actor: 'TapMenu NFC Studio'
-      },
-      {
-        id: 'evt-7-3',
-        tagId: 'nfc-tag-7',
-        type: 'write_completed',
-        title: 'Gravação concluída',
-        description: 'Registo NDEF gravado com sucesso.',
-        timestamp: '2026-10-14T11:05:00Z',
-        actor: 'TapMenu NFC Studio'
-      },
-      {
-        id: 'evt-7-4',
-        tagId: 'nfc-tag-7',
-        type: 'verified',
-        title: 'Conteúdo verificado',
-        description: 'Validação de integridade sem anomalias.',
-        timestamp: '2026-10-14T11:05:30Z',
-        actor: 'TapMenu NFC Studio'
-      },
-      {
-        id: 'evt-7-5',
-        tagId: 'nfc-tag-7',
-        type: 'locked',
-        title: 'Etiqueta bloqueada',
-        description: 'Etiqueta bloqueada permanentemente antes da instalação na mesa exterior.',
-        timestamp: '2026-10-14T11:10:00Z',
-        actor: 'Gerente Matola'
-      }
-    ]
-  },
-  {
-    id: 'nfc-tag-8',
-    uid: '04:90:1C:7B:A8:12:80',
-    tagType: 'NXP NTAG216 (924 Bytes)',
-    tenantId: 'tenant-2',
-    restaurantId: 'rest-4',
-    restaurantName: 'Ocean Restaurant & Lounge',
-    tableId: 'tbl-401',
-    tableNumber: 'O-01',
-    targetUrl: '/menu/ocean-restaurant/O-01',
-    status: 'programmed',
-    isLocked: false,
-    createdAt: '2026-10-14T14:00:00Z',
-    writtenAt: '2026-10-14T14:06:00Z',
-    scanCount: 42,
-    lastScannedAt: '2026-10-16T10:10:00Z',
-    ndefRecordType: 'URI (Well-Known Type \'U\' - 0x55)',
-    ndefPrefix: '0x04 (https://)',
-    ndefPayload: 'https://tapmenu.co.mz/menu/ocean-restaurant/O-01',
-    ndefSize: 66,
-    timeline: [
-      {
-        id: 'evt-8-1',
-        tagId: 'nfc-tag-8',
-        type: 'created',
-        title: 'Etiqueta criada',
-        description: 'Tag de alta capacidade NTAG216 configurada para Deck Baía Mar.',
-        timestamp: '2026-10-14T14:00:00Z',
-        actor: 'David Matsinhe'
-      },
-      {
-        id: 'evt-8-2',
-        tagId: 'nfc-tag-8',
-        type: 'write_started',
-        title: 'Gravação iniciada',
-        description: 'Escrita de payload NDEF URI no chip.',
-        timestamp: '2026-10-14T14:05:20Z',
-        actor: 'TapMenu NFC Studio'
-      },
-      {
-        id: 'evt-8-3',
-        tagId: 'nfc-tag-8',
-        type: 'write_completed',
-        title: 'Gravação concluída',
-        description: 'Dados gravados no chip com sucesso.',
-        timestamp: '2026-10-14T14:06:00Z',
-        actor: 'TapMenu NFC Studio'
-      },
-      {
-        id: 'evt-8-4',
-        tagId: 'nfc-tag-8',
-        type: 'verified',
-        title: 'Conteúdo verificado',
-        description: 'Verificação com leitor móvel OK.',
-        timestamp: '2026-10-14T14:06:40Z',
-        actor: 'TapMenu NFC Studio'
-      }
-    ]
-  }
-]
+function isStatus(value: unknown): value is NfcTag['status'] {
+  return value === 'active' || value === 'protected' || value === 'failed' || value === 'unassigned'
+}
+
+export interface EnsureNfcRecordParams {
+  tenantId: string
+  restaurantId: string
+  restaurantName: string
+  tableId: string
+  tableNumber: string
+  tableArea?: string
+  url: string
+  actor?: string
+}
+
+export interface RegisterWriteParams {
+  record: NfcTag
+  outcome: NFCWriteOutcome
+  /**
+   * Resultado real da verificação:
+   *  - 'verified': etiqueta relida e URL igual ao esperado;
+   *  - 'different' | 'no_url' | 'unreadable' | 'cancelled': gravação real
+   *    aconteceu mas o conteúdo gravado não foi confirmado/aprovado.
+   */
+  verification: 'verified' | 'different' | 'no_url' | 'unreadable' | 'cancelled'
+  foundUrl?: string | null
+  actor?: string
+}
 
 export const useNfcStore = defineStore('nfc', () => {
+  const authStore = useAuthStore()
   const toastStore = useToastStore()
-  const tags = ref<NfcTag[]>([])
+
+  const records = ref<NfcTag[]>([])
   const isLoaded = ref(false)
 
-  const loadTags = () => {
+  const currentActor = (): string => authStore.currentUser?.name || 'Operador TapMenu'
+
+  // ---------- Persistência local ----------
+  const persist = () => {
     try {
-      const stored = localStorage.getItem(STORAGE_KEY)
-      if (stored) {
-        const parsed = JSON.parse(stored)
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          tags.value = parsed
-          isLoaded.value = true
-          return
+      localStorage.setItem(REGISTRY_KEY, JSON.stringify(records.value))
+    } catch (e) {
+      console.error('Erro ao guardar o registo NFC', e)
+    }
+  }
+
+  const loadRegistry = () => {
+    try {
+      // Limpa dados da versão simulada anterior (UIDs/timelines fictícios)
+      localStorage.removeItem(LEGACY_KEY)
+
+      const raw = localStorage.getItem(REGISTRY_KEY)
+      if (raw) {
+        const parsed = JSON.parse(raw)
+        if (Array.isArray(parsed)) {
+          records.value = parsed.filter(
+            (r): r is NfcTag =>
+              r &&
+              typeof r.id === 'string' &&
+              typeof r.restaurantId === 'string' &&
+              typeof r.tableId === 'string' &&
+              typeof r.url === 'string' &&
+              isStatus(r.status) &&
+              Array.isArray(r.timeline)
+          )
         }
       }
     } catch (e) {
-      console.warn('Erro ao carregar etiquetas NFC do storage', e)
+      console.warn('Erro ao carregar o registo NFC', e)
+      records.value = []
     }
-
-    tags.value = JSON.parse(JSON.stringify(initialTags))
-    saveToStorage()
     isLoaded.value = true
   }
 
-  const saveToStorage = () => {
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(tags.value))
-    } catch (e) {
-      console.error('Erro ao guardar etiquetas NFC', e)
-    }
+  const resetLocalRegistry = () => {
+    records.value = []
+    persist()
+    toastStore.info('Registo limpo', 'Todas as etiquetas e histórico NFC foram removidos deste dispositivo.')
   }
 
-  const resetToDefault = () => {
-    tags.value = JSON.parse(JSON.stringify(initialTags))
-    saveToStorage()
-    toastStore.success('Demonstração Reiniciada', 'Todas as etiquetas NFC foram repostas aos dados padrão.')
+  // ---------- Consultas ----------
+  const getRecordById = (id: string): NfcTag | undefined => records.value.find(r => r.id === id)
+
+  const getRecordByTable = (restaurantId: string, tableId: string): NfcTag | undefined =>
+    records.value.find(r => r.restaurantId === restaurantId && r.tableId === tableId)
+
+  const getRecordByUrl = (url: string): NfcTag | undefined => {
+    const norm = normalizeMenuUrl(url)
+    return records.value.find(r => normalizeMenuUrl(r.url) === norm)
   }
 
-  const getTagById = (id: string): NfcTag | undefined => {
-    return tags.value.find(t => t.id === id)
-  }
-
-  const getTagByTable = (restaurantId: string, tableId: string): NfcTag | undefined => {
-    return tags.value.find(t => t.restaurantId === restaurantId && t.tableId === tableId)
-  }
-
-  // Simulation: Write NFC Tag
-  const writeTag = (params: {
-    tagId?: string
-    restaurantId: string
-    restaurantName: string
-    tenantId: string
-    tableId: string
-    tableNumber: string
-    targetUrl: string
-    tagType?: string
+  // ---------- Utilitários de timeline ----------
+  const pushEvent = (
+    record: NfcTag,
+    type: NfcTimelineEventType,
+    title: string,
+    description: string,
     actor?: string
-  }): { success: boolean; tag?: NfcTag; message?: string } => {
-    const actor = params.actor || 'TapMenu NFC Studio'
-    const now = new Date().toISOString()
-    const fullPayload = typeof window !== 'undefined'
-      ? `${window.location.origin}${params.targetUrl}`
-      : `https://tapmenu.co.mz${params.targetUrl}`
+  ) => {
+    const evt: NfcTimelineEvent = {
+      id: newId('evt'),
+      tagId: record.id,
+      type,
+      title,
+      description,
+      timestamp: nowIso(),
+      actor: actor || currentActor()
+    }
+    record.timeline.unshift(evt)
+    return evt
+  }
 
-    // Check if target tag is existing and locked
-    let target = params.tagId ? getTagById(params.tagId) : getTagByTable(params.restaurantId, params.tableId)
+  const setLastOperation = (record: NfcTag, op: NfcOperationType) => {
+    record.lastOperation = op
+    record.lastOperationAt = nowIso()
+  }
 
-    if (target && target.isLocked) {
-      // Block! Record rejected attempt in timeline
-      recordRefusedModification(target.id, 'Tentativa de alteração de URL rejeitada. A etiqueta está bloqueada permanentemente.')
-      return {
-        success: false,
-        tag: target,
-        message: 'Etiqueta protegida — alterações não permitidas. O chip está bloqueado contra escrita por hardware.'
-      }
+  // ---------- Criação de registos ----------
+  /** Garante a existência de um registo local para a mesa (estado virgem). */
+  const ensureRecordForTable = (params: EnsureNfcRecordParams): NfcTag => {
+    const existing = getRecordByTable(params.restaurantId, params.tableId)
+    if (existing) {
+      // Atualiza URL de destino (mesa/URL podem ter mudado nos dados mock)
+      const wasWritten = !!existing.lastWrittenAt
+      if (!wasWritten) existing.url = params.url
+      existing.restaurantName = params.restaurantName
+      existing.tableNumber = params.tableNumber
+      existing.tableArea = params.tableArea
+      persist()
+      return existing
     }
 
-    if (!target) {
-      // Create new tag
-      const newTag: NfcTag = {
-        id: `nfc-tag-${Date.now()}`,
-        uid: generateRealisticNfcUid(),
-        tagType: params.tagType || 'NXP NTAG213 (180 Bytes)',
-        tenantId: params.tenantId,
-        restaurantId: params.restaurantId,
-        restaurantName: params.restaurantName,
-        tableId: params.tableId,
-        tableNumber: params.tableNumber,
-        targetUrl: params.targetUrl,
-        status: 'programmed',
-        isLocked: false,
-        createdAt: now,
-        writtenAt: now,
-        scanCount: 0,
-        ndefRecordType: 'URI (Well-Known Type \'U\' - 0x55)',
-        ndefPrefix: '0x04 (https://)',
-        ndefPayload: fullPayload,
-        ndefSize: calculateNdefUriSize(fullPayload),
-        timeline: [
-          {
-            id: `evt-${Date.now()}-1`,
-            tagId: `nfc-tag-${Date.now()}`,
-            type: 'created',
-            title: 'Etiqueta criada',
-            description: `Nova etiqueta NFC alocada para Mesa ${params.tableNumber}.`,
-            timestamp: now,
-            actor
-          },
-          {
-            id: `evt-${Date.now()}-2`,
-            tagId: `nfc-tag-${Date.now()}`,
-            type: 'write_started',
-            title: 'Gravação iniciada',
-            description: 'Transmissão de blocos NDEF TLV iniciada.',
-            timestamp: now,
-            actor
-          },
-          {
-            id: `evt-${Date.now()}-3`,
-            tagId: `nfc-tag-${Date.now()}`,
-            type: 'write_completed',
-            title: 'Gravação concluída',
-            description: `URL gravada: ${params.targetUrl} (${calculateNdefUriSize(fullPayload)} bytes).`,
-            timestamp: now,
-            actor
-          },
-          {
-            id: `evt-${Date.now()}-4`,
-            tagId: `nfc-tag-${Date.now()}`,
-            type: 'verified',
-            title: 'Conteúdo verificado',
-            description: 'Checksum CRC32 validado — Leitura de teste bem-sucedida.',
-            timestamp: now,
-            actor
-          }
-        ]
-      }
-      tags.value.unshift(newTag)
-      saveToStorage()
-      toastStore.success('Gravação Concluída!', `Etiqueta gravada com sucesso para a Mesa ${params.tableNumber}.`)
-      return { success: true, tag: newTag }
-    } else {
-      // Update existing unlocked tag
-      target.targetUrl = params.targetUrl
-      target.writtenAt = now
-      target.status = 'programmed'
-      target.ndefPayload = fullPayload
-      target.ndefSize = calculateNdefUriSize(fullPayload)
-      target.ndefRecordType = 'URI (Well-Known Type \'U\' - 0x55)'
-      target.ndefPrefix = '0x04 (https://)'
+    const record: NfcTag = {
+      id: newId('nfc'),
+      tenantId: params.tenantId,
+      restaurantId: params.restaurantId,
+      restaurantName: params.restaurantName,
+      tableId: params.tableId,
+      tableNumber: params.tableNumber,
+      tableArea: params.tableArea,
+      url: params.url,
+      ndefType: NDEF_URI_TYPE,
+      status: 'unassigned',
+      serialNumber: null,
+      hardwareName: null, // a Web NFC não fornece o modelo do chip
+      protection: 'none',
+      writeCount: 0,
+      createdAt: nowIso(),
+      timeline: []
+    }
+    pushEvent(
+      record,
+      'created',
+      'Registo criado',
+      `Etiqueta registada no sistema para a Mesa ${params.tableNumber}. Aguarda gravação física do URL.`,
+      params.actor
+    )
+    records.value.push(record)
+    persist()
+    return record
+  }
 
-      // Add timeline operations
-      target.timeline.unshift(
-        {
-          id: `evt-${Date.now()}-v`,
-          tagId: target.id,
-          type: 'verified',
-          title: 'Conteúdo verificado',
-          description: 'Checksum CRC32 validado — Leitura de teste bem-sucedida.',
-          timestamp: now,
-          actor
-        },
-        {
-          id: `evt-${Date.now()}-wc`,
-          tagId: target.id,
-          type: 'write_completed',
-          title: 'Gravação concluída',
-          description: `Novo conteúdo gravado: ${params.targetUrl}.`,
-          timestamp: now,
-          actor
-        },
-        {
-          id: `evt-${Date.now()}-ws`,
-          tagId: target.id,
-          type: 'write_started',
-          title: 'Gravação iniciada',
-          description: 'Regravação de registo NDEF iniciada.',
-          timestamp: now,
-          actor
-        }
+  // ---------- Operações reais ----------
+  /**
+   * Regista o resultado REAL de uma sessão de gravação.
+   * A gravação física só acontece via nfcService.writeNdefUrl — o outcome
+   * contém as deteções lidas da etiqueta pelo browser.
+   */
+  const registerWrite = (params: RegisterWriteParams): NfcTag => {
+    const { record, outcome, verification } = params
+    const isRewrite = record.writeCount > 0 || !!record.lastWrittenAt
+
+    // Serial físico apenas se o browser o fornecer
+    const detectedSerial = outcome.detections.find(d => !!d.serialNumber)?.serialNumber ?? null
+    if (detectedSerial) record.serialNumber = detectedSerial
+
+    // Etiqueta protegida nunca deve chegar aqui (bloqueado a montante)
+    if (record.protection === 'system' && record.status === 'protected') {
+      recordBlockedAttempt(record.id, 'Regravação impedida: etiqueta protegida no sistema.')
+      return record
+    }
+
+    // 1. Início da sessão física
+    pushEvent(
+      record,
+      'write_started',
+      isRewrite ? 'Regravação iniciada' : 'Gravação iniciada',
+      'Sessão NFC ativa — aguardar aproximação da etiqueta. Foram detetadas ' +
+        `${outcome.detections.length} leitura(s) física(s) durante a sessão.`,
+      params.actor
+    )
+
+    // 2. Escrita concluída (a promise de write() terminou com sucesso)
+    record.status = 'active'
+    record.url = outcome.url
+    record.lastWrittenAt = outcome.writtenAt
+    record.writeCount += 1
+    record.ndefType = NDEF_URI_TYPE
+    setLastOperation(record, isRewrite ? 'rewrite' : 'write')
+
+    pushEvent(
+      record,
+      'write_completed',
+      isRewrite ? 'Etiqueta regravada' : 'Gravação concluída',
+      `Registo NDEF URL gravado fisicamente: ${outcome.url}`,
+      params.actor
+    )
+
+    // 3. Verificação real (leitura de retorno — só se o browser permitir)
+    if (verification === 'verified') {
+      record.lastVerifiedAt = nowIso()
+      pushEvent(
+        record,
+        'verified',
+        'Conteúdo verificado',
+        `Leitura de retorno confirma o URL gravado: ${outcome.url}`,
+        params.actor
       )
-
-      saveToStorage()
-      toastStore.success('Gravação Atualizada!', `Etiqueta reprogramada para a Mesa ${target.tableNumber}.`)
-      return { success: true, tag: target }
+      toastStore.success('Gravação concluída!', `Etiqueta verificada — Mesa ${record.tableNumber}.`)
+    } else {
+      pushEvent(
+        record,
+        'verify_failed',
+        'Verificação não confirmada',
+        'Não foi possível confirmar que o conteúdo gravado corresponde ao endereço esperado. O conteúdo foi gravado, mas a etiqueta fica marcada como NÃO validada.',
+        params.actor
+      )
+      toastStore.warning(
+        'Gravação sem verificação',
+        'A escrita terminou, mas o conteúdo não pôde ser confirmado por nova leitura.'
+      )
     }
+
+    persist()
+    return record
   }
 
-  // Simulation: Lock NFC Tag
-  const lockTag = (tagId: string, actor: string = 'Administrador TapMenu'): { success: boolean; tag?: NfcTag; message?: string } => {
-    const target = getTagById(tagId)
-    if (!target) {
-      return { success: false, message: 'Etiqueta não encontrada' }
+  /**
+   * Regista a falha REAL de uma tentativa de gravação.
+   * Nunca marca como gravada — a etiqueta permanece sem confirmação.
+   */
+  const registerWriteFailure = (record: NfcTag, reason: string, actor?: string) => {
+    pushEvent(record, 'write_failed', 'Gravação falhou', reason, actor)
+    setLastOperation(record, 'error')
+    // Só marca 'failed' quando nunca existiu gravação comprovada
+    if (record.status === 'unassigned') {
+      record.status = 'failed'
+    }
+    persist()
+    return record
+  }
+
+  /** Sessão cancelada antes de qualquer escrita física confirmada. */
+  const registerCancellation = (record: NfcTag, reason?: string) => {
+    pushEvent(
+      record,
+      'cancelled',
+      'Gravação cancelada',
+      reason || 'A sessão de gravação foi cancelada antes de o navegador confirmar qualquer escrita física.'
+    )
+    setLastOperation(record, 'cancelled')
+    persist()
+    return record
+  }
+
+  /**
+   * Registra uma leitura real de etiqueta cujo URL corresponde a um registo.
+   * (Etiquetas com URLs desconhecidos não são associadas a nenhuma mesa.)
+   */
+  const registerRead = (record: NfcTag, read: ParsedNfcRead) => {
+    const found = read.url ? normalizeMenuUrl(read.url) : null
+    const expected = normalizeMenuUrl(record.url)
+    if (found === expected) {
+      pushEvent(record, 'read', 'Etiqueta lida', `Conteúdo lido corresponde ao URL registado (${record.url}).`)
+    } else {
+      pushEvent(
+        record,
+        'read',
+        'Leitura com divergência',
+        `URL lido (${found ?? 'sem URL'}) difere do registado (${record.url}). Verifique a etiqueta.`
+      )
+    }
+    setLastOperation(record, 'read')
+    persist()
+    return record
+  }
+
+  /** Resultado real do verificador (detalhes/após-verificação). */
+  const registerVerify = (record: NfcTag, status: 'verified' | 'different' | 'no_url', foundUrl?: string | null) => {
+    setLastOperation(record, 'verify')
+    if (status === 'verified') {
+      record.lastVerifiedAt = nowIso()
+      pushEvent(record, 'verified', 'Conteúdo verificado', `Leitura confirma o URL gravado: ${record.url}.`)
+      toastStore.success('Verificação concluída', 'Etiqueta verificada com sucesso.')
+    } else if (status === 'different') {
+      pushEvent(
+        record,
+        'verify_failed',
+        'Verificação divergente',
+        `URL encontrado (${foundUrl}) difere do esperado (${record.url}). A etiqueta não é marcada como validada.`
+      )
+      toastStore.warning('Verificação divergente', 'Conteúdo físico não corresponde ao endereço esperado.')
+    } else {
+      pushEvent(
+        record,
+        'verify_failed',
+        'Verificação sem registo URL',
+        'A etiqueta foi lida mas não contém um registo NDEF URL confirmável.'
+      )
+      toastStore.warning('Verificação inconclusiva', 'A etiqueta não contém um registo URL.')
+    }
+    persist()
+    return record
+  }
+
+  // ---------- Proteção (SISTEMA — nunca física) ----------
+  const protectRecord = (tagId: string, reason?: string, actor?: string) => {
+    const record = getRecordById(tagId)
+    if (!record) return { success: false, record, message: 'Etiqueta não encontrada no registo local.' }
+    if (record.protection === 'system' && record.status === 'protected') {
+      return { success: true, record, message: 'A etiqueta já está protegida no sistema.' }
     }
 
-    if (target.isLocked) {
-      return { success: true, tag: target, message: 'A etiqueta já se encontra bloqueada.' }
-    }
-
-    const now = new Date().toISOString()
-    target.isLocked = true
-    target.status = 'locked'
-    target.lockedAt = now
-
-    // Add locking event to timeline
-    target.timeline.unshift({
-      id: `evt-${Date.now()}-lock`,
-      tagId: target.id,
-      type: 'locked',
-      title: 'Etiqueta bloqueada',
-      description: 'Lock-bits estáticos e dinâmicos OTP ativados. O chip NTAG foi selado permanentemente em modo apenas leitura.',
-      timestamp: now,
+    record.protection = 'system'
+    record.status = 'protected'
+    setLastOperation(record, 'protect')
+    pushEvent(
+      record,
+      'protected',
+      'Etiqueta protegida',
+      reason ||
+        'Proteção ATIVADA NO SISTEMA: o TapMenu impede a regravação desta etiqueta pela aplicação. Bloqueio físico por hardware não é possível via Web NFC.',
       actor
-    })
-
-    saveToStorage()
-    toastStore.success('Etiqueta Bloqueada!', `A etiqueta da Mesa ${target.tableNumber} está agora protegida permanentemente.`)
-    return { success: true, tag: target }
+    )
+    persist()
+    toastStore.success('Etiqueta protegida', `Mesa ${record.tableNumber} não pode ser regravada pelo sistema.`)
+    return { success: true, record, message: 'Etiqueta protegida no sistema.' }
   }
 
-  // Simulation: Unlock/Unprotect NFC Tag for future modifications
-  const unlockTag = (tagId: string, actor: string = 'Administrador TapMenu'): { success: boolean; tag?: NfcTag; message?: string } => {
-    const target = getTagById(tagId)
-    if (!target) {
-      return { success: false, message: 'Etiqueta não encontrada' }
+  const unprotectRecord = (tagId: string, actor?: string) => {
+    const record = getRecordById(tagId)
+    if (!record) return { success: false, record, message: 'Etiqueta não encontrada no registo local.' }
+    if (record.protection !== 'system' || record.status !== 'protected') {
+      return { success: true, record, message: 'A etiqueta já não está protegida.' }
     }
 
-    if (!target.isLocked) {
-      return { success: true, tag: target, message: 'A etiqueta já se encontra desprotegida.' }
-    }
-
-    const now = new Date().toISOString()
-    target.isLocked = false
-    target.status = target.writtenAt ? 'programmed' : 'unprogrammed'
-    target.lockedAt = undefined
-
-    // Add unlocking event to timeline
-    target.timeline.unshift({
-      id: `evt-${Date.now()}-unlock`,
-      tagId: target.id,
-      type: 'unlocked',
-      title: 'Etiqueta desprotegida',
-      description: 'Proteção de escrita removida com autorização de administrador (PWD AUTH). Modo Read/Write reativado para futuras alterações.',
-      timestamp: now,
+    record.protection = 'none'
+    record.status = record.lastWrittenAt ? 'active' : 'unassigned'
+    setLastOperation(record, 'unprotect')
+    pushEvent(
+      record,
+      'unprotected',
+      'Proteção removida (sistema)',
+      'A proteção LÓGICA do TapMenu foi retirada. Se a etiqueta foi bloqueada fisicamente por outra ferramenta externa, a gravação continua impossível — verifique com o "Testar NFC".',
       actor
-    })
-
-    saveToStorage()
-    toastStore.success('Etiqueta Desprotegida!', `A Mesa ${target.tableNumber} pode agora ser regravada ou editada.`)
-    return { success: true, tag: target }
+    )
+    persist()
+    toastStore.success('Proteção removida', `Mesa ${record.tableNumber} pode ser regravada pelo sistema.`)
+    return { success: true, record, message: 'Proteção removida.' }
   }
 
-  // Record a refused modification attempt on a locked tag
-  const recordRefusedModification = (tagId: string, reason?: string, actor: string = 'Terminal de Serviço'): void => {
-    const target = getTagById(tagId)
-    if (!target) return
-
-    const now = new Date().toISOString()
-    target.timeline.unshift({
-      id: `evt-${Date.now()}-rej`,
-      tagId: target.id,
-      type: 'write_rejected',
-      title: 'Tentativa de alteração recusada',
-      description: reason || 'Tentativa de alteração recusada: O chip NFC está bloqueado e protegido contra escrita. Alteração impedida pelo sistema.',
-      timestamp: now,
+  /** Tentativa bloqueada de regravação numa etiqueta protegida. */
+  const recordBlockedAttempt = (tagId: string, reason?: string, actor?: string) => {
+    const record = getRecordById(tagId)
+    if (!record) return
+    pushEvent(
+      record,
+      'write_rejected',
+      'Tentativa bloqueada',
+      reason || 'Tentativa de regravação recusada — a etiqueta está protegida no sistema.',
       actor
-    })
-
-    saveToStorage()
-    toastStore.error('Alteração Recusada', 'Etiqueta protegida — alterações não permitidas.')
+    )
+    setLastOperation(record, 'blocked_attempt')
+    persist()
   }
 
-  // Global Timeline across all tags
+  // ---------- Histórico global ----------
   const allTimelineEvents = computed(() => {
-    const events: Array<NfcTimelineEvent & { tagUid: string; tableNumber: string; restaurantName: string }> = []
-    tags.value.forEach(tag => {
-      tag.timeline.forEach(evt => {
+    const events: Array<NfcTimelineEvent & { recordId: string; serial: string | null; tableNumber: string; restaurantName: string; url: string }> = []
+    records.value.forEach(record => {
+      record.timeline.forEach(evt => {
         events.push({
           ...evt,
-          tagUid: tag.uid,
-          tableNumber: tag.tableNumber,
-          restaurantName: tag.restaurantName
+          recordId: record.id,
+          serial: record.serialNumber,
+          tableNumber: record.tableNumber,
+          restaurantName: record.restaurantName,
+          url: record.url
         })
       })
     })
     return events.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
   })
 
-  // Summary Metrics
-  const metrics = computed(() => {
-    const total = tags.value.length
-    const programmed = tags.value.filter(t => t.status === 'programmed').length
-    const locked = tags.value.filter(t => t.isLocked).length
-    const unprogrammed = tags.value.filter(t => t.status === 'unprogrammed').length
-    const totalScans = tags.value.reduce((acc, t) => acc + (t.scanCount || 0), 0)
+  /** Histórico "plano" pedido pela gestão (data, operador, restaurante, mesa, URL, operação, resultado). */
+  const historyEntries = computed(() => {
+    return allTimelineEvents.value.map(evt => ({
+      id: evt.id,
+      timestamp: evt.timestamp,
+      actor: evt.actor ?? '—',
+      restaurantName: evt.restaurantName,
+      tableNumber: evt.tableNumber,
+      url: evt.url,
+      operation: evt.type,
+      result: evt.description
+    }))
+  })
 
-    return {
-      total,
-      programmed,
-      locked,
-      unprogrammed,
-      totalScans
-    }
+  const metrics = computed(() => {
+    const total = records.value.length
+    const active = records.value.filter(r => r.status === 'active').length
+    const protectedCount = records.value.filter(r => r.status === 'protected').length
+    const unassigned = records.value.filter(r => r.status === 'unassigned').length
+    const failed = records.value.filter(r => r.status === 'failed').length
+    const verified = records.value.filter(r => !!r.lastVerifiedAt).length
+    const writeTotal = records.value.reduce((acc, r) => acc + (r.writeCount || 0), 0)
+    return { total, active, protected: protectedCount, unassigned, failed, verified, writeTotal }
   })
 
   return {
-    tags,
+    records,
     isLoaded,
-    loadTags,
-    saveToStorage,
-    resetToDefault,
-    getTagById,
-    getTagByTable,
-    writeTag,
-    lockTag,
-    unlockTag,
-    recordRefusedModification,
+    loadRegistry,
+    resetLocalRegistry,
+    getRecordById,
+    getRecordByTable,
+    getRecordByUrl,
+    ensureRecordForTable,
+    registerWrite,
+    registerWriteFailure,
+    registerCancellation,
+    registerRead,
+    registerVerify,
+    protectRecord,
+    unprotectRecord,
+    recordBlockedAttempt,
     allTimelineEvents,
+    historyEntries,
     metrics
   }
 })
 
+/** Mensagem honesta sobre proteção — usada pelos modais. */
+export const HARDWARE_LOCK_NOTE =
+  'Bloqueio físico por hardware (read-only permanente) não é suportado pela Web NFC API neste dispositivo/navegador.'

@@ -30,7 +30,7 @@ export interface Company {
   name: string
   legalName: string
   slug: string
-  taxId: string // NUIT em Moçambique
+  taxId: string // NUIT em MoÃƒÂ§ambique
   logoUrl?: string
   primaryColor?: string
   phone: string
@@ -139,17 +139,12 @@ export interface DigitalAccess {
   updatedAt: string
 }
 
-export interface NfcSimulationRecord {
-  id: string
-  digitalAccessId: string
-  tableNumber: string
-  restaurantName: string
-  urlPayload: string
-  tagUid: string
-  timestamp: string
-  success: boolean
-  statusMessage: string
-}
+// ==========================================
+// NFC REAL — re-export of src/types/nfc.ts
+// (registry, timeline, capabilities, errors)
+// ==========================================
+
+export * from './nfc'
 
 export interface Category {
   id: string
@@ -407,55 +402,7 @@ export interface DashboardMetrics {
   unavailableProductsCount: number
 }
 
-// ==========================================
-// NFC MANAGEMENT & SIMULATION TYPES
-// ==========================================
-
-export type NfcTagStatus = 'unprogrammed' | 'programmed' | 'locked'
-
-export type NfcTimelineEventType =
-  | 'created'
-  | 'write_started'
-  | 'write_completed'
-  | 'verified'
-  | 'locked'
-  | 'unlocked'
-  | 'write_rejected'
-
-export interface NfcTimelineEvent {
-  id: string
-  tagId: string
-  type: NfcTimelineEventType
-  title: string
-  description: string
-  timestamp: string
-  actor?: string
-}
-
-export interface NfcTag {
-  id: string
-  uid: string
-  tagType: string
-  tenantId: string
-  restaurantId: string
-  restaurantName: string
-  tableId: string
-  tableNumber: string
-  targetUrl: string
-  status: NfcTagStatus
-  isLocked: boolean
-  writtenAt?: string
-  lockedAt?: string
-  createdAt: string
-  scanCount: number
-  lastScannedAt?: string
-  ndefRecordType?: string
-  ndefPrefix?: string
-  ndefPayload?: string
-  ndefSize?: number
-  timeline: NfcTimelineEvent[]
-}
-
+// NFC real module types (registry, timeline, capabilities, errors)
 // ==========================================
 // CUSTOMER EXPERIENCE & REVIEWS TYPES
 // ==========================================
@@ -547,7 +494,7 @@ export interface HourlySalesData {
   label: string // e.g. "12h"
   orderCount: number
   revenue: number
-  periodTag: 'Pequeno-almoço' | 'Almoço' | 'Tarde' | 'Jantar' | 'Noite'
+  periodTag: 'Pequeno-almoÃƒÂ§o' | 'AlmoÃƒÂ§o' | 'Tarde' | 'Jantar' | 'Noite'
   isPeak: boolean
 }
 

@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
-import type { Table, TableStatus, DigitalAccess, NfcSimulationRecord } from '@/types'
+import type { Table, TableStatus, DigitalAccess } from '@/types'
 import { tableService, digitalAccessService } from '@/services'
 import { useTenantStore } from './tenant'
 import { useToastStore } from './toast'
@@ -12,7 +12,6 @@ export const useTableStore = defineStore('table', () => {
 
   const tables = ref<Table[]>([])
   const accessList = ref<DigitalAccess[]>([])
-  const nfcHistory = ref<NfcSimulationRecord[]>([])
   const isLoading = ref(false)
 
   const loadTables = async () => {
@@ -124,35 +123,14 @@ export const useTableStore = defineStore('table', () => {
     }
   }
 
-  // NFC Simulation
-  const simulateNfcWrite = (digitalAccess: DigitalAccess): NfcSimulationRecord => {
-    const record: NfcSimulationRecord = {
-      id: `nfc-sim-${Date.now()}`,
-      digitalAccessId: digitalAccess.id,
-      tableNumber: digitalAccess.tableNumber,
-      restaurantName: tenantStore.currentRestaurant?.name || 'Restaurante',
-      urlPayload: `${window.location.origin}${digitalAccess.url}`,
-      tagUid: digitalAccess.nfcTagUid || `NFC-TAG-${Math.floor(1000 + Math.random() * 9000)}`,
-      timestamp: new Date().toISOString(),
-      success: true,
-      statusMessage: 'Sucesso: URL codificada e gravada na tag NFC simulada (NDEF URI Record).'
-    }
-
-    nfcHistory.value.unshift(record)
-    toastStore.success('Simulação de Escrita NFC Concluída', `URL gravada para Mesa ${digitalAccess.tableNumber}`)
-    return record
-  }
-
   return {
     tables,
     accessList,
-    nfcHistory,
     isLoading,
     loadTables,
     generateQrCode,
     updateTableStatus,
     saveTable,
-    deleteTable,
-    simulateNfcWrite
+    deleteTable
   }
 })

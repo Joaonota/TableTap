@@ -9,13 +9,19 @@ import {
   Unlock,
   ShieldAlert,
   Clock,
+  Search,
+  XCircle,
+  Ban,
+  X,
   User
 } from 'lucide-vue-next'
 
 interface TimelineItem extends NfcTimelineEvent {
-  tagUid?: string
+  recordId?: string
+  serial?: string | null
   tableNumber?: string
   restaurantName?: string
+  url?: string
 }
 
 interface Props {
@@ -33,14 +39,14 @@ const getEventConfig = (type: NfcTimelineEvent['type']) => {
       return {
         icon: Radio,
         colorClass: 'evt-created',
-        badgeText: 'Criação',
+        badgeText: 'Registo',
         badgeVariant: 'neutral'
       }
     case 'write_started':
       return {
         icon: Cpu,
         colorClass: 'evt-started',
-        badgeText: 'Inicialização',
+        badgeText: 'Gravação iniciada',
         badgeVariant: 'primary'
       }
     case 'write_completed':
@@ -50,6 +56,13 @@ const getEventConfig = (type: NfcTimelineEvent['type']) => {
         badgeText: 'Gravada',
         badgeVariant: 'success'
       }
+    case 'write_failed':
+      return {
+        icon: XCircle,
+        colorClass: 'evt-failed',
+        badgeText: 'Gravação falhou',
+        badgeVariant: 'danger'
+      }
     case 'verified':
       return {
         icon: ShieldCheck,
@@ -57,14 +70,28 @@ const getEventConfig = (type: NfcTimelineEvent['type']) => {
         badgeText: 'Verificada',
         badgeVariant: 'info'
       }
-    case 'locked':
+    case 'verify_failed':
+      return {
+        icon: Search,
+        colorClass: 'evt-unverified',
+        badgeText: 'Verificação inconclusiva',
+        badgeVariant: 'warning'
+      }
+    case 'read':
+      return {
+        icon: Search,
+        colorClass: 'evt-read',
+        badgeText: 'Leitura',
+        badgeVariant: 'teal'
+      }
+    case 'protected':
       return {
         icon: Lock,
         colorClass: 'evt-locked',
-        badgeText: 'Bloqueada',
+        badgeText: 'Protegida',
         badgeVariant: 'warning'
       }
-    case 'unlocked':
+    case 'unprotected':
       return {
         icon: Unlock,
         colorClass: 'evt-unlocked',
@@ -76,6 +103,20 @@ const getEventConfig = (type: NfcTimelineEvent['type']) => {
         icon: ShieldAlert,
         colorClass: 'evt-rejected',
         badgeText: 'Recusada',
+        badgeVariant: 'danger'
+      }
+    case 'cancelled':
+      return {
+        icon: Ban,
+        colorClass: 'evt-cancelled',
+        badgeText: 'Cancelada',
+        badgeVariant: 'neutral'
+      }
+    case 'error':
+      return {
+        icon: X,
+        colorClass: 'evt-failed',
+        badgeText: 'Erro',
         badgeVariant: 'danger'
       }
     default:
@@ -146,15 +187,18 @@ const formatDate = (iso: string) => {
           </div>
 
           <!-- Context if in global view -->
-          <div v-if="showTagContext && (evt.tableNumber || evt.tagUid)" class="context-pill-row">
+          <div v-if="showTagContext && (evt.tableNumber || evt.serial)" class="context-pill-row">
             <span v-if="evt.restaurantName" class="context-pill">
               {{ evt.restaurantName }}
             </span>
             <span v-if="evt.tableNumber" class="context-pill table-pill">
               Mesa {{ evt.tableNumber }}
             </span>
-            <span v-if="evt.tagUid" class="context-pill uid-pill">
-              UID: {{ evt.tagUid }}
+            <span v-if="evt.url" class="context-pill url-pill">
+              {{ evt.url }}
+            </span>
+            <span v-if="evt.serial" class="context-pill uid-pill">
+              Serial: {{ evt.serial }}
             </span>
           </div>
 
@@ -356,6 +400,12 @@ const formatDate = (iso: string) => {
   color: #475569;
 }
 
+.url-pill {
+  font-family: monospace;
+  background: var(--color-primary-50);
+  color: var(--color-primary-800);
+}
+
 .event-desc {
   font-size: 0.8125rem;
   color: var(--color-neutral-700);
@@ -437,6 +487,40 @@ const formatDate = (iso: string) => {
 .evt-rejected .timeline-card {
   border-color: var(--color-danger-200);
   background: #fff8f8;
+}
+
+.evt-failed .timeline-node {
+  background-color: var(--color-danger-50);
+  color: var(--color-danger-600);
+  border: 1px solid var(--color-danger-200);
+}
+
+.evt-failed .timeline-card {
+  border-color: var(--color-danger-200);
+  background: #fff8f8;
+}
+
+.evt-unverified .timeline-node {
+  background-color: var(--color-warning-50);
+  color: #b45309;
+  border: 1px solid #fde68a;
+}
+
+.evt-unverified .timeline-card {
+  border-color: #fde68a;
+  background: #fffdf5;
+}
+
+.evt-read .timeline-node {
+  background-color: #f0fdfa;
+  color: #0d9488;
+  border: 1px solid #99f6e4;
+}
+
+.evt-cancelled .timeline-node {
+  background-color: var(--color-neutral-100);
+  color: var(--color-neutral-600);
+  border: 1px solid var(--border-medium);
 }
 
 @keyframes shake {

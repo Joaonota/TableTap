@@ -1,12 +1,15 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, watch } from 'vue'
 import type { NfcTag } from '@/types'
-import { useNfcStore } from '@/stores/nfc'
+import { NfcError } from '@/types'
+import { useNfcStore, HARDWARE_LOCK_NOTE } from '@/stores/nfc'
 import { useToastStore } from '@/stores/toast'
+import { nfcService } from '@/services/nfc/nfcService'
 import AppModal from '@/components/ui/AppModal.vue'
 import AppButton from '@/components/ui/AppButton.vue'
 import AppBadge from '@/components/ui/AppBadge.vue'
 import NfcTimelineView from './NfcTimelineView.vue'
+import NFCVerification from './NFCVerification.vue'
 import {
   Radio,
   Lock,
@@ -15,14 +18,13 @@ import {
   Copy,
   Clock,
   Cpu,
-  Layers,
   FileCode,
   ShieldCheck,
   ShieldAlert,
   History,
-  RotateCcw,
-  Sliders,
-  Check
+  Check,
+  Search,
+  Info
 } from 'lucide-vue-next'
 
 interface Props {
@@ -42,65 +44,119 @@ const nfcStore = useNfcStore()
 const toastStore = useToastStore()
 
 const activeTab = ref<'details' | 'timeline'>('details')
-const isCopiedUid = ref(false)
+const isCopiedSerial = ref(false)
 const isCopiedUrl = ref(false)
-const originUrl = typeof window !== 'undefined' ? window.location.origin : 'https://tapmenu.co.mz'
 
-const copyUid = () => {
-  if (!props.tag) return
-  navigator.clipboard.writeText(props.tag.uid)
-  isCopiedUid.value = true
-  toastStore.success('UID Copiado!', props.tag.uid)
-  setTimeout(() => {
-    isCopiedUid.value = false
-  }, 2000)
+// Verificação REAL (nova leitura + comparação)
+const verifying = ref(false)
+const verifyState = ref<'idle' | 'verifying' | 'verified' | 'different' | 'no_url' | 'verify_failed' | 'cancelled'>('idle')
+const verifyFoundUrl = ref<string | null>(null)
+const verifyTechnical = ref<string | null>(null)
+
+watch(
+  () => props.isOpen,
+  (open) => {
+    if (open) {
+      activeTab.value = 'details'
+      isCopiedSerial.value = false
+      isCopiedUrl.value = false
+      verifying.value = false
+      verifyState.value = 'idle'
+      verifyFoundUrl.value = null
+      verifyTechnical.value = null
+    }
+  }
+)
+
+const serialLine = (tag: NfcTag) =>
+  tag.serialNumber || 'Identificador físico não disponibilizado pelo navegador.'
+
+const copySerial = () => {
+  if (!props.tag?.serialNumber) {
+    toastStore.info('Sem serial físico', 'O navegador não disponibilizou o identificador da etiqueta.')
+    return
+  }
+  navigator.clipboard.writeText(props.tag.serialNumber)
+  isCopiedSerial.value = true
+  toastStore.success('Serial copiado!', props.tag.serialNumber)
+  setTimeout(() => { isCopiedSerial.value = false }, 2000)
 }
 
 const copyUrl = () => {
-  if (!props.tag) return
-  const full = props.tag.ndefPayload || `${window.location.origin}${props.tag.targetUrl}`
-  navigator.clipboard.writeText(full)
+  if (!props.tag?.url) return
+  navigator.clipboard.writeText(props.tag.url)
   isCopiedUrl.value = true
-  toastStore.success('URL Copiado!', full)
-  setTimeout(() => {
-    isCopiedUrl.value = false
-  }, 2000)
+  toastStore.success('URL copiado!', props.tag.url)
+  setTimeout(() => { isCopiedUrl.value = false }, 2000)
 }
 
 const formatDate = (iso?: string) => {
   if (!iso) return 'Não registado'
   try {
     return new Date(iso).toLocaleString('pt-PT', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit'
+      day: '2-digit', month: '2-digit', year: 'numeric',
+      hour: '2-digit', minute: '2-digit', second: '2-digit'
     })
   } catch {
     return iso
   }
 }
 
-// Generate demonstrative raw hex bytes for NDEF representation
-const demonstrativeHexBytes = computed(() => {
-  if (!props.tag || props.tag.status === 'unprogrammed') {
-    return '00 00 00 00 (Memória Virgem / Formatada)'
-  }
-  const prefix = '03 40 D1 01 3C 55 04'
-  const slugBytes = '74 61 70 6D 65 6E 75 2E 63 6F 2E 6D 7A 2F 6D 65 6E 75'
-  return `${prefix} ${slugBytes} FE 00 00`
-})
-
-// Trigger a test of the protection on a locked tag
+/** Teste real da proteção do sistema: a recusa é registrada no histórico. */
 const simulateProtectedModificationAttempt = () => {
   if (!props.tag) return
-  nfcStore.recordRefusedModification(
+  nfcStore.recordBlockedAttempt(
     props.tag.id,
-    'Tentativa de alteração recusada: O chip NFC está bloqueado e protegido contra escrita. Alteração impedida pelo sistema.',
-    'Terminal do Garçom (Simulado)'
+    'Tentativa de alteração recusada: etiqueta protegida contra alterações (proteção no sistema).'
   )
+}
+
+/** Leitura + verificação REAL: encoste a etiqueta para confirmar o conteúdo. */
+const runReadAndVerify = async () => {
+  const tag = props.tag
+  if (!tag?.url) return
+  verifying.value = true
+  verifyState.value = 'verifying'
+  verifyTechnical.value = null
+  try {
+    const result = await nfcService.verifyUrl(tag.url)
+    verifyFoundUrl.value = result.foundUrl
+    verifyState.value = result.status
+    nfcStore.registerVerify(tag, result.status, result.foundUrl)
+  } catch (e) {
+    const err = e instanceof NfcError
+      ? e
+      : new NfcError('unknown', 'Falha na verificação.')
+    if (err.code === 'cancelled') {
+      verifyState.value = 'cancelled'
+    } else {
+      verifyState.value = 'verify_failed'
+      verifyTechnical.value = err.technical
+      toastStore.error('Verificação falhou', err.message)
+    }
+  } finally {
+    verifying.value = false
+  }
+}
+
+const statusLabel = (tag: NfcTag) => {
+  switch (tag.status) {
+    case 'protected': return 'Protegida (sistema)'
+    case 'active': return 'Ativa'
+    case 'failed': return 'Falha na última gravação'
+    case 'unassigned': return 'Não gravada'
+    default: return '—'
+  }
+}
+
+const statusVariant = (tag: NfcTag) => {
+  switch (tag.status) {
+    case 'protected': return 'danger' as const
+    case 'active': return 'success' as const
+    case 'failed': return 'warning' as const
+    case 'unassigned': return 'neutral' as const
+    default: return 'neutral' as const
+  }
 }
 </script>
 
@@ -108,12 +164,12 @@ const simulateProtectedModificationAttempt = () => {
   <AppModal
     :is-open="isOpen"
     :title="`Etiqueta NFC — Mesa ${tag?.tableNumber || ''}`"
-    subtitle="Especificações de hardware, payload NDEF e auditoria de segurança"
+    subtitle="Especificações reais do registo, verificação física e auditoria"
     max-width="640px"
-    @close="$emit('close')"
+    @close="emit('close')"
   >
     <div v-if="tag" class="details-modal-wrapper">
-      <!-- Top Pill Tabs -->
+      <!-- Tabs -->
       <div class="tabs-nav">
         <button
           class="tab-btn"
@@ -121,7 +177,7 @@ const simulateProtectedModificationAttempt = () => {
           @click="activeTab = 'details'"
         >
           <Cpu :size="16" />
-          <span>Especificações & NDEF</span>
+          <span>Detalhes & NDEF</span>
         </button>
 
         <button
@@ -135,98 +191,82 @@ const simulateProtectedModificationAttempt = () => {
         </button>
       </div>
 
-      <!-- Tab 1: Details & NDEF -->
+      <!-- Tab: Detalhes -->
       <div v-if="activeTab === 'details'" class="tab-pane">
-        <!-- Status & Locking Header Banner -->
+        <!-- Estado -->
         <div
           class="status-feature-card"
-          :class="{ 'card-locked': tag.isLocked, 'card-unlocked': !tag.isLocked }"
+          :class="{ 'card-locked': tag.status === 'protected', 'card-unlocked': tag.status !== 'protected' }"
         >
           <div class="status-feature-left">
             <div class="feature-icon-box">
-              <Lock v-if="tag.isLocked" :size="24" />
+              <Lock v-if="tag.status === 'protected'" :size="24" />
               <Unlock v-else :size="24" />
             </div>
             <div>
               <div class="status-badge-row">
                 <span class="status-badge-main">
-                  {{ tag.isLocked ? 'Etiqueta Bloqueada' : tag.status === 'programmed' ? 'Etiqueta Gravada' : 'Etiqueta Virgem' }}
+                  {{ statusLabel(tag) }}
                 </span>
                 <span class="status-mode-pill">
-                  {{ tag.isLocked ? 'Read-Only Permanente' : 'Read/Write Aberto' }}
+                  {{ tag.status === 'protected' ? 'Protegida (sistema)' : tag.lastWrittenAt ? 'Gravação permitida' : 'Sem conteúdo físico confirmado' }}
                 </span>
               </div>
-              <p v-if="tag.isLocked" class="locked-text-highlight">
-                <strong>Etiqueta protegida — alterações não permitidas</strong>
+              <p v-if="tag.status === 'protected'" class="locked-text-highlight">
+                <strong>Etiqueta protegida — alterações não permitidas.</strong>
+                Clientes continuam a ler o menu normalmente; a gravação pelo TapMenu está bloqueada.
               </p>
               <p v-else class="unlocked-text-highlight">
-                Gravação ativa. Pode atualizar o URL ou bloquear o chip permanentemente.
+                Gravação permitida. {{ tag.lastWrittenAt ? 'Pode atualizar o URL ou aplicar proteção.' : 'Encoste um etiqueta com "Gravar NFC" para registar o conteúdo físico.' }}
               </p>
             </div>
           </div>
 
           <div class="status-feature-actions">
-            <!-- If locked: allow unprotecting or test rejection -->
             <button
-              v-if="tag.isLocked"
+              v-if="tag.status === 'protected'"
               class="btn-sm-unlock"
-              title="Remover proteção de escrita para permitir alterações"
-              @click="$emit('request-unlock', tag)"
+              title="Remover proteção para permitir alterações"
+              @click="emit('request-unlock', tag)"
             >
               <Unlock :size="14" />
-              <span>Desproteger NFC</span>
+              <span>Desproteger</span>
             </button>
 
             <button
-              v-if="tag.isLocked"
+              v-if="tag.status === 'protected'"
               class="btn-sm-test-reject"
-              title="Testar proteção contra alterações"
+              title="Testar recusa de gravação (registrada no histórico)"
               @click="simulateProtectedModificationAttempt"
             >
               <ShieldAlert :size="14" />
               <span>Testar Recusa</span>
             </button>
 
-            <!-- If programmed and unlocked: quick lock button -->
-            <AppButton
-              v-else-if="tag.status === 'programmed'"
-              size="sm"
-              variant="warning"
-              @click="$emit('request-lock', tag)"
-            >
-              <template #icon-left>
-                <Lock :size="14" />
-              </template>
-              Bloquear NFC
-            </AppButton>
-
-            <!-- If unprogrammed: write button -->
             <AppButton
               v-else
               size="sm"
-              variant="primary"
-              @click="$emit('request-write', tag)"
+              variant="warning"
+              @click="emit('request-lock', tag)"
             >
-              <template #icon-left>
-                <Radio :size="14" />
-              </template>
-              Gravar NFC
+              <Lock :size="14" />
+              Proteger
             </AppButton>
           </div>
         </div>
 
-        <!-- Hardware & Table Associations Card -->
+        <!-- Specs -->
         <div class="specs-grid">
           <div class="spec-card">
-            <span class="spec-label">Identificador UID Físico</span>
+            <span class="spec-label">Serial físico (browser)</span>
             <div class="spec-val-row">
-              <strong class="font-mono text-primary">{{ tag.uid }}</strong>
-              <button class="btn-copy-chip" title="Copiar UID" @click="copyUid">
-                <Check v-if="isCopiedUid" :size="13" class="text-success" />
+              <strong class="font-mono text-primary serial-text">{{ serialLine(tag) }}</strong>
+              <button class="btn-copy-chip" title="Copiar serial" :disabled="!tag.serialNumber" @click="copySerial">
+                <Check v-if="isCopiedSerial" :size="13" class="text-success" />
                 <Copy v-else :size="13" />
               </button>
             </div>
-            <span class="spec-hint">ISO/IEC 14443-3A 7-Byte Cascade</span>
+            <span class="spec-hint">Fornecido pelo Web NFC quando disponível — nunca inventado</span>
           </div>
 
           <div class="spec-card">
@@ -234,34 +274,34 @@ const simulateProtectedModificationAttempt = () => {
             <div class="spec-val-row">
               <strong class="text-dark">{{ tag.restaurantName }}</strong>
             </div>
-            <span class="spec-hint font-bold text-primary">Mesa {{ tag.tableNumber }}</span>
+            <span class="spec-hint font-bold text-primary">Mesa {{ tag.tableNumber }}{{ tag.tableArea ? ` · ${tag.tableArea}` : '' }}</span>
           </div>
 
           <div class="spec-card">
-            <span class="spec-label">Modelo do Chip Integrado</span>
+            <span class="spec-label">Estado do registo</span>
             <div class="spec-val-row">
-              <strong>{{ tag.tagType }}</strong>
+              <AppBadge :variant="statusVariant(tag)" dot>{{ statusLabel(tag) }}</AppBadge>
             </div>
-            <span class="spec-hint">Frequência RF: 13.56 MHz (HF)</span>
+            <span class="spec-hint">Proteção: {{ tag.protection === 'system' ? 'protegida no sistema' : 'nenhuma' }}</span>
           </div>
 
           <div class="spec-card">
-            <span class="spec-label">Total de Leituras Registadas</span>
+            <span class="spec-label">Gravações físicas</span>
             <div class="spec-val-row">
-              <strong class="text-success">{{ tag.scanCount || 0 }} leituras</strong>
+              <strong class="text-success">{{ tag.writeCount }}</strong>
             </div>
-            <span class="spec-hint">Último scan: {{ formatDate(tag.lastScannedAt) }}</span>
+            <span class="spec-hint">Tipo NDEF: {{ tag.ndefType }}</span>
           </div>
         </div>
 
-        <!-- NDEF Demonstrative Content -->
+        <!-- NDEF content -->
         <div class="ndef-content-box">
           <div class="ndef-header">
             <span class="ndef-title">
               <FileCode :size="15" />
-              Conteúdo NDEF Demonstrativo (NFC Data Exchange Format)
+              Conteúdo NDEF recomendado (URL)
             </span>
-            <span class="ndef-tag-badge">NFC Forum Type 2</span>
+            <span class="ndef-tag-badge">URI (Well-Known RTD)</span>
           </div>
 
           <div class="ndef-body">
@@ -269,9 +309,9 @@ const simulateProtectedModificationAttempt = () => {
               <span class="ndef-key">URL Gravado:</span>
               <div class="ndef-url-row">
                 <span class="ndef-url-text font-mono">
-                  {{ tag.ndefPayload || `${originUrl}${tag.targetUrl}` }}
+                  {{ tag.url || '—' }}
                 </span>
-                <button class="btn-copy-chip" title="Copiar URL" @click="copyUrl">
+                <button v-if="tag.url" class="btn-copy-chip" title="Copiar URL" @click="copyUrl">
                   <Check v-if="isCopiedUrl" :size="13" class="text-success" />
                   <Copy v-else :size="13" />
                 </button>
@@ -280,59 +320,67 @@ const simulateProtectedModificationAttempt = () => {
 
             <div class="ndef-meta-grid">
               <div class="ndef-meta-item">
-                <span class="ndef-meta-label">Tipo de Registo:</span>
-                <span class="ndef-meta-val">URI (Well-Known RTD: 0x55)</span>
+                <span class="ndef-meta-label">Última gravação:</span>
+                <span class="ndef-meta-val">{{ formatDate(tag.lastWrittenAt) }}</span>
               </div>
               <div class="ndef-meta-item">
-                <span class="ndef-meta-label">Prefixo URI:</span>
-                <span class="ndef-meta-val font-mono">{{ tag.ndefPrefix || '0x04 (https://)' }}</span>
+                <span class="ndef-meta-label">Última verificação:</span>
+                <span class="ndef-meta-val">{{ formatDate(tag.lastVerifiedAt) }}</span>
               </div>
               <div class="ndef-meta-item">
-                <span class="ndef-meta-label">Tamanho Estimado:</span>
-                <span class="ndef-meta-val font-mono">{{ tag.ndefSize || 64 }} Bytes</span>
+                <span class="ndef-meta-label">Criado em:</span>
+                <span class="ndef-meta-val">{{ formatDate(tag.createdAt) }}</span>
               </div>
               <div class="ndef-meta-item">
-                <span class="ndef-meta-label">Codificação:</span>
-                <span class="ndef-meta-val">UTF-8 / US-ASCII</span>
+                <span class="ndef-meta-label">Última operação:</span>
+                <span class="ndef-meta-val">{{ tag.lastOperation ? `${tag.lastOperation} · ${formatDate(tag.lastOperationAt)}` : '—' }}</span>
               </div>
-            </div>
-
-            <div class="ndef-raw-preview">
-              <span class="raw-title">Bytes Hexadecimais no Chip (Páginas 04 a 19):</span>
-              <div class="raw-hex-code font-mono">{{ demonstrativeHexBytes }}</div>
             </div>
           </div>
         </div>
 
-        <!-- Timestamps History Table -->
-        <div class="operations-log-box">
-          <div class="log-row">
-            <span class="log-label">
-              <Clock :size="13" />
-              Data de Criação da Tag:
+        <!-- Verificação real -->
+        <div class="verify-section">
+          <div class="verify-head">
+            <span class="verify-title">
+              <Search :size="15" />
+              Verificação física (leitura real)
             </span>
-            <span class="log-time">{{ formatDate(tag.createdAt) }}</span>
+            <AppButton
+              size="sm"
+              variant="secondary"
+              :disabled="!tag.url || verifying"
+              :loading="verifying"
+              @click="runReadAndVerify"
+            >
+              <Search :size="14" />
+              Ler & Verificar
+            </AppButton>
           </div>
-          <div class="log-row">
-            <span class="log-label">
-              <Radio :size="13" />
-              Data da Última Gravação:
-            </span>
-            <span class="log-time">{{ formatDate(tag.writtenAt) }}</span>
-          </div>
-          <div class="log-row">
-            <span class="log-label">
-              <Lock :size="13" />
-              Data de Bloqueio OTP:
-            </span>
-            <span class="log-time font-bold" :class="tag.isLocked ? 'text-danger' : 'text-muted'">
-              {{ tag.isLocked ? formatDate(tag.lockedAt) : 'Desbloqueada (Não bloqueada)' }}
-            </span>
-          </div>
+
+          <NFCVerification
+            v-if="tag.url && verifyState !== 'idle'"
+            :state="verifyState"
+            :expected-url="tag.url"
+            :found-url="verifyFoundUrl"
+            :technical="verifyTechnical"
+          />
+          <p v-else class="verify-hint">
+            Lê o conteúdo físico da etiqueta e compara o URL com o esperado — a leitura confirma apenas conteúdo real.
+          </p>
+        </div>
+
+        <!-- Proteção honesta -->
+        <div class="physical-note">
+          <Info :size="16" />
+          <p>
+            <strong>Nota técnica:</strong> {{ HARDWARE_LOCK_NOTE }} A proteção significa que o
+            TapMenu recusa gravar nesta etiqueta e registra tentativas bloqueadas.
+          </p>
         </div>
       </div>
 
-      <!-- Tab 2: Timeline View -->
+      <!-- Tab: Timeline -->
       <div v-else class="tab-pane">
         <NfcTimelineView :events="tag.timeline" />
       </div>
@@ -340,11 +388,11 @@ const simulateProtectedModificationAttempt = () => {
 
     <template #footer>
       <div class="details-footer-row">
-        <!-- Test URL Button -->
         <a
-          v-if="tag?.targetUrl"
-          :href="tag.targetUrl"
+          v-if="tag?.url"
+          :href="tag.url"
           target="_blank"
+          rel="noopener"
           class="app-btn app-btn--secondary app-btn--md"
           title="Abrir menu digital correspondente"
         >
@@ -352,45 +400,34 @@ const simulateProtectedModificationAttempt = () => {
           <span>Testar URL</span>
         </a>
 
-        <!-- Action if locked: Unprotect button -->
         <AppButton
-          v-if="tag && tag.isLocked"
+          v-if="tag && tag.status === 'protected'"
           variant="primary"
-          @click="$emit('request-unlock', tag)"
+          @click="emit('request-unlock', tag)"
         >
-          <template #icon-left>
-            <Unlock :size="16" />
-          </template>
-          Desproteger NFC
+          <Unlock :size="16" />
+          Desproteger
         </AppButton>
 
-        <!-- Secondary Action: Lock or Write depending on state -->
         <AppButton
-          v-else-if="tag && !tag.isLocked && tag.status === 'programmed'"
+          v-else-if="tag"
+          variant="primary"
+          @click="emit('request-write', tag)"
+        >
+          <Radio :size="16" />
+          {{ tag.lastWrittenAt ? 'Regravar NFC' : 'Gravar NFC' }}
+        </AppButton>
+
+        <AppButton
+          v-if="tag && tag.status !== 'protected'"
           variant="warning"
-          @click="$emit('request-lock', tag)"
+          @click="emit('request-lock', tag)"
         >
-          <template #icon-left>
-            <Lock :size="16" />
-          </template>
-          Bloquear NFC
+          <Lock :size="16" />
+          Proteger
         </AppButton>
 
-        <AppButton
-          v-else-if="tag && !tag.isLocked && tag.status === 'unprogrammed'"
-          variant="primary"
-          @click="$emit('request-write', tag)"
-        >
-          <template #icon-left>
-            <Radio :size="16" />
-          </template>
-          Gravar NFC
-        </AppButton>
-
-        <!-- Close Button -->
-        <AppButton variant="secondary" @click="$emit('close')">
-          Fechar
-        </AppButton>
+        <AppButton variant="secondary" @click="emit('close')">Fechar</AppButton>
       </div>
     </template>
   </AppModal>
@@ -403,13 +440,13 @@ const simulateProtectedModificationAttempt = () => {
   gap: 1.25rem;
 }
 
-/* Tabs */
 .tabs-nav {
   display: flex;
   align-items: center;
   gap: 0.5rem;
   border-bottom: 1px solid var(--border-subtle);
   padding-bottom: 0.5rem;
+  flex-wrap: wrap;
 }
 
 .tab-btn {
@@ -457,7 +494,7 @@ const simulateProtectedModificationAttempt = () => {
   gap: 1.25rem;
 }
 
-/* Status Feature Card */
+/* Status card */
 .status-feature-card {
   display: flex;
   align-items: center;
@@ -511,6 +548,7 @@ const simulateProtectedModificationAttempt = () => {
   align-items: center;
   gap: 0.5rem;
   margin-bottom: 0.25rem;
+  flex-wrap: wrap;
 }
 
 .status-badge-main {
@@ -528,15 +566,21 @@ const simulateProtectedModificationAttempt = () => {
 }
 
 .locked-text-highlight {
-  font-size: 0.8125rem;
+  font-size: 0.78rem;
   color: #b91c1c;
   margin: 0;
 }
 
 .unlocked-text-highlight {
-  font-size: 0.8125rem;
+  font-size: 0.78rem;
   color: #15803d;
   margin: 0;
+}
+
+.status-feature-actions {
+  display: inline-flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
 }
 
 .btn-sm-unlock {
@@ -579,7 +623,7 @@ const simulateProtectedModificationAttempt = () => {
   color: #7f1d1d;
 }
 
-/* Specs Grid */
+/* Specs */
 .specs-grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
@@ -609,8 +653,12 @@ const simulateProtectedModificationAttempt = () => {
   gap: 0.5rem;
 }
 
-.spec-hint {
+.serial-text {
   font-size: 0.75rem;
+}
+
+.spec-hint {
+  font-size: 0.72rem;
   color: var(--color-neutral-600);
 }
 
@@ -622,13 +670,19 @@ const simulateProtectedModificationAttempt = () => {
   display: flex;
   align-items: center;
   justify-content: center;
+  padding: 0.15rem;
 }
 
-.btn-copy-chip:hover {
+.btn-copy-chip:hover:not(:disabled) {
   color: var(--color-neutral-900);
 }
 
-/* NDEF Box */
+.btn-copy-chip:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+/* NDEF box */
 .ndef-content-box {
   background-color: #ffffff;
   border: 1px solid var(--border-medium);
@@ -643,6 +697,8 @@ const simulateProtectedModificationAttempt = () => {
   padding-bottom: 0.625rem;
   border-bottom: 1px solid var(--border-subtle);
   margin-bottom: 0.75rem;
+  gap: 0.5rem;
+  flex-wrap: wrap;
 }
 
 .ndef-title {
@@ -712,6 +768,7 @@ const simulateProtectedModificationAttempt = () => {
 .ndef-meta-item {
   display: flex;
   justify-content: space-between;
+  gap: 0.5rem;
 }
 
 .ndef-meta-label {
@@ -721,57 +778,61 @@ const simulateProtectedModificationAttempt = () => {
 .ndef-meta-val {
   font-weight: 600;
   color: var(--color-neutral-800);
+  text-align: right;
 }
 
-.ndef-raw-preview {
-  margin-top: 0.25rem;
-  background-color: #0f172a;
-  border-radius: var(--radius-sm);
-  padding: 0.625rem 0.875rem;
-}
-
-.raw-title {
-  display: block;
-  font-size: 0.6875rem;
-  color: #94a3b8;
-  margin-bottom: 0.25rem;
-}
-
-.raw-hex-code {
-  font-size: 0.6875rem;
-  color: #38bdf8;
-  letter-spacing: 0.05em;
-  word-break: break-all;
-}
-
-/* Operations Log Box */
-.operations-log-box {
-  background-color: var(--color-neutral-50);
+/* Verificação */
+.verify-section {
   border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-md);
-  padding: 0.75rem 1rem;
+  border-radius: var(--radius-lg);
+  padding: 1rem 1.25rem;
   display: flex;
   flex-direction: column;
-  gap: 0.4rem;
-  font-size: 0.75rem;
+  gap: 0.75rem;
+  background: #fcfdff;
 }
 
-.log-row {
+.verify-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 0.5rem;
+  flex-wrap: wrap;
 }
 
-.log-label {
+.verify-title {
+  font-size: 0.8125rem;
+  font-weight: 700;
+  color: var(--color-neutral-900);
   display: inline-flex;
   align-items: center;
-  gap: 0.35rem;
+  gap: 0.4rem;
+}
+
+.verify-hint {
+  margin: 0;
+  font-size: 0.75rem;
   color: var(--text-muted);
 }
 
-.log-time {
-  color: var(--color-neutral-800);
-  font-variant-numeric: tabular-nums;
+.physical-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.625rem;
+  padding: 0.75rem 1rem;
+  background-color: var(--color-neutral-100);
+  border-radius: var(--radius-md);
+  font-size: 0.75rem;
+  color: var(--color-neutral-700);
+  line-height: 1.5;
+}
+
+.physical-note p { margin: 0; }
+
+.physical-note :deep(svg) {
+  flex-shrink: 0;
+  margin-top: 0.1rem;
+  color: var(--color-neutral-600);
 }
 
 .details-footer-row {
@@ -780,7 +841,13 @@ const simulateProtectedModificationAttempt = () => {
   justify-content: flex-end;
   gap: 0.75rem;
   width: 100%;
+  flex-wrap: wrap;
 }
+
+.text-muted { color: var(--text-muted); }
+.text-primary { color: var(--color-primary-800); }
+.text-dark { color: var(--color-neutral-900); }
+.text-success { color: #16a34a; }
 
 @media (max-width: 640px) {
   .specs-grid {
@@ -795,5 +862,9 @@ const simulateProtectedModificationAttempt = () => {
   .ndef-meta-grid {
     grid-template-columns: 1fr;
   }
+}
+
+.font-mono {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
 }
 </style>
