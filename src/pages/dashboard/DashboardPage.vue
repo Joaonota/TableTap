@@ -3,6 +3,7 @@ import { ref, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useTenantStore } from '@/stores/tenant'
 import { useOrderStore } from '@/stores/order'
+import { useSubscriptionStore } from '@/stores/subscription'
 import { reportService } from '@/services'
 import MetricCard from '@/components/ui/MetricCard.vue'
 import AppBadge from '@/components/ui/AppBadge.vue'
@@ -19,12 +20,14 @@ import {
   AlertTriangle,
   ArrowRight,
   ExternalLink,
-  Plus
+  Plus,
+  Sparkles
 } from 'lucide-vue-next'
 
 const router = useRouter()
 const tenantStore = useTenantStore()
 const orderStore = useOrderStore()
+const subscriptionStore = useSubscriptionStore()
 
 const timePeriod = ref<'today' | '7days' | '30days'>('today')
 const metrics = ref<DashboardMetrics>({
@@ -52,7 +55,8 @@ const loadDashboardData = async () => {
     const [m, sales, top] = await Promise.all([
       reportService.getDashboardMetrics(restId),
       reportService.getSalesByDay(restId),
-      reportService.getTopProducts(restId)
+      reportService.getTopProducts(restId),
+      subscriptionStore.fetchSubscriptionData()
     ])
     metrics.value = m
     salesChartData.value = sales
@@ -186,6 +190,65 @@ const maxSalesAmount = () => {
       <div v-if="metrics.unavailableProductsCount > 0" class="sub-metric-pill warning">
         <AlertTriangle :size="16" class="pill-icon text-warning" />
         <span><strong>{{ metrics.unavailableProductsCount }}</strong> Itens Esgotados</span>
+      </div>
+    </div>
+
+    <!-- Plan & Resource Limits Widget -->
+    <div v-if="subscriptionStore.currentPlan" class="plan-dashboard-widget">
+      <div class="widget-header">
+        <div class="widget-title-wrap">
+          <div class="widget-icon">
+            <Sparkles :size="18" />
+          </div>
+          <div>
+            <h3 class="widget-title">
+              Plano {{ subscriptionStore.currentPlan.name }}
+              <span class="widget-status">({{ subscriptionStore.currentSubscription?.status.toUpperCase() }})</span>
+            </h3>
+            <span class="widget-sub">Consumo de limites da empresa no ciclo corrente</span>
+          </div>
+        </div>
+
+        <router-link to="/app/meu-plano">
+          <AppButton variant="outline" size="sm">
+            <span>Gerir Limites & Upgrade</span>
+            <ArrowRight :size="14" />
+          </AppButton>
+        </router-link>
+      </div>
+
+      <div class="widget-meters-grid">
+        <div
+          v-for="resKey in ['PRODUCTS', 'TABLES', 'STAFF', 'ORDERS_PER_MONTH'] as const"
+          :key="resKey"
+          class="meter-item"
+        >
+          <div class="meter-head">
+            <span class="meter-label">{{ subscriptionStore.usageMetrics[resKey]?.name || resKey }}</span>
+            <span class="meter-val font-mono">
+              <strong>{{ subscriptionStore.usageMetrics[resKey]?.current ?? 0 }}</strong>
+              <span v-if="subscriptionStore.usageMetrics[resKey]?.limit === null"> / ∞</span>
+              <span v-else> / {{ subscriptionStore.usageMetrics[resKey]?.limit }}</span>
+            </span>
+          </div>
+          <div class="meter-track">
+            <div
+              v-if="subscriptionStore.usageMetrics[resKey]?.limit === null"
+              class="meter-fill unlimited"
+              style="width: 100%"
+            ></div>
+            <div
+              v-else
+              class="meter-fill"
+              :class="{
+                'fill-danger': (subscriptionStore.usageMetrics[resKey]?.percentage ?? 0) >= 100,
+                'fill-warning': (subscriptionStore.usageMetrics[resKey]?.percentage ?? 0) >= 80,
+                'fill-normal': (subscriptionStore.usageMetrics[resKey]?.percentage ?? 0) < 80
+              }"
+              :style="{ width: `${subscriptionStore.usageMetrics[resKey]?.percentage ?? 0}%` }"
+            ></div>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -365,6 +428,125 @@ const maxSalesAmount = () => {
   padding: 0.25rem;
   border-radius: var(--radius-md);
   border: 1px solid var(--border-subtle);
+}
+
+/* Plan & Limits Widget */
+.plan-dashboard-widget {
+  background: linear-gradient(135deg, rgba(254, 243, 199, 0.25), rgba(255, 255, 255, 0.95));
+  border: 1px solid rgba(245, 158, 11, 0.3);
+  border-radius: var(--radius-xl, 1rem);
+  padding: 1.25rem 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.03);
+}
+
+.widget-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.widget-title-wrap {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.widget-icon {
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: var(--radius-md, 0.5rem);
+  background: #fef3c7;
+  color: #d97706;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.widget-title {
+  font-size: 1.125rem;
+  font-weight: 700;
+  color: var(--color-neutral-900);
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0;
+}
+
+.widget-status {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #059669;
+}
+
+.widget-sub {
+  font-size: 0.8125rem;
+  color: var(--text-muted);
+}
+
+.widget-meters-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 1rem;
+}
+
+.meter-item {
+  background: var(--bg-surface, #ffffff);
+  border: 1px solid var(--border-subtle, #e5e7eb);
+  border-radius: var(--radius-md, 0.5rem);
+  padding: 0.75rem 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.meter-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 0.8125rem;
+}
+
+.meter-label {
+  font-weight: 600;
+  color: var(--color-neutral-700);
+}
+
+.meter-val {
+  color: var(--color-neutral-800);
+}
+
+.meter-track {
+  height: 6px;
+  background: var(--color-neutral-100, #f3f4f6);
+  border-radius: 9999px;
+  overflow: hidden;
+}
+
+.meter-fill {
+  height: 100%;
+  border-radius: 9999px;
+  transition: width 0.3s ease;
+}
+
+.meter-fill.unlimited {
+  background: linear-gradient(90deg, #10b981, #059669);
+}
+
+.meter-fill.fill-normal {
+  background: #3b82f6;
+}
+
+.meter-fill.fill-warning {
+  background: #f59e0b;
+}
+
+.meter-fill.fill-danger {
+  background: #ef4444;
 }
 
 .period-btn {

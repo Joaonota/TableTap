@@ -14,11 +14,15 @@ import {
   initialStaff,
   initialPlans,
   initialSubscriptions,
-  initialDigitalAccessList
+  initialDigitalAccessList,
+  initialMenuCustomizations,
+  initialPlatformAuditLogs,
+  initialPlatformConfig
 } from '@/mocks/initialData'
 import { generateHistoricalReviews } from '@/mocks/historicalData'
+import type { MenuCustomization, PlatformAuditLog, PlatformConfig } from '@/types'
 
-const STORAGE_KEY = 'tapmenu_mock_database_v2'
+const STORAGE_KEY = 'tapmenu_mock_database_v3'
 
 function getInitialDatabase(): MockDatabase {
   return {
@@ -37,7 +41,10 @@ function getInitialDatabase(): MockDatabase {
     plans: JSON.parse(JSON.stringify(initialPlans)),
     subscriptions: JSON.parse(JSON.stringify(initialSubscriptions)),
     digitalAccessList: JSON.parse(JSON.stringify(initialDigitalAccessList)),
-    reviews: generateHistoricalReviews()
+    reviews: generateHistoricalReviews(),
+    menuCustomizations: JSON.parse(JSON.stringify(initialMenuCustomizations)),
+    auditLogs: JSON.parse(JSON.stringify(initialPlatformAuditLogs)),
+    platformConfig: JSON.parse(JSON.stringify(initialPlatformConfig))
   }
 }
 
@@ -62,18 +69,27 @@ export class MockStorageService {
       if (stored) {
         const parsed = JSON.parse(stored)
         // Basic schema check
-        if (parsed.companies && parsed.restaurants && parsed.products && parsed.orders) {
+        if (parsed.companies && parsed.restaurants && parsed.products && parsed.orders && parsed.plans) {
           if (!parsed.tableSessions) {
             parsed.tableSessions = JSON.parse(JSON.stringify(initialTableSessions))
           }
           if (!parsed.notifications) {
             parsed.notifications = JSON.parse(JSON.stringify(initialNotifications))
           }
+          if (!parsed.menuCustomizations) {
+            parsed.menuCustomizations = JSON.parse(JSON.stringify(initialMenuCustomizations))
+          }
+          if (!parsed.auditLogs) {
+            parsed.auditLogs = JSON.parse(JSON.stringify(initialPlatformAuditLogs))
+          }
+          if (!parsed.platformConfig) {
+            parsed.platformConfig = JSON.parse(JSON.stringify(initialPlatformConfig))
+          }
           return parsed as MockDatabase
         }
       }
     } catch (e) {
-      console.warn('TapMenu: Erro ao ler mock database do localStorage. A reiniciar com dados padrão.', e)
+      console.warn('TapMenu: Erro ao ler mock database v3 do localStorage. A reiniciar com dados padrão.', e)
     }
 
     const initial = getInitialDatabase()
@@ -101,6 +117,18 @@ export class MockStorageService {
     this.db = getInitialDatabase()
     this.saveToStorage(this.db)
   }
+
+  public addAuditLog(entry: Omit<PlatformAuditLog, 'id' | 'createdAt'>): PlatformAuditLog {
+    const log: PlatformAuditLog = {
+      ...entry,
+      id: `log-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+      createdAt: new Date().toISOString()
+    }
+    this.db.auditLogs.unshift(log)
+    this.commit()
+    return log
+  }
 }
 
 export const mockStorage = MockStorageService.getInstance()
+

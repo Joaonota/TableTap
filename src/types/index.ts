@@ -146,6 +146,13 @@ export interface DigitalAccess {
 
 export * from './nfc'
 
+// ==========================================
+// PLANS, FEATURES & LIMITS (SaaS)
+// re-export of src/types/plan.ts
+// ==========================================
+
+export * from './plan'
+
 export interface Category {
   id: string
   tenantId: string
@@ -191,6 +198,9 @@ export interface Product {
   allergens?: string[]
   sortOrder: number
   isActive: boolean
+  isPromotion?: boolean
+  isSpicy?: boolean
+  isVegetarian?: boolean
 }
 
 export type OrderStatus =
@@ -204,6 +214,7 @@ export type OrderStatus =
 export type PaymentStatus =
   | 'pending'
   | 'awaiting_confirmation'
+  | 'confirmed'
   | 'paid'
   | 'failed'
   | 'refunded'
@@ -352,31 +363,7 @@ export interface StaffMember {
   isActive: boolean
 }
 
-export interface Plan {
-  id: string
-  name: string
-  priceMonthly: number // MT
-  maxRestaurants: number
-  maxStaff: number
-  maxTables: number
-  features: string[]
-  isActive: boolean
-}
 
-export type SubscriptionStatus = 'trial' | 'active' | 'suspended' | 'expired'
-
-export interface Subscription {
-  id: string
-  tenantId: string
-  companyName: string
-  planId: string
-  planName: string
-  status: SubscriptionStatus
-  startDate: string
-  renewalDate: string
-  monthlyPrice: number
-  isAutoRenew: boolean
-}
 
 export interface PlatformAuditLog {
   id: string
@@ -386,7 +373,8 @@ export interface PlatformAuditLog {
   action: string
   resource: string
   details: string
-  timestamp: string
+  timestamp?: string
+  createdAt?: string
 }
 
 export interface DashboardMetrics {
@@ -400,6 +388,68 @@ export interface DashboardMetrics {
   readyOrders: number
   activeServiceRequests: number
   unavailableProductsCount: number
+}
+
+// ==========================================
+// MENU CUSTOMIZATION (Layout & Tema)
+// ==========================================
+
+export type MenuLayout = 'classic' | 'modern' | 'elegant' | 'compact' | 'visual'
+
+export interface MenuFontOption {
+  key: string
+  name: string
+  cssStack: string
+}
+
+export interface MenuThemeExperience {
+  showSearch: boolean
+  showCategories: boolean
+  showImages: boolean
+  showDescriptions: boolean
+  showPrices: boolean
+  showAddToOrder: boolean
+  showPromotions: boolean
+  showFeaturedProducts: boolean
+  showWaiterCall: boolean
+  showOrders: boolean
+  showRestaurantInfo: boolean
+}
+
+export interface MenuTheme {
+  layout: MenuLayout
+  primaryColor: string
+  secondaryColor: string
+  accentColor: string
+  backgroundColor: string
+  textColor: string
+  fontFamilyKey: string // chave de MenuFontOption (só fontes do projeto)
+  logoUrl?: string
+  coverImage?: string
+  experience: MenuThemeExperience
+}
+
+export interface MenuCustomization {
+  id: string
+  tenantId: string
+  restaurantId: string
+  theme: MenuTheme
+  updatedAt: string
+  updatedBy: string
+}
+
+// ==========================================
+// PLATFORM CONFIG (Super Admin)
+// ==========================================
+
+export interface PlatformConfig {
+  platformName: string
+  supportEmail: string
+  supportPhone: string
+  defaultPlanId: string
+  trialDays: number
+  allowSelfSignup: boolean
+  maintenanceMode: boolean
 }
 
 // NFC real module types (registry, timeline, capabilities, errors)

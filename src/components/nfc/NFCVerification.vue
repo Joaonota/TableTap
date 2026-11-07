@@ -8,8 +8,8 @@ import {
 } from 'lucide-vue-next'
 
 interface Props {
-  /** estado da operação; 'different'/'no_url'/'idle' descrevem resultados de verificação */
-  state: NfcOpState | 'different' | 'no_url' | 'idle'
+  /** estado da operação; 'different'/'no_url'/'unreadable'/'idle' descrevem resultados de verificação */
+  state: NfcOpState | 'different' | 'no_url' | 'unreadable' | 'idle'
   expectedUrl?: string | null
   foundUrl?: string | null
   /** detalhe técnico opcional (exibido só no bloco de falha) */
@@ -27,6 +27,7 @@ const statusTitle: Record<string, string> = {
   verified: 'Etiqueta verificada com sucesso.',
   different: 'Conteúdo diferente do esperado',
   no_url: 'Etiqueta sem registo URL',
+  unreadable: 'Gravação concluída, mas a verificação independente não foi possível',
   verify_failed: 'Verificação não concluída',
   cancelled: 'Verificação cancelada',
   failed: 'Falha na verificação'
@@ -37,6 +38,7 @@ const statusBody: Record<string, string> = {
   verified: 'O conteúdo físico da etiqueta corresponde ao endereço esperado.',
   different: 'Não foi possível confirmar que o conteúdo gravado corresponde ao endereço esperado. A etiqueta não é marcada como validada.',
   no_url: 'A etiqueta foi lida mas não contém um registo NDEF URL. A etiqueta não é marcada como validada.',
+  unreadable: 'A escrita física terminou, mas não foi possível ler a etiqueta novamente. A gravação não foi validada por leitura independente.',
   verify_failed: 'Não foi possível confirmar o conteúdo gravado. Encoste novamente a etiqueta para tentar verificar.',
   cancelled: 'A verificação foi cancelada. Pode verificar a etiqueta mais tarde em "Detalhes".',
   failed: 'Não foi possível concluir a verificação. Tente novamente.'
@@ -47,6 +49,7 @@ const statusIcon: Record<string, unknown> = {
   verified: CheckCircle2,
   different: AlertTriangle,
   no_url: ShieldQuestion,
+  unreadable: ShieldQuestion,
   verify_failed: ShieldQuestion,
   cancelled: ShieldQuestion,
   failed: AlertTriangle
@@ -57,6 +60,7 @@ const toneClass: Record<string, string> = {
   verified: 'tone-success',
   different: 'tone-warning',
   no_url: 'tone-warning',
+  unreadable: 'tone-warning',
   verify_failed: 'tone-warning',
   cancelled: 'tone-neutral',
   failed: 'tone-warning'

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue'
+import { ref, watch, computed } from 'vue'
 import type { NfcTag } from '@/types'
 import { NfcError } from '@/types'
 import { useNfcStore, HARDWARE_LOCK_NOTE } from '@/stores/nfc'
@@ -52,6 +52,7 @@ const verifying = ref(false)
 const verifyState = ref<'idle' | 'verifying' | 'verified' | 'different' | 'no_url' | 'verify_failed' | 'cancelled'>('idle')
 const verifyFoundUrl = ref<string | null>(null)
 const verifyTechnical = ref<string | null>(null)
+const readSupported = computed(() => nfcService.isReadSupported() && nfcService.isSecureContext())
 
 watch(
   () => props.isOpen,
@@ -349,8 +350,9 @@ const statusVariant = (tag: NfcTag) => {
             <AppButton
               size="sm"
               variant="secondary"
-              :disabled="!tag.url || verifying"
+              :disabled="!tag.url || verifying || !readSupported"
               :loading="verifying"
+              :title="readSupported ? 'Ler a etiqueta e comparar o URL' : 'A leitura NFC não está disponível neste navegador/dispositivo.'"
               @click="runReadAndVerify"
             >
               <Search :size="14" />

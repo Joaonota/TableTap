@@ -30,12 +30,14 @@ const nfcStore = useNfcStore()
 const isWaiting = ref(false)
 const lastRead = ref<ParsedNfcRead | null>(null)
 const errorMessage = ref<string | null>(null)
+const errorHint = ref<string | null>(null)
 const technical = ref<string | null>(null)
 
 const isSupported = computed(() => nfcService.isSupported())
 
 const startRead = async () => {
   errorMessage.value = null
+  errorHint.value = null
   technical.value = null
   lastRead.value = null
   isWaiting.value = true
@@ -53,6 +55,7 @@ const startRead = async () => {
     const err = translateNfcException(e)
     if (err.code !== 'cancelled') {
       errorMessage.value = err.message
+      errorHint.value = err.hint
       technical.value = err.technical
     }
   }
@@ -127,7 +130,11 @@ const serialOrFallback = computed(() => {
       <AlertTriangle :size="16" />
       <div>
         <p class="reader-error-text">{{ errorMessage }}</p>
-        <p v-if="technical" class="reader-error-technical">{{ technical }}</p>
+        <p v-if="errorHint" class="reader-error-hint">{{ errorHint }}</p>
+        <details v-if="technical" class="reader-tech-details">
+          <summary>Detalhes técnicos</summary>
+          <p class="reader-error-technical">{{ technical }}</p>
+        </details>
       </div>
     </div>
 
@@ -320,6 +327,25 @@ const serialOrFallback = computed(() => {
   font-weight: 600;
 }
 
+.reader-error-hint {
+  margin: 0.25rem 0 0;
+  font-size: 0.75rem;
+  color: #7f1d1d;
+  line-height: 1.45;
+}
+
+.reader-tech-details {
+  margin-top: 0.3rem;
+  font-size: 0.72rem;
+  color: #b91c1c;
+}
+
+.reader-tech-details summary {
+  cursor: pointer;
+  font-weight: 700;
+  user-select: none;
+}
+
 .reader-error-technical {
   margin: 0.2rem 0 0;
   font-size: 0.7rem;
@@ -327,6 +353,7 @@ const serialOrFallback = computed(() => {
   color: #b91c1c;
   opacity: 0.8;
   word-break: break-all;
+  white-space: pre-wrap;
 }
 
 /* Result card */

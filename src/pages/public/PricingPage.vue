@@ -1,12 +1,23 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { subscriptionService } from '@/services'
-import type { Plan } from '@/types'
+import type { Plan, PlanFeature } from '@/types'
+import { getPlanLimit, getFeatureCatalogEntry } from '@/types/plan'
 import AppButton from '@/components/ui/AppButton.vue'
 import { Check, Sparkles } from 'lucide-vue-next'
 
 const plans = ref<Plan[]>([])
 const isLoading = ref(true)
+
+const formatLimit = (plan: Plan, key: any, singular: string, plural: string) => {
+  const val = getPlanLimit(plan, key)
+  if (val === null) return `Ilimitados ${plural}`
+  return `${val} ${val === 1 ? singular : plural}`
+}
+
+const getFeatureLabel = (f: PlanFeature) => {
+  return getFeatureCatalogEntry(f.featureKey)?.name || f.featureKey
+}
 
 onMounted(async () => {
   try {
@@ -36,24 +47,25 @@ onMounted(async () => {
         v-for="plan in plans"
         :key="plan.id"
         class="plan-card"
-        :class="{ 'is-featured': plan.id === 'plan-pro' }"
+        :class="{ 'is-featured': plan.id === 'plan-pro' || plan.highlighted }"
       >
-        <div v-if="plan.id === 'plan-pro'" class="featured-badge">
+        <div v-if="plan.id === 'plan-pro' || plan.highlighted" class="featured-badge">
           <Sparkles :size="13" />
           <span>MAIS POPULAR</span>
         </div>
 
         <div class="plan-header">
           <h3 class="plan-name">{{ plan.name }}</h3>
+          <p class="plan-desc">{{ plan.description }}</p>
           <div class="plan-price-wrap">
-            <span class="plan-currency">MT</span>
-            <span class="plan-amount">{{ plan.priceMonthly.toLocaleString('pt-MZ') }}</span>
+            <span class="plan-currency">{{ plan.currency || 'MT' }}</span>
+            <span class="plan-amount">{{ plan.price.toLocaleString('pt-MZ') }}</span>
             <span class="plan-period">/mês</span>
           </div>
           <p class="plan-limits">
-            Até <strong>{{ plan.maxRestaurants }}</strong> {{ plan.maxRestaurants === 1 ? 'restaurante' : 'restaurantes' }} •
-            <strong>{{ plan.maxTables }}</strong> mesas •
-            <strong>{{ plan.maxStaff }}</strong> colaboradores
+            Até <strong>{{ formatLimit(plan, 'MAX_RESTAURANTS', 'restaurante', 'restaurantes') }}</strong> •
+            <strong>{{ formatLimit(plan, 'MAX_TABLES', 'mesa', 'mesas') }}</strong> •
+            <strong>{{ formatLimit(plan, 'MAX_STAFF', 'colaborador', 'colaboradores') }}</strong>
           </p>
         </div>
 
@@ -62,9 +74,12 @@ onMounted(async () => {
         <div class="plan-features">
           <div class="features-label">FUNCIONALIDADES INCLUÍDAS:</div>
           <ul class="features-list">
-            <li v-for="(feat, idx) in plan.features" :key="idx">
+            <li
+              v-for="feat in (plan.features || []).filter(f => f.enabled).slice(0, 8)"
+              :key="feat.featureKey"
+            >
               <div class="check-icon"><Check :size="15" /></div>
-              <span>{{ feat }}</span>
+              <span>{{ getFeatureLabel(feat) }}</span>
             </li>
           </ul>
         </div>
@@ -72,7 +87,7 @@ onMounted(async () => {
         <div class="plan-footer">
           <router-link :to="`/demonstracao?plan=${plan.id}`">
             <AppButton
-              :variant="plan.id === 'plan-pro' ? 'primary' : 'outline'"
+              :variant="plan.id === 'plan-pro' || plan.highlighted ? 'primary' : 'outline'"
               class="w-full"
               size="lg"
             >
@@ -110,11 +125,11 @@ onMounted(async () => {
 }
 
 .pricing-grid {
-    display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 2rem;
-    align-items: stretch;
-  }
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 1.5rem;
+  align-items: stretch;
+}
 
 .plan-card {
   background: #ffffff;

@@ -31,7 +31,9 @@ import {
   Menu,
   X,
   ExternalLink,
-  LogOut
+  LogOut,
+  Palette,
+  Sparkles
 } from 'lucide-vue-next'
 
 const router = useRouter()
@@ -285,6 +287,16 @@ onMounted(async () => {
             </router-link>
 
             <router-link
+              to="/app/menu/personalizacao"
+              class="nav-link"
+              :class="{ 'is-active': route.path === '/app/menu/personalizacao' }"
+              @click="isMobileSidebarOpen = false"
+            >
+              <Palette :size="18" />
+              <span>Personalizar Menu</span>
+            </router-link>
+
+            <router-link
               to="/app/acesso-digital"
               class="nav-link"
               :class="{ 'is-active': route.path === '/app/acesso-digital' }"
@@ -307,6 +319,16 @@ onMounted(async () => {
 
           <div class="sidebar-nav-group">
             <div class="nav-label">GESTÃO & RELATÓRIOS</div>
+
+            <router-link
+              to="/app/meu-plano"
+              class="nav-link"
+              :class="{ 'is-active': route.path === '/app/meu-plano' }"
+              @click="isMobileSidebarOpen = false"
+            >
+              <Sparkles :size="18" />
+              <span>Meu Plano & Limites</span>
+            </router-link>
 
             <router-link
               to="/app/funcionarios"

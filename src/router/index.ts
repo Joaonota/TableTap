@@ -31,6 +31,8 @@ import PaymentsPage from '@/pages/payments/PaymentsPage.vue'
 import StaffPage from '@/pages/staff/StaffPage.vue'
 import ReportsPage from '@/pages/reports/ReportsPage.vue'
 import SettingsPage from '@/pages/settings/SettingsPage.vue'
+import MenuBuilderPage from '@/pages/menu/MenuBuilderPage.vue'
+import MeuPlanoPage from '@/pages/tenant/MeuPlanoPage.vue'
 
 // Super Admin Pages
 import SuperDashboardPage from '@/pages/super-admin/SuperDashboardPage.vue'
@@ -40,6 +42,12 @@ import UsersPage from '@/pages/super-admin/UsersPage.vue'
 import PlansPage from '@/pages/super-admin/PlansPage.vue'
 import SubscriptionsPage from '@/pages/super-admin/SubscriptionsPage.vue'
 import ActivityLogPage from '@/pages/super-admin/ActivityLogPage.vue'
+import FeaturesCatalogPage from '@/pages/super-admin/FeaturesCatalogPage.vue'
+import SuperMenusPage from '@/pages/super-admin/SuperMenusPage.vue'
+import SuperOrdersPage from '@/pages/super-admin/SuperOrdersPage.vue'
+import SuperPaymentsPage from '@/pages/super-admin/SuperPaymentsPage.vue'
+import SuperReportsPage from '@/pages/super-admin/SuperReportsPage.vue'
+import SuperSettingsPage from '@/pages/super-admin/SuperSettingsPage.vue'
 
 // Error Pages
 import NotFoundPage from '@/pages/errors/NotFoundPage.vue'
@@ -96,6 +104,8 @@ const routes: RouteRecordRaw[] = [
       { path: 'mesas', name: 'admin-tables', component: TablesPage },
       { path: 'menu/produtos', name: 'admin-products', component: ProductsPage },
       { path: 'menu/categorias', name: 'admin-categories', component: CategoriesPage },
+      { path: 'menu/personalizacao', name: 'admin-menu-customization', component: MenuBuilderPage },
+      { path: 'meu-plano', name: 'admin-my-plan', component: MeuPlanoPage },
       { path: 'acesso-digital', name: 'admin-digital-access', component: DigitalAccessPage },
       { path: 'pagamentos', name: 'admin-payments', component: PaymentsPage },
       { path: 'funcionarios', name: 'admin-staff', component: StaffPage },
@@ -114,9 +124,15 @@ const routes: RouteRecordRaw[] = [
       { path: 'empresas', name: 'super-companies', component: CompaniesPage },
       { path: 'restaurantes', name: 'super-restaurants', component: RestaurantsPage },
       { path: 'utilizadores', name: 'super-users', component: UsersPage },
+      { path: 'menus', name: 'super-menus', component: SuperMenusPage },
+      { path: 'pedidos', name: 'super-orders', component: SuperOrdersPage },
+      { path: 'pagamentos', name: 'super-payments', component: SuperPaymentsPage },
       { path: 'planos', name: 'super-plans', component: PlansPage },
+      { path: 'funcionalidades', name: 'super-features', component: FeaturesCatalogPage },
       { path: 'subscricoes', name: 'super-subscriptions', component: SubscriptionsPage },
-      { path: 'atividade', name: 'super-activity', component: ActivityLogPage }
+      { path: 'relatorios', name: 'super-reports', component: SuperReportsPage },
+      { path: 'atividade', name: 'super-activity', component: ActivityLogPage },
+      { path: 'configuracoes', name: 'super-settings', component: SuperSettingsPage }
     ]
   },
 

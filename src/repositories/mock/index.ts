@@ -11,7 +11,11 @@ import type {
   IPaymentRepository,
   IServiceRequestRepository,
   IStaffRepository,
+  IPlanRepository,
   ISubscriptionRepository,
+  IMenuCustomizationRepository,
+  IAuditLogRepository,
+  IPlatformConfigRepository,
   ITableSessionRepository,
   INotificationRepository
 } from '../interfaces'
@@ -30,10 +34,14 @@ import type {
   StaffMember,
   Plan,
   Subscription,
+  SubscriptionHistory,
   DigitalAccess,
   OrderStatus,
   PaymentStatus,
-  ServiceRequestStatus
+  ServiceRequestStatus,
+  MenuCustomization,
+  PlatformAuditLog,
+  PlatformConfig
 } from '@/types'
 
 export class MockCompanyRepository implements ICompanyRepository {
@@ -520,6 +528,50 @@ export class MockStaffRepository implements IStaffRepository {
   }
 }
 
+export class MockPlanRepository implements IPlanRepository {
+  async getAll(): Promise<Plan[]> {
+    return [...mockStorage.getDb().plans].sort((a, b) => (a.displayOrder || 0) - (b.displayOrder || 0))
+  }
+
+  async getById(id: string): Promise<Plan | null> {
+    const item = mockStorage.getDb().plans.find(p => p.id === id)
+    return item ? { ...item } : null
+  }
+
+  async getBySlug(slug: string): Promise<Plan | null> {
+    const item = mockStorage.getDb().plans.find(p => p.slug === slug)
+    return item ? { ...item } : null
+  }
+
+  async create(plan: Omit<Plan, 'id'>): Promise<Plan> {
+    const newPlan: Plan = {
+      ...plan,
+      id: `plan-${Date.now()}`
+    }
+    mockStorage.getDb().plans.push(newPlan)
+    mockStorage.commit()
+    return newPlan
+  }
+
+  async update(id: string, updates: Partial<Plan>): Promise<Plan> {
+    const db = mockStorage.getDb()
+    const index = db.plans.findIndex(p => p.id === id)
+    if (index === -1) throw new Error(`Plano ${id} não encontrado`)
+    db.plans[index] = { ...db.plans[index], ...updates }
+    mockStorage.commit()
+    return { ...db.plans[index] }
+  }
+
+  async delete(id: string): Promise<boolean> {
+    const db = mockStorage.getDb()
+    const index = db.plans.findIndex(p => p.id === id)
+    if (index === -1) return false
+    db.plans.splice(index, 1)
+    mockStorage.commit()
+    return true
+  }
+}
+
 export class MockSubscriptionRepository implements ISubscriptionRepository {
   async getAllPlans(): Promise<Plan[]> {
     return [...mockStorage.getDb().plans]
@@ -534,6 +586,21 @@ export class MockSubscriptionRepository implements ISubscriptionRepository {
     return item ? { ...item } : null
   }
 
+  async getById(id: string): Promise<Subscription | null> {
+    const item = mockStorage.getDb().subscriptions.find(s => s.id === id)
+    return item ? { ...item } : null
+  }
+
+  async create(sub: Omit<Subscription, 'id'>): Promise<Subscription> {
+    const newSub: Subscription = {
+      ...sub,
+      id: `sub-${Date.now()}`
+    }
+    mockStorage.getDb().subscriptions.push(newSub)
+    mockStorage.commit()
+    return newSub
+  }
+
   async updateSubscription(id: string, updates: Partial<Subscription>): Promise<Subscription> {
     const db = mockStorage.getDb()
     const index = db.subscriptions.findIndex(s => s.id === id)
@@ -541,6 +608,103 @@ export class MockSubscriptionRepository implements ISubscriptionRepository {
     db.subscriptions[index] = { ...db.subscriptions[index], ...updates }
     mockStorage.commit()
     return { ...db.subscriptions[index] }
+  }
+
+  async addHistoryEvent(id: string, event: Omit<SubscriptionHistory, 'id' | 'date'>): Promise<Subscription> {
+    const db = mockStorage.getDb()
+    const index = db.subscriptions.findIndex(s => s.id === id)
+    if (index === -1) throw new Error(`Subscrição ${id} não encontrada`)
+    const sub = db.subscriptions[index]
+    if (!sub.history) sub.history = []
+    const newEvent: SubscriptionHistory = {
+      ...event,
+      id: `subh-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+      date: new Date().toISOString()
+    }
+    sub.history.unshift(newEvent)
+    mockStorage.commit()
+    return { ...sub }
+  }
+}
+
+export class MockMenuCustomizationRepository implements IMenuCustomizationRepository {
+  async getByRestaurant(restaurantId: string): Promise<MenuCustomization | null> {
+    const item = mockStorage.getDb().menuCustomizations?.find(mc => mc.restaurantId === restaurantId)
+    return item ? JSON.parse(JSON.stringify(item)) : null
+  }
+
+  async save(customization: Omit<MenuCustomization, 'id' | 'updatedAt'> & { id?: string }): Promise<MenuCustomization> {
+    const db = mockStorage.getDb()
+    if (!db.menuCustomizations) db.menuCustomizations = []
+    const index = db.menuCustomizations.findIndex(mc => mc.restaurantId === customization.restaurantId)
+    const now = new Date().toISOString()
+
+    if (index >= 0) {
+      db.menuCustomizations[index] = {
+        ...db.menuCustomizations[index],
+        ...customization,
+        updatedAt: now
+      }
+      mockStorage.commit()
+      return JSON.parse(JSON.stringify(db.menuCustomizations[index]))
+    } else {
+      const newMC: MenuCustomization = {
+        id: customization.id || `mc-${customization.restaurantId}-${Date.now()}`,
+        tenantId: customization.tenantId,
+        restaurantId: customization.restaurantId,
+        theme: customization.theme,
+        updatedAt: now,
+        updatedBy: customization.updatedBy || 'Administrador'
+      }
+      db.menuCustomizations.push(newMC)
+      mockStorage.commit()
+      return JSON.parse(JSON.stringify(newMC))
+    }
+  }
+
+  async delete(restaurantId: string): Promise<boolean> {
+    const db = mockStorage.getDb()
+    if (!db.menuCustomizations) return false
+    const index = db.menuCustomizations.findIndex(mc => mc.restaurantId === restaurantId)
+    if (index === -1) return false
+    db.menuCustomizations.splice(index, 1)
+    mockStorage.commit()
+    return true
+  }
+}
+
+export class MockAuditLogRepository implements IAuditLogRepository {
+  async getAll(filter?: { tenantId?: string; limit?: number }): Promise<PlatformAuditLog[]> {
+    let logs = [...(mockStorage.getDb().auditLogs || [])]
+    if (filter?.tenantId) {
+      logs = logs.filter(l => l.tenantId === filter.tenantId)
+    }
+    logs.sort(
+      (a, b) =>
+        new Date(b.createdAt ?? b.timestamp ?? 0).getTime() -
+        new Date(a.createdAt ?? a.timestamp ?? 0).getTime()
+    )
+    if (filter?.limit) {
+      logs = logs.slice(0, filter.limit)
+    }
+    return logs
+  }
+
+  async create(log: Omit<PlatformAuditLog, 'id' | 'createdAt'>): Promise<PlatformAuditLog> {
+    return mockStorage.addAuditLog(log)
+  }
+}
+
+export class MockPlatformConfigRepository implements IPlatformConfigRepository {
+  async get(): Promise<PlatformConfig> {
+    return { ...mockStorage.getDb().platformConfig }
+  }
+
+  async update(updates: Partial<PlatformConfig>): Promise<PlatformConfig> {
+    const db = mockStorage.getDb()
+    db.platformConfig = { ...db.platformConfig, ...updates }
+    mockStorage.commit()
+    return { ...db.platformConfig }
   }
 }
 

@@ -284,7 +284,7 @@ const formatDateShort = (iso?: string) => {
 
       <button class="section-tab-btn" :class="{ 'is-active': activeTab === 'diagnostics' }" @click="activeTab = 'diagnostics'">
         <Search :size="16" />
-        <span>Testar NFC</span>
+        <span>Diagnóstico NFC</span>
       </button>
 
       <button class="section-tab-btn" :class="{ 'is-active': activeTab === 'qr' }" @click="activeTab = 'qr'">

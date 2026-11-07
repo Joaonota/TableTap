@@ -13,10 +13,14 @@ import type {
   StaffMember,
   Plan,
   Subscription,
+  SubscriptionHistory,
   DigitalAccess,
   OrderStatus,
   PaymentStatus,
-  ServiceRequestStatus
+  ServiceRequestStatus,
+  MenuCustomization,
+  PlatformAuditLog,
+  PlatformConfig
 } from '@/types'
 
 export interface ICompanyRepository {
@@ -103,11 +107,39 @@ export interface IStaffRepository {
   delete(id: string): Promise<boolean>
 }
 
+export interface IPlanRepository {
+  getAll(): Promise<Plan[]>
+  getById(id: string): Promise<Plan | null>
+  getBySlug(slug: string): Promise<Plan | null>
+  create(plan: Omit<Plan, 'id'>): Promise<Plan>
+  update(id: string, updates: Partial<Plan>): Promise<Plan>
+  delete(id: string): Promise<boolean>
+}
+
 export interface ISubscriptionRepository {
   getAllPlans(): Promise<Plan[]>
   getAllSubscriptions(): Promise<Subscription[]>
   getByTenant(tenantId: string): Promise<Subscription | null>
+  getById(id: string): Promise<Subscription | null>
+  create(sub: Omit<Subscription, 'id'>): Promise<Subscription>
   updateSubscription(id: string, updates: Partial<Subscription>): Promise<Subscription>
+  addHistoryEvent(id: string, event: Omit<SubscriptionHistory, 'id' | 'date'>): Promise<Subscription>
+}
+
+export interface IMenuCustomizationRepository {
+  getByRestaurant(restaurantId: string): Promise<MenuCustomization | null>
+  save(customization: Omit<MenuCustomization, 'id' | 'updatedAt'> & { id?: string }): Promise<MenuCustomization>
+  delete(restaurantId: string): Promise<boolean>
+}
+
+export interface IAuditLogRepository {
+  getAll(filter?: { tenantId?: string; limit?: number }): Promise<PlatformAuditLog[]>
+  create(log: Omit<PlatformAuditLog, 'id' | 'createdAt'>): Promise<PlatformAuditLog>
+}
+
+export interface IPlatformConfigRepository {
+  get(): Promise<PlatformConfig>
+  update(updates: Partial<PlatformConfig>): Promise<PlatformConfig>
 }
 
 export interface ITableSessionRepository {

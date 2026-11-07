@@ -1,173 +1,259 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
-import { tenantService, restaurantService, subscriptionService, authService } from '@/services'
-import type { Company, Restaurant, Subscription, Plan, User } from '@/types'
-import MetricCard from '@/components/ui/MetricCard.vue'
+import { ref, onMounted, computed } from 'vue'
+import { tenantService, restaurantService, authService } from '@/services'
+import { usePlatformStore } from '@/stores/platform'
+import { usePlansStore } from '@/stores/plans'
+import type { Company, Restaurant, User } from '@/types'
 import AppBadge from '@/components/ui/AppBadge.vue'
+import AppButton from '@/components/ui/AppButton.vue'
 import {
   Building2,
   Store,
   Users,
   CreditCard,
   TrendingUp,
-  ShieldAlert,
+  ShieldCheck,
   Sparkles,
-  ArrowRight
+  ArrowRight,
+  Activity,
+  Layers,
+  ArrowUpRight
 } from 'lucide-vue-next'
+
+const platformStore = usePlatformStore()
+const plansStore = usePlansStore()
 
 const companies = ref<Company[]>([])
 const restaurants = ref<Restaurant[]>([])
-const subscriptions = ref<Subscription[]>([])
-const plans = ref<Plan[]>([])
 const users = ref<User[]>([])
 const isLoading = ref(true)
 
 onMounted(async () => {
   try {
-    const [c, r, s, p, u] = await Promise.all([
-      tenantService.getAllCompanies(),
-      restaurantService.getAllRestaurants(),
-      subscriptionService.getAllSubscriptions(),
-      subscriptionService.getAllPlans(),
-      authService.getDemoUsers()
+    await Promise.all([
+      platformStore.fetchPlatformData(),
+      plansStore.fetchPlans(),
+      tenantService.getAllCompanies().then(c => companies.value = c),
+      restaurantService.getAllRestaurants().then(r => restaurants.value = r),
+      authService.getDemoUsers().then(u => users.value = u)
     ])
-    companies.value = c
-    restaurants.value = r
-    subscriptions.value = s
-    plans.value = p
-    users.value = u
   } finally {
     isLoading.value = false
   }
 })
 
-const totalMrr = () => {
-  return subscriptions.value
-    .filter(s => s.status === 'active')
-    .reduce((sum, s) => sum + s.monthlyPrice, 0)
-}
+// Monthly projection data for visualization
+const monthlyRevenueProjection = [
+  { month: 'Jun', value: 10470 },
+  { month: 'Jul', value: 11960 },
+  { month: 'Ago', value: 13450 },
+  { month: 'Set', value: 14940 },
+  { month: 'Out', value: 16430 },
+  { month: 'Nov (Atual)', value: 16470 }
+]
+
+const maxRev = Math.max(...monthlyRevenueProjection.map(m => m.value))
+
+const planDistributionList = computed(() => {
+  const counts = platformStore.planDistribution
+  const total = platformStore.subscriptions.length || 1
+  return Object.entries(counts).map(([name, count]) => ({
+    name,
+    count,
+    percent: Math.round((count / total) * 100)
+  }))
+})
 </script>
 
 <template>
   <div class="super-dashboard">
     <div class="super-header">
       <div>
-        <h1 class="super-title">Consola Global SaaS</h1>
-        <p class="super-subtitle">Visão macro de todas as organizações, subscrições ativas e métricas da plataforma</p>
+        <h1 class="super-title">Consola Executiva Super Admin</h1>
+        <p class="super-subtitle">Visão macro de todas as organizações, subscrições ativas, métricas SaaS e atividade do sistema</p>
       </div>
 
-      <div class="badge badge-primary">SaaS Multi-Tenant Ativo</div>
+      <div class="header-pills">
+        <span class="badge-status online">● Plataforma Operacional</span>
+        <span class="badge-mrr font-mono">MRR: {{ platformStore.mrr.toLocaleString('pt-MZ') }} MT</span>
+      </div>
     </div>
 
     <!-- Global SaaS Metrics -->
     <div class="super-metrics-grid">
       <div class="super-metric-card">
         <div class="m-head">
-          <span>RECEITA RECORRENTE MENSAL (MRR)</span>
-          <CreditCard :size="18" class="m-icon" />
+          <span>RECEITA RECORRENTE (MRR)</span>
+          <CreditCard :size="18" class="m-icon m-icon-green" />
         </div>
-        <div class="m-val">{{ totalMrr().toLocaleString('pt-MZ') }} MT</div>
-        <div class="m-sub text-success">↑ 22.4% no último trimestre</div>
+        <div class="m-val">{{ platformStore.mrr.toLocaleString('pt-MZ') }} MT</div>
+        <div class="m-sub text-success">
+          <TrendingUp :size="13" /> +18.4% vs mês anterior
+        </div>
+      </div>
+
+      <div class="super-metric-card">
+        <div class="m-head">
+          <span>RECEITA ANUALIZADA (ARR)</span>
+          <Sparkles :size="18" class="m-icon m-icon-blue" />
+        </div>
+        <div class="m-val">{{ platformStore.arr.toLocaleString('pt-MZ') }} MT</div>
+        <div class="m-sub">Projeção 12 meses</div>
       </div>
 
       <div class="super-metric-card">
         <div class="m-head">
           <span>EMPRESAS CLIENTES (TENANTS)</span>
-          <Building2 :size="18" class="m-icon" />
+          <Building2 :size="18" class="m-icon m-icon-purple" />
         </div>
         <div class="m-val">{{ companies.length }}</div>
-        <div class="m-sub">{{ companies.filter(c => c.isActive).length }} com subscrição ativa</div>
+        <div class="m-sub">{{ platformStore.activeSubscriptionsCount }} com subscrição ativa</div>
       </div>
 
       <div class="super-metric-card">
         <div class="m-head">
-          <span>TOTAL DE RESTAURANTES</span>
-          <Store :size="18" class="m-icon" />
+          <span>FILIAIS & RESTAURANTES</span>
+          <Store :size="18" class="m-icon m-icon-orange" />
         </div>
         <div class="m-val">{{ restaurants.length }}</div>
-        <div class="m-sub">Em 3 províncias de Moçambique</div>
-      </div>
-
-      <div class="super-metric-card">
-        <div class="m-head">
-          <span>UTILIZADORES REGISTADOS</span>
-          <Users :size="18" class="m-icon" />
-        </div>
-        <div class="m-val">{{ users.length }}</div>
-        <div class="m-sub">Com perfis e acessos definidos</div>
+        <div class="m-sub">Em 3 províncias (Maputo, Matola, Beira)</div>
       </div>
     </div>
 
-    <!-- Two columns: Companies and Subscriptions -->
-    <div class="super-tables-grid">
-      <!-- Companies Table -->
-      <div class="super-card">
+    <!-- Charts & Distribution Grid -->
+    <div class="analytics-row">
+      <!-- Revenue Growth Bar Chart -->
+      <div class="super-card revenue-chart-card">
         <div class="card-header">
-          <h2 class="card-title">Empresas Registadas na Plataforma</h2>
-          <router-link to="/super-admin/empresas" class="card-link">
-            <span>Ver Todas</span>
+          <div>
+            <h2 class="card-title">Evolução de MRR (Últimos 6 Meses)</h2>
+            <p class="card-subtitle">Receita recorrente acumulada de subscrições ativas</p>
+          </div>
+          <span class="currency-tag">Moeda: Meticais (MT)</span>
+        </div>
+
+        <div class="chart-bars">
+          <div
+            v-for="item in monthlyRevenueProjection"
+            :key="item.month"
+            class="bar-column"
+          >
+            <div class="bar-val font-mono">{{ item.value.toLocaleString('pt-MZ') }}</div>
+            <div class="bar-track">
+              <div
+                class="bar-fill"
+                :style="{ height: `${Math.round((item.value / maxRev) * 100)}%` }"
+              ></div>
+            </div>
+            <span class="bar-month">{{ item.month }}</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Plan Distribution -->
+      <div class="super-card distribution-card">
+        <div class="card-header">
+          <h2 class="card-title">Distribuição de Planos</h2>
+          <router-link to="/super-admin/planos" class="card-link">
+            <span>Gerir</span>
             <ArrowRight :size="14" />
           </router-link>
         </div>
 
-        <div class="table-scroll">
-          <table class="super-table">
-          <thead>
-            <tr>
-              <th>Empresa</th>
-              <th>NUIT</th>
-              <th>Restaurantes</th>
-              <th>Estado</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="comp in companies" :key="comp.id">
-              <td>
-                <strong>{{ comp.name }}</strong>
-                <div class="text-xs text-muted">{{ comp.email }}</div>
-              </td>
-              <td>{{ comp.taxId }}</td>
-              <td>
-                <span class="badge badge-neutral">
-                  {{ restaurants.filter(r => r.tenantId === comp.id).length }} filiais
-                </span>
-              </td>
-              <td>
-                <AppBadge :variant="comp.isActive ? 'success' : 'danger'">
-                  {{ comp.isActive ? 'Ativa' : 'Suspensa' }}
-                </AppBadge>
-              </td>
-            </tr>
-          </tbody>
-        </table>
+        <div class="distribution-list">
+          <div
+            v-for="p in planDistributionList"
+            :key="p.name"
+            class="dist-item"
+          >
+            <div class="dist-head">
+              <strong class="dist-name">{{ p.name }}</strong>
+              <span class="dist-val">{{ p.count }} subscrições ({{ p.percent }}%)</span>
+            </div>
+            <div class="dist-track">
+              <div class="dist-fill" :style="{ width: `${p.percent}%` }"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="plan-quick-action">
+          <router-link to="/super-admin/planos">
+            <AppButton variant="outline" size="sm" class="w-full">
+              <Layers :size="14" />
+              <span>Configurar Catálogo de Planos</span>
+            </AppButton>
+          </router-link>
         </div>
       </div>
+    </div>
 
-      <!-- Subscriptions Card -->
+    <!-- Tables Grid: Subscriptions and Audit Logs -->
+    <div class="super-tables-grid">
+      <!-- Active Subscriptions -->
       <div class="super-card">
         <div class="card-header">
-          <h2 class="card-title">Subscrições Comerciais</h2>
+          <div>
+            <h2 class="card-title">Subscrições de Clientes</h2>
+            <p class="card-subtitle">Contratos ativos, em teste e renovações</p>
+          </div>
           <router-link to="/super-admin/subscricoes" class="card-link">
-            <span>Gerir</span>
+            <span>Ver Todas</span>
             <ArrowRight :size="14" />
           </router-link>
         </div>
 
         <div class="subscriptions-list">
           <div
-            v-for="sub in subscriptions"
+            v-for="sub in platformStore.subscriptions"
             :key="sub.id"
             class="sub-item"
           >
             <div class="sub-left">
               <strong>{{ sub.companyName }}</strong>
-              <span class="text-xs text-muted">{{ sub.planName }}</span>
+              <div class="sub-meta">
+                <span class="plan-badge-mini">{{ sub.planName }}</span>
+                <span>• Renovação: {{ new Date(sub.renewalDate).toLocaleDateString('pt-MZ') }}</span>
+              </div>
             </div>
             <div class="sub-right">
-              <strong>{{ sub.monthlyPrice.toLocaleString('pt-MZ') }} MT</strong>
-              <AppBadge :variant="sub.status === 'active' ? 'success' : 'warning'">
+              <strong class="font-mono text-price">{{ sub.monthlyPrice.toLocaleString('pt-MZ') }} MT</strong>
+              <AppBadge :variant="sub.status === 'active' ? 'success' : sub.status === 'trial' ? 'primary' : 'warning'">
                 {{ sub.status }}
               </AppBadge>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Activity Log Feed -->
+      <div class="super-card">
+        <div class="card-header">
+          <div>
+            <h2 class="card-title">Registo de Atividades (Auditoria)</h2>
+            <p class="card-subtitle">Últimas ações e eventos críticos no sistema</p>
+          </div>
+          <router-link to="/super-admin/auditoria" class="card-link">
+            <span>Ver Tudo</span>
+            <ArrowRight :size="14" />
+          </router-link>
+        </div>
+
+        <div class="audit-feed">
+          <div
+            v-for="log in platformStore.auditLogs.slice(0, 5)"
+            :key="log.id"
+            class="audit-item"
+          >
+            <div class="audit-icon-bullet">
+              <Activity :size="13" />
+            </div>
+            <div class="audit-content">
+              <div class="audit-top">
+                <span class="audit-action font-mono">{{ log.action }}</span>
+                <span class="audit-time">{{ new Date(log.createdAt ?? log.timestamp ?? Date.now()).toLocaleDateString('pt-MZ') }}</span>
+              </div>
+              <p class="audit-details">{{ log.details }}</p>
+              <div class="audit-actor">Por: <strong>{{ log.userName }}</strong></div>
             </div>
           </div>
         </div>
@@ -180,7 +266,7 @@ const totalMrr = () => {
 .super-dashboard {
   display: flex;
   flex-direction: column;
-  gap: 1.75rem;
+  gap: 1.5rem;
 }
 
 .super-header {
@@ -195,11 +281,37 @@ const totalMrr = () => {
   font-size: 1.75rem;
   font-weight: 800;
   color: #ffffff;
+  margin: 0;
 }
 
 .super-subtitle {
   font-size: 0.875rem;
   color: #94a3b8;
+  margin: 0.25rem 0 0;
+}
+
+.header-pills {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.badge-status.online {
+  font-size: 0.8125rem;
+  font-weight: 700;
+  color: #34d399;
+  background: rgba(16, 185, 129, 0.12);
+  padding: 0.35rem 0.75rem;
+  border-radius: 20px;
+}
+
+.badge-mrr {
+  font-size: 0.8125rem;
+  font-weight: 700;
+  color: #38bdf8;
+  background: rgba(56, 189, 248, 0.12);
+  padding: 0.35rem 0.75rem;
+  border-radius: 20px;
 }
 
 .super-metrics-grid {
@@ -208,180 +320,334 @@ const totalMrr = () => {
   gap: 1.25rem;
 }
 
+@media (max-width: 1024px) {
+  .super-metrics-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 600px) {
+  .super-metrics-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
 .super-metric-card {
-  background: #0f172a;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: var(--radius-lg);
+  background: #1e293b;
+  border: 1px solid #334155;
+  border-radius: 12px;
   padding: 1.25rem;
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
+  gap: 0.4rem;
 }
 
 .m-head {
   display: flex;
-  align-items: center;
   justify-content: space-between;
+  align-items: center;
   font-size: 0.6875rem;
   font-weight: 700;
-  color: #64748b;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.05em;
+  color: #94a3b8;
 }
 
 .m-icon {
-  color: #8b5cf6;
+  padding: 4px;
+  border-radius: 6px;
+  box-sizing: content-box;
+}
+
+.m-icon-green {
+  background: rgba(16, 185, 129, 0.12);
+  color: #34d399;
+}
+
+.m-icon-blue {
+  background: rgba(56, 189, 248, 0.12);
+  color: #38bdf8;
+}
+
+.m-icon-purple {
+  background: rgba(168, 85, 247, 0.12);
+  color: #c084fc;
+}
+
+.m-icon-orange {
+  background: rgba(245, 158, 11, 0.12);
+  color: #fbbf24;
 }
 
 .m-val {
-  font-size: 1.75rem;
+  font-size: 1.5rem;
   font-weight: 800;
-  font-family: var(--font-heading);
   color: #ffffff;
-  line-height: 1;
 }
 
 .m-sub {
   font-size: 0.75rem;
-  color: #94a3b8;
+  color: #64748b;
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
 }
 
-.super-tables-grid {
+.text-success {
+  color: #34d399;
+}
+
+.analytics-row {
   display: grid;
   grid-template-columns: 2fr 1fr;
-  gap: 1.5rem;
+  gap: 1.25rem;
+}
+
+@media (max-width: 900px) {
+  .analytics-row {
+    grid-template-columns: 1fr;
+  }
 }
 
 .super-card {
-  background: #0f172a;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: var(--radius-lg);
-  padding: 1.5rem;
+  background: #1e293b;
+  border: 1px solid #334155;
+  border-radius: 12px;
+  padding: 1.25rem;
+  display: flex;
+  flex-direction: column;
 }
 
 .card-header {
   display: flex;
-  align-items: center;
   justify-content: space-between;
+  align-items: flex-start;
   margin-bottom: 1.25rem;
 }
 
 .card-title {
-  font-size: 1.0625rem;
+  font-size: 1rem;
   font-weight: 700;
   color: #ffffff;
+  margin: 0;
+}
+
+.card-subtitle {
+  font-size: 0.75rem;
+  color: #94a3b8;
+  margin: 0.2rem 0 0;
+}
+
+.currency-tag {
+  font-size: 0.6875rem;
+  color: #64748b;
 }
 
 .card-link {
   display: inline-flex;
   align-items: center;
   gap: 0.35rem;
-  font-size: 0.75rem;
-  color: #a78bfa;
+  font-size: 0.8125rem;
+  color: #38bdf8;
+  font-weight: 600;
+  text-decoration: none;
 }
 
-.super-table {
+.chart-bars {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 0.75rem;
+  height: 180px;
+  padding-top: 1rem;
+}
+
+.bar-column {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  height: 100%;
+}
+
+.bar-val {
+  font-size: 0.6875rem;
+  color: #94a3b8;
+}
+
+.bar-track {
+  flex: 1;
   width: 100%;
-  border-collapse: collapse;
-  text-align: left;
-  font-size: 0.875rem;
+  max-width: 44px;
+  background: #0f172a;
+  border-radius: 6px;
+  display: flex;
+  align-items: flex-end;
+  overflow: hidden;
 }
 
-.super-table th {
-  padding: 0.75rem 0.5rem;
+.bar-fill {
+  width: 100%;
+  background: linear-gradient(180deg, #38bdf8 0%, #0d7a5f 100%);
+  border-radius: 6px 6px 0 0;
+  transition: height 0.4s ease;
+}
+
+.bar-month {
   font-size: 0.75rem;
-  color: #64748b;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  color: #94a3b8;
 }
 
-.super-table td {
-  padding: 0.875rem 0.5rem;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-  color: #cbd5e1;
+.distribution-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+  flex: 1;
+}
+
+.dist-head {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.8125rem;
+  margin-bottom: 0.3rem;
+}
+
+.dist-name {
+  color: #ffffff;
+}
+
+.dist-val {
+  color: #94a3b8;
+  font-size: 0.75rem;
+}
+
+.dist-track {
+  height: 8px;
+  background: #0f172a;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.dist-fill {
+  height: 100%;
+  background: #0d7a5f;
+  border-radius: 4px;
+}
+
+.plan-quick-action {
+  margin-top: 1.25rem;
+  padding-top: 1rem;
+  border-top: 1px solid #334155;
+}
+
+.super-tables-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.25rem;
+}
+
+@media (max-width: 900px) {
+  .super-tables-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 .subscriptions-list {
   display: flex;
   flex-direction: column;
-  gap: 1rem;
+  gap: 0.75rem;
 }
 
 .sub-item {
   display: flex;
-  align-items: center;
   justify-content: space-between;
-  padding: 0.85rem;
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid rgba(255, 255, 255, 0.06);
-  border-radius: var(--radius-md);
+  align-items: center;
+  padding: 0.75rem;
+  background: #0f172a;
+  border-radius: 8px;
+  border: 1px solid #334155;
 }
 
-.sub-left {
+.sub-left strong {
+  display: block;
+  font-size: 0.875rem;
+  color: #ffffff;
+}
+
+.sub-meta {
   display: flex;
-  flex-direction: column;
+  align-items: center;
+  gap: 0.45rem;
+  font-size: 0.75rem;
+  color: #94a3b8;
+  margin-top: 0.2rem;
+}
+
+.plan-badge-mini {
+  color: #38bdf8;
+  font-weight: 700;
 }
 
 .sub-right {
   display: flex;
-  align-items: center;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.35rem;
+}
+
+.text-price {
+  color: #34d399;
+}
+
+.audit-feed {
+  display: flex;
+  flex-direction: column;
   gap: 0.75rem;
 }
 
-.table-scroll {
-  width: 100%;
-  overflow-x: auto;
-  -webkit-overflow-scrolling: touch;
+.audit-item {
+  display: flex;
+  gap: 0.75rem;
+  padding: 0.75rem;
+  background: #0f172a;
+  border-radius: 8px;
+  border: 1px solid #334155;
 }
 
-.table-scroll .super-table {
-  min-width: 640px;
+.audit-icon-bullet {
+  color: #38bdf8;
+  margin-top: 2px;
 }
 
-.super-tables-grid {
-  min-width: 0;
+.audit-content {
+  flex: 1;
 }
 
-.super-tables-grid > * {
-  min-width: 0;
+.audit-top {
+  display: flex;
+  justify-content: space-between;
 }
 
-@media (max-width: 1100px) {
-    .super-metrics-grid {
-      grid-template-columns: repeat(2, 1fr);
-    }
-    .super-tables-grid {
-      grid-template-columns: 1fr;
-    }
-  }
+.audit-action {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #38bdf8;
+}
 
-@media (max-width: 560px) {
-  .super-header {
-    align-items: flex-start;
-  }
+.audit-time {
+  font-size: 0.6875rem;
+  color: #64748b;
+}
 
-  .super-title {
-    font-size: 1.375rem;
-  }
+.audit-details {
+  font-size: 0.7813rem;
+  color: #cbd5e1;
+  margin: 0.2rem 0;
+  line-height: 1.35;
+}
 
-  .super-subtitle {
-    font-size: 0.8125rem;
-  }
-
-  .super-metrics-grid {
-    grid-template-columns: 1fr;
-    gap: 0.875rem;
-  }
-
-  .super-metric-card {
-    padding: 1rem;
-  }
-
-  .super-card {
-    padding: 0.875rem;
-  }
-
-  .sub-item {
-    flex-wrap: wrap;
-    gap: 0.375rem;
-  }
+.audit-actor {
+  font-size: 0.6875rem;
+  color: #94a3b8;
 }
 </style>

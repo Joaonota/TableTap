@@ -34,26 +34,28 @@ const compute = async () => {
 
 onMounted(compute)
 
-const state = computed<'available' | 'not_supported' | 'insecure'>(() => {
+const state = computed<'available' | 'not_supported' | 'insecure' | 'browser_incompatible'>(() => {
   const c = caps.value
   if (!c) return 'available' // estado neutro durante a verificação inicial
   if (!c.apiSupported) return 'not_supported'
   if (!c.secureContext) return 'insecure'
+  if (!c.writeApiSupported || !c.browserCompatible) return 'browser_incompatible'
   return 'available'
 })
 
 const stateLabel = computed(() => {
   switch (state.value) {
-    case 'available': return 'NFC disponível'
-    case 'not_supported': return 'NFC não suportado'
+    case 'available': return 'Web NFC disponível'
+    case 'not_supported': return 'Web NFC não suportada'
     case 'insecure': return 'Contexto não seguro (HTTPS necessário)'
+    case 'browser_incompatible': return 'Navegador sem escrita NFC'
   }
 })
 
 const stateBoxClass = computed(() => ({
   'is-available': state.value === 'available',
   'is-unsupported': state.value === 'not_supported',
-  'is-insecure': state.value === 'insecure'
+  'is-insecure': state.value === 'insecure' || state.value === 'browser_incompatible'
 }))
 </script>
 
@@ -74,8 +76,11 @@ const stateBoxClass = computed(() => ({
           </span>
         </div>
         <p class="nfc-status-sub">
-          Sistema de gravação usando a Web NFC API (NDEFReader). A URL registada é gravada
-          fisicamente na etiqueta — nunca há simulização de sucesso.
+          {{ caps?.compatibilitySummary || 'A detetar o suporte NFC deste dispositivo…' }}
+        </p>
+        <p class="nfc-status-sub">
+          A URL é gravada fisicamente via NDEFReader — nunca há simulação de sucesso. A API não
+          confirma a existência de hardware NFC antes de uma operação real.
         </p>
       </div>
     </div>

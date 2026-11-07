@@ -10,7 +10,11 @@ import {
   MockPaymentRepository,
   MockServiceRequestRepository,
   MockStaffRepository,
+  MockPlanRepository,
   MockSubscriptionRepository,
+  MockMenuCustomizationRepository,
+  MockAuditLogRepository,
+  MockPlatformConfigRepository,
   MockTableSessionRepository,
   MockNotificationRepository
 } from '@/repositories/mock'
@@ -30,11 +34,15 @@ import type {
   StaffMember,
   Plan,
   Subscription,
+  SubscriptionHistory,
   DigitalAccess,
   OrderStatus,
   PaymentStatus,
   ServiceRequestStatus,
-  DashboardMetrics
+  DashboardMetrics,
+  MenuCustomization,
+  PlatformAuditLog,
+  PlatformConfig
 } from '@/types'
 
 // Repositories instances
@@ -51,7 +59,11 @@ const digitalAccessRepo = new MockDigitalAccessRepository()
 const paymentRepo = new MockPaymentRepository()
 const serviceRequestRepo = new MockServiceRequestRepository()
 const staffRepo = new MockStaffRepository()
+const planRepo = new MockPlanRepository()
 const subscriptionRepo = new MockSubscriptionRepository()
+const menuCustomizationRepo = new MockMenuCustomizationRepository()
+const auditRepo = new MockAuditLogRepository()
+const platformConfigRepo = new MockPlatformConfigRepository()
 
 // ================= AuthService =================
 export const authService = {
@@ -258,9 +270,30 @@ export const staffService = {
 }
 
 // ================= Subscriptions & Plans (SaaS) =================
+export const planService = {
+  async getAllPlans(): Promise<Plan[]> {
+    return planRepo.getAll()
+  },
+  async getPlanById(id: string): Promise<Plan | null> {
+    return planRepo.getById(id)
+  },
+  async getPlanBySlug(slug: string): Promise<Plan | null> {
+    return planRepo.getBySlug(slug)
+  },
+  async createPlan(data: Omit<Plan, 'id'>): Promise<Plan> {
+    return planRepo.create(data)
+  },
+  async updatePlan(id: string, updates: Partial<Plan>): Promise<Plan> {
+    return planRepo.update(id, updates)
+  },
+  async deletePlan(id: string): Promise<boolean> {
+    return planRepo.delete(id)
+  }
+}
+
 export const subscriptionService = {
   async getAllPlans(): Promise<Plan[]> {
-    return subscriptionRepo.getAllPlans()
+    return planRepo.getAll()
   },
   async getAllSubscriptions(): Promise<Subscription[]> {
     return subscriptionRepo.getAllSubscriptions()
@@ -268,10 +301,79 @@ export const subscriptionService = {
   async getByTenant(tenantId: string): Promise<Subscription | null> {
     return subscriptionRepo.getByTenant(tenantId)
   },
+  async getById(id: string): Promise<Subscription | null> {
+    return subscriptionRepo.getById(id)
+  },
+  async createSubscription(sub: Omit<Subscription, 'id'>): Promise<Subscription> {
+    return subscriptionRepo.create(sub)
+  },
   async updateSubscription(id: string, updates: Partial<Subscription>): Promise<Subscription> {
     return subscriptionRepo.updateSubscription(id, updates)
+  },
+  async addHistoryEvent(id: string, event: Omit<SubscriptionHistory, 'id' | 'date'>): Promise<Subscription> {
+    return subscriptionRepo.addHistoryEvent(id, event)
+  },
+  async upgradePlan(tenantId: string, targetPlanId: string, performedBy: string = 'Administrador'): Promise<{ subscription: Subscription; plan: Plan }> {
+    const sub = await subscriptionRepo.getByTenant(tenantId)
+    const plan = await planRepo.getById(targetPlanId)
+    if (!sub || !plan) throw new Error('Subscrição ou plano não encontrado')
+
+    const fromPlan = sub.planName
+    const updated = await subscriptionRepo.updateSubscription(sub.id, {
+      planId: plan.id,
+      planName: plan.name,
+      monthlyPrice: plan.price,
+      status: 'active'
+    })
+
+    await subscriptionRepo.addHistoryEvent(sub.id, {
+      event: 'plan_changed',
+      fromPlanName: fromPlan,
+      toPlanName: plan.name,
+      amount: plan.price,
+      note: `Upgrade efetuado com sucesso para ${plan.name}`,
+      performedBy
+    })
+
+    // Update company planId
+    await companyRepo.update(tenantId, { planId: plan.id })
+
+    // Add audit log
+    await auditRepo.create({
+      tenantId,
+      userId: 'user-admin-1',
+      userName: performedBy,
+      action: 'plan.upgraded',
+      resource: `Subscription: ${sub.id}`,
+      details: `Plano atualizado de ${fromPlan} para ${plan.name} (${plan.price} MT/mês).`
+    })
+
+    return { subscription: updated, plan }
   }
 }
+
+// ================= Platform Audit & Config (Super Admin) =================
+export const auditService = {
+  async getLogs(filter?: { tenantId?: string; limit?: number }): Promise<PlatformAuditLog[]> {
+    return auditRepo.getAll(filter)
+  },
+  async log(entry: Omit<PlatformAuditLog, 'id' | 'createdAt'>): Promise<PlatformAuditLog> {
+    return auditRepo.create(entry)
+  }
+}
+
+export const platformConfigService = {
+  async getConfig(): Promise<PlatformConfig> {
+    return platformConfigRepo.get()
+  },
+  async updateConfig(updates: Partial<PlatformConfig>): Promise<PlatformConfig> {
+    return platformConfigRepo.update(updates)
+  }
+}
+
+export * from './planAccessService'
+export * from './menuCustomizationService'
+
 
 // ================= Report & Metrics Service =================
 export const reportService = {

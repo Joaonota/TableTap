@@ -13,8 +13,12 @@ import type {
   StaffMember,
   Plan,
   Subscription,
+  SubscriptionHistory,
   DigitalAccess,
-  CustomerReview
+  CustomerReview,
+  MenuCustomization,
+  PlatformAuditLog,
+  PlatformConfig
 } from '@/types'
 import {
   generateHistoricalOrders,
@@ -39,6 +43,9 @@ export interface MockDatabase {
   subscriptions: Subscription[]
   digitalAccessList: DigitalAccess[]
   reviews: CustomerReview[]
+  menuCustomizations: MenuCustomization[]
+  auditLogs: PlatformAuditLog[]
+  platformConfig: PlatformConfig
 }
 
 export const initialCompanies: Company[] = [
@@ -76,7 +83,7 @@ export const initialCompanies: Company[] = [
     taxId: '400554433',
     phone: '+258 82 999 8877',
     email: 'geral@urbandining.co.mz',
-    planId: 'plan-starter',
+    planId: 'plan-basic',
     subscriptionId: 'sub-3',
     isActive: true,
     createdAt: '2024-03-01T11:00:00Z'
@@ -1553,52 +1560,173 @@ export const initialStaff: StaffMember[] = [
 
 export const initialPlans: Plan[] = [
   {
-    id: 'plan-starter',
-    name: 'Plano Básico / Café',
-    priceMonthly: 1990,
-    maxRestaurants: 1,
-    maxStaff: 5,
-    maxTables: 15,
+    id: 'plan-basic',
+    name: 'Básico',
+    slug: 'basico',
+    description: 'Para cafés e restaurantes independentes a começar. Menu digital por QR Code e gestão essencial.',
+    price: 1990,
+    currency: 'MT',
+    billingPeriod: 'monthly',
+    active: true,
+    displayOrder: 1,
     features: [
-      'Menu digital por QR Code',
-      'Atendimento digital simples',
-      'Gestão básica de mesas',
-      'Relatórios mensais'
+      { featureKey: 'MENU_DIGITAL', enabled: true },
+      { featureKey: 'QR_CODE', enabled: true },
+      { featureKey: 'NFC', enabled: false },
+      { featureKey: 'ORDERS', enabled: false },
+      { featureKey: 'KDS', enabled: false },
+      { featureKey: 'WAITER_CALL', enabled: true },
+      { featureKey: 'PAYMENTS', enabled: false },
+      { featureKey: 'TABLES', enabled: true },
+      { featureKey: 'STOCK', enabled: false },
+      { featureKey: 'RECIPES', enabled: false },
+      { featureKey: 'WASTE', enabled: false },
+      { featureKey: 'REVIEWS', enabled: false },
+      { featureKey: 'GOOGLE_REVIEWS', enabled: false },
+      { featureKey: 'BUSINESS_INTELLIGENCE', enabled: false },
+      { featureKey: 'DEMAND_FORECAST', enabled: false },
+      { featureKey: 'STAFF', enabled: true },
+      { featureKey: 'REPORTS', enabled: true },
+      { featureKey: 'CSV_EXPORT', enabled: false },
+      { featureKey: 'MULTI_RESTAURANT', enabled: false },
+      { featureKey: 'MULTI_BRANCH', enabled: false },
+      { featureKey: 'MENU_CUSTOMIZATION', enabled: false }
     ],
-    isActive: true
+    limits: [
+      { resourceKey: 'RESTAURANTS', limit: 1 },
+      { resourceKey: 'PRODUCTS', limit: 30 },
+      { resourceKey: 'CATEGORIES', limit: 10 },
+      { resourceKey: 'TABLES', limit: 15 },
+      { resourceKey: 'STAFF', limit: 5 },
+      { resourceKey: 'ORDERS_PER_MONTH', limit: 300 }
+    ]
   },
   {
     id: 'plan-pro',
-    name: 'Plano Restaurante Pro',
-    priceMonthly: 4490,
-    maxRestaurants: 3,
-    maxStaff: 20,
-    maxTables: 50,
+    name: 'Pro',
+    slug: 'pro',
+    description: 'A escolha da maioria: pedidos digitais, KDS, NFC, pagamentos simulados e relatórios avançados.',
+    price: 4490,
+    currency: 'MT',
+    billingPeriod: 'monthly',
+    active: true,
+    displayOrder: 2,
+    highlighted: true,
     features: [
-      'Pedidos no menu digital',
-      'Kitchen Display System (KDS Cozinha & Bar)',
-      'Acesso NFC e QR Code com estatísticas',
-      'Pagamentos simulados M-Pesa e Cartão',
-      'Relatórios avançados e exportação',
-      'Multi-restaurante (até 3)'
+      { featureKey: 'MENU_DIGITAL', enabled: true },
+      { featureKey: 'QR_CODE', enabled: true },
+      { featureKey: 'NFC', enabled: true },
+      { featureKey: 'ORDERS', enabled: true },
+      { featureKey: 'KDS', enabled: true },
+      { featureKey: 'WAITER_CALL', enabled: true },
+      { featureKey: 'PAYMENTS', enabled: true },
+      { featureKey: 'TABLES', enabled: true },
+      { featureKey: 'STOCK', enabled: false },
+      { featureKey: 'RECIPES', enabled: false },
+      { featureKey: 'WASTE', enabled: false },
+      { featureKey: 'REVIEWS', enabled: true },
+      { featureKey: 'GOOGLE_REVIEWS', enabled: true },
+      { featureKey: 'BUSINESS_INTELLIGENCE', enabled: false },
+      { featureKey: 'DEMAND_FORECAST', enabled: false },
+      { featureKey: 'STAFF', enabled: true },
+      { featureKey: 'REPORTS', enabled: true },
+      { featureKey: 'CSV_EXPORT', enabled: true },
+      { featureKey: 'MULTI_RESTAURANT', enabled: true },
+      { featureKey: 'MULTI_BRANCH', enabled: false },
+      { featureKey: 'MENU_CUSTOMIZATION', enabled: true }
     ],
-    isActive: true
+    limits: [
+      { resourceKey: 'RESTAURANTS', limit: 3 },
+      { resourceKey: 'PRODUCTS', limit: 100 },
+      { resourceKey: 'CATEGORIES', limit: 25 },
+      { resourceKey: 'TABLES', limit: 50 },
+      { resourceKey: 'STAFF', limit: 20 },
+      { resourceKey: 'ORDERS_PER_MONTH', limit: 1500 }
+    ]
+  },
+  {
+    id: 'plan-business',
+    name: 'Business',
+    slug: 'business',
+    description: 'Redes em crescimento: BI, multi-restaurante alargado, exportações e controlo de operação avançada.',
+    price: 7990,
+    currency: 'MT',
+    billingPeriod: 'monthly',
+    active: true,
+    displayOrder: 3,
+    features: [
+      { featureKey: 'MENU_DIGITAL', enabled: true },
+      { featureKey: 'QR_CODE', enabled: true },
+      { featureKey: 'NFC', enabled: true },
+      { featureKey: 'ORDERS', enabled: true },
+      { featureKey: 'KDS', enabled: true },
+      { featureKey: 'WAITER_CALL', enabled: true },
+      { featureKey: 'PAYMENTS', enabled: true },
+      { featureKey: 'TABLES', enabled: true },
+      { featureKey: 'STOCK', enabled: true },
+      { featureKey: 'RECIPES', enabled: true },
+      { featureKey: 'WASTE', enabled: false },
+      { featureKey: 'REVIEWS', enabled: true },
+      { featureKey: 'GOOGLE_REVIEWS', enabled: true },
+      { featureKey: 'BUSINESS_INTELLIGENCE', enabled: true },
+      { featureKey: 'DEMAND_FORECAST', enabled: true },
+      { featureKey: 'STAFF', enabled: true },
+      { featureKey: 'REPORTS', enabled: true },
+      { featureKey: 'CSV_EXPORT', enabled: true },
+      { featureKey: 'MULTI_RESTAURANT', enabled: true },
+      { featureKey: 'MULTI_BRANCH', enabled: true },
+      { featureKey: 'MENU_CUSTOMIZATION', enabled: true }
+    ],
+    limits: [
+      { resourceKey: 'RESTAURANTS', limit: 10 },
+      { resourceKey: 'PRODUCTS', limit: null },
+      { resourceKey: 'CATEGORIES', limit: 50 },
+      { resourceKey: 'TABLES', limit: 120 },
+      { resourceKey: 'STAFF', limit: 50 },
+      { resourceKey: 'ORDERS_PER_MONTH', limit: 5000 }
+    ]
   },
   {
     id: 'plan-enterprise',
-    name: 'Plano Enterprise Redes & Franquias',
-    priceMonthly: 9990,
-    maxRestaurants: 20,
-    maxStaff: 100,
-    maxTables: 200,
+    name: 'Enterprise',
+    slug: 'enterprise',
+    description: 'Grupos e franquias: tudo ilimitado, incluindo personalização completa e suporte prioritário.',
+    price: 9990,
+    currency: 'MT',
+    billingPeriod: 'monthly',
+    active: true,
+    displayOrder: 4,
     features: [
-      'Todos os recursos do plano Pro',
-      'Restaurantes e filiais ilimitadas',
-      'Permissões personalizadas por função',
-      'Gestão de cadeia e inventário',
-      'Suporte prioritário 24/7'
+      { featureKey: 'MENU_DIGITAL', enabled: true },
+      { featureKey: 'QR_CODE', enabled: true },
+      { featureKey: 'NFC', enabled: true },
+      { featureKey: 'ORDERS', enabled: true },
+      { featureKey: 'KDS', enabled: true },
+      { featureKey: 'WAITER_CALL', enabled: true },
+      { featureKey: 'PAYMENTS', enabled: true },
+      { featureKey: 'TABLES', enabled: true },
+      { featureKey: 'STOCK', enabled: true },
+      { featureKey: 'RECIPES', enabled: true },
+      { featureKey: 'WASTE', enabled: true },
+      { featureKey: 'REVIEWS', enabled: true },
+      { featureKey: 'GOOGLE_REVIEWS', enabled: true },
+      { featureKey: 'BUSINESS_INTELLIGENCE', enabled: true },
+      { featureKey: 'DEMAND_FORECAST', enabled: true },
+      { featureKey: 'STAFF', enabled: true },
+      { featureKey: 'REPORTS', enabled: true },
+      { featureKey: 'CSV_EXPORT', enabled: true },
+      { featureKey: 'MULTI_RESTAURANT', enabled: true },
+      { featureKey: 'MULTI_BRANCH', enabled: true },
+      { featureKey: 'MENU_CUSTOMIZATION', enabled: true }
     ],
-    isActive: true
+    limits: [
+      { resourceKey: 'RESTAURANTS', limit: null },
+      { resourceKey: 'PRODUCTS', limit: null },
+      { resourceKey: 'CATEGORIES', limit: null },
+      { resourceKey: 'TABLES', limit: null },
+      { resourceKey: 'STAFF', limit: null },
+      { resourceKey: 'ORDERS_PER_MONTH', limit: null }
+    ]
   }
 ]
 
@@ -1608,36 +1736,105 @@ export const initialSubscriptions: Subscription[] = [
     tenantId: 'tenant-1',
     companyName: 'Sabores de Moçambique Lda',
     planId: 'plan-pro',
-    planName: 'Plano Restaurante Pro',
+    planName: 'Pro',
     status: 'active',
     startDate: '2024-01-15',
     renewalDate: '2026-11-15',
     monthlyPrice: 4490,
-    isAutoRenew: true
+    isAutoRenew: true,
+    history: [
+      {
+        id: 'subh-1-3',
+        date: '2026-10-15T08:00:00Z',
+        event: 'renewed',
+        amount: 4490,
+        note: 'Renovação mensal automática confirmada via M-Pesa.',
+        performedBy: 'Gateway Automático M-Pesa'
+      },
+      {
+        id: 'subh-1-2',
+        date: '2025-06-01T10:30:00Z',
+        event: 'plan_changed',
+        fromPlanName: 'Básico',
+        toPlanName: 'Pro',
+        amount: 4490,
+        note: 'Upgrade para plano Pro para habilitar KDS, NFC e pedidos no menu.',
+        performedBy: 'Rui Mondlane (Admin)'
+      },
+      {
+        id: 'subh-1-1',
+        date: '2024-01-15T09:00:00Z',
+        event: 'created',
+        toPlanName: 'Básico',
+        amount: 1990,
+        note: 'Subscrição inicial da empresa no lançamento do restaurante.',
+        performedBy: 'Sistema TapMenu'
+      }
+    ]
   },
   {
     id: 'sub-2',
     tenantId: 'tenant-2',
     companyName: 'Ocean Food Group',
     planId: 'plan-enterprise',
-    planName: 'Plano Enterprise Redes & Franquias',
+    planName: 'Enterprise',
     status: 'active',
     startDate: '2024-02-10',
     renewalDate: '2026-12-10',
     monthlyPrice: 9990,
-    isAutoRenew: true
+    isAutoRenew: true,
+    history: [
+      {
+        id: 'subh-2-3',
+        date: '2026-10-10T09:15:00Z',
+        event: 'renewed',
+        amount: 9990,
+        note: 'Renovação empresarial processada com sucesso.',
+        performedBy: 'Sistema Automático'
+      },
+      {
+        id: 'subh-2-2',
+        date: '2025-01-10T11:00:00Z',
+        event: 'plan_changed',
+        fromPlanName: 'Business',
+        toPlanName: 'Enterprise',
+        amount: 9990,
+        note: 'Migração de grupo gastronómico para plano Enterprise ilimitado.',
+        performedBy: 'Super Admin'
+      },
+      {
+        id: 'subh-2-1',
+        date: '2024-02-10T14:20:00Z',
+        event: 'created',
+        toPlanName: 'Business',
+        amount: 7990,
+        note: 'Subscrição inicial do grupo Ocean Food.',
+        performedBy: 'Carlos Silva'
+      }
+    ]
   },
   {
     id: 'sub-3',
     tenantId: 'tenant-3',
     companyName: 'Urban Dining Lda',
-    planId: 'plan-starter',
-    planName: 'Plano Básico / Café',
+    planId: 'plan-basic',
+    planName: 'Básico',
     status: 'trial',
-    startDate: '2026-10-01',
-    renewalDate: '2026-10-31',
+    startDate: '2026-10-15',
+    renewalDate: '2026-11-15',
     monthlyPrice: 1990,
-    isAutoRenew: false
+    isAutoRenew: false,
+    history: [
+      {
+        id: 'subh-3-1',
+        date: '2026-10-15T16:00:00Z',
+        event: 'trial_started',
+        toPlanName: 'Básico',
+        amount: 0,
+        note: 'Início do período experimental gratuito (30 dias).',
+        performedBy: 'Auto-registo'
+      }
+    ]
   }
 ]
 
@@ -1793,4 +1990,183 @@ export const initialNotifications: Notification[] = [
     createdAt: '2026-10-16T11:15:00Z'
   }
 ]
+
+export const initialMenuCustomizations: MenuCustomization[] = [
+  {
+    id: 'mc-rest-1',
+    tenantId: 'tenant-1',
+    restaurantId: 'rest-1',
+    theme: {
+      layout: 'modern',
+      primaryColor: '#0D7A5F',
+      secondaryColor: '#E69D00',
+      accentColor: '#10B981',
+      backgroundColor: '#FFFFFF',
+      textColor: '#111827',
+      fontFamilyKey: 'inter',
+      logoUrl: '',
+      coverImage: '',
+      experience: {
+        showSearch: true,
+        showCategories: true,
+        showImages: true,
+        showDescriptions: true,
+        showPrices: true,
+        showAddToOrder: true,
+        showPromotions: true,
+        showFeaturedProducts: true,
+        showWaiterCall: true,
+        showOrders: true,
+        showRestaurantInfo: true
+      }
+    },
+    updatedAt: '2026-10-15T14:30:00Z',
+    updatedBy: 'Rui Mondlane'
+  },
+  {
+    id: 'mc-rest-2',
+    tenantId: 'tenant-1',
+    restaurantId: 'rest-2',
+    theme: {
+      layout: 'classic',
+      primaryColor: '#1E3A8A',
+      secondaryColor: '#3B82F6',
+      accentColor: '#60A5FA',
+      backgroundColor: '#F9FAFB',
+      textColor: '#0F172A',
+      fontFamilyKey: 'system',
+      logoUrl: '',
+      coverImage: '',
+      experience: {
+        showSearch: true,
+        showCategories: true,
+        showImages: true,
+        showDescriptions: true,
+        showPrices: true,
+        showAddToOrder: true,
+        showPromotions: true,
+        showFeaturedProducts: true,
+        showWaiterCall: true,
+        showOrders: true,
+        showRestaurantInfo: true
+      }
+    },
+    updatedAt: '2026-10-14T09:15:00Z',
+    updatedBy: 'Rui Mondlane'
+  },
+  {
+    id: 'mc-rest-3',
+    tenantId: 'tenant-2',
+    restaurantId: 'rest-3',
+    theme: {
+      layout: 'elegant',
+      primaryColor: '#831843',
+      secondaryColor: '#BE185D',
+      accentColor: '#F472B6',
+      backgroundColor: '#FFFDF9',
+      textColor: '#1F2937',
+      fontFamilyKey: 'playfair',
+      logoUrl: '',
+      coverImage: '',
+      experience: {
+        showSearch: true,
+        showCategories: true,
+        showImages: true,
+        showDescriptions: true,
+        showPrices: true,
+        showAddToOrder: true,
+        showPromotions: true,
+        showFeaturedProducts: true,
+        showWaiterCall: true,
+        showOrders: true,
+        showRestaurantInfo: true
+      }
+    },
+    updatedAt: '2026-10-12T16:00:00Z',
+    updatedBy: 'Carlos Silva'
+  }
+]
+
+export const initialPlatformAuditLogs: PlatformAuditLog[] = [
+  {
+    id: 'log-101',
+    tenantId: 'tenant-1',
+    userId: 'user-admin-1',
+    userName: 'Rui Mondlane',
+    action: 'plan.upgraded',
+    resource: 'Subscription: sub-1',
+    details: 'Subscrição atualizada de Básico para Pro (4.490 MT/mês).',
+    createdAt: '2025-06-01T10:30:00Z'
+  },
+  {
+    id: 'log-102',
+    tenantId: 'tenant-1',
+    userId: 'user-admin-1',
+    userName: 'Rui Mondlane',
+    action: 'menu.theme_updated',
+    resource: 'Menu: Sabores Maputo',
+    details: 'Tema do menu personalizado alterado para layout "Modern" com cor primária #0D7A5F.',
+    createdAt: '2026-10-15T14:30:00Z'
+  },
+  {
+    id: 'log-103',
+    tenantId: 'tenant-1',
+    userId: 'user-admin-1',
+    userName: 'Rui Mondlane',
+    action: 'subscription.renewed',
+    resource: 'Subscription: sub-1',
+    details: 'Renovação automática mensal de 4.490 MT processada com sucesso.',
+    createdAt: '2026-10-15T08:00:00Z'
+  },
+  {
+    id: 'log-104',
+    tenantId: 'tenant-2',
+    userId: 'user-super-1',
+    userName: 'Super Administrador',
+    action: 'plan.upgraded',
+    resource: 'Subscription: sub-2',
+    details: 'Ocean Food Group migrado para plano Enterprise.',
+    createdAt: '2025-01-10T11:00:00Z'
+  },
+  {
+    id: 'log-105',
+    tenantId: 'tenant-3',
+    userId: 'user-super-1',
+    userName: 'Sistema Automático',
+    action: 'company.registered',
+    resource: 'Company: tenant-3',
+    details: 'Nova empresa Urban Dining Lda criada com período de teste no plano Básico.',
+    createdAt: '2026-10-15T16:00:00Z'
+  },
+  {
+    id: 'log-106',
+    userId: 'user-super-1',
+    userName: 'Super Administrador',
+    action: 'platform.plans_reordered',
+    resource: 'Plans Catalog',
+    details: 'Catálogo de planos atualizado com 4 níveis (Básico, Pro, Business, Enterprise).',
+    createdAt: '2026-11-01T09:00:00Z'
+  },
+  {
+    id: 'log-107',
+    tenantId: 'tenant-1',
+    userId: 'user-admin-1',
+    userName: 'Rui Mondlane',
+    action: 'nfc.tag_locked',
+    resource: 'NFC Tag: Mesa 01',
+    details: 'Etiqueta NFC da Mesa 01 protegida logicamente contra alterações.',
+    createdAt: '2026-10-15T10:20:00Z'
+  }
+]
+
+export const initialPlatformConfig: PlatformConfig = {
+  platformName: 'TapMenu Moçambique',
+  supportEmail: 'suporte@tapmenu.co.mz',
+  supportPhone: '+258 84 300 4000',
+  defaultPlanId: 'plan-pro',
+  trialDays: 14,
+  allowSelfSignup: true,
+  maintenanceMode: false
+}
+
 

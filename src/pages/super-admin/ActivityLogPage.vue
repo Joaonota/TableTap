@@ -1,98 +1,128 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, onMounted, computed } from 'vue'
+import { auditService } from '@/services'
 import type { PlatformAuditLog } from '@/types'
-import { Activity, ShieldCheck, UserCheck, Clock } from 'lucide-vue-next'
+import { Activity, ShieldCheck, UserCheck, Clock, Search, Filter } from 'lucide-vue-next'
 
-const logs = ref<PlatformAuditLog[]>([
-  {
-    id: 'log-1',
-    userId: 'user-super',
-    userName: 'Carlos Silva (Super Admin)',
-    action: 'LOGIN',
-    resource: 'Plataforma SaaS',
-    details: 'Autenticação com privilégios de super administrador',
-    timestamp: '2026-10-16T11:45:00Z'
-  },
-  {
-    id: 'log-2',
-    tenantId: 'tenant-1',
-    userId: 'user-owner-1',
-    userName: 'Amélia Cossa',
-    action: 'SUBSCRIPTION_RENEWAL',
-    resource: 'Plano Restaurante Pro',
-    details: 'Renovação automática mensal de 4.490 MT processada',
-    timestamp: '2026-10-16T08:00:00Z'
-  },
-  {
-    id: 'log-3',
-    tenantId: 'tenant-1',
-    userId: 'user-admin-1',
-    userName: 'Rui Mondlane',
-    action: 'PRODUCT_UPDATE',
-    resource: 'Catálogo Sabores Maputo',
-    details: 'Atualização do preço promocional do Frango à Zambeziana',
-    timestamp: '2026-10-15T18:22:00Z'
-  },
-  {
-    id: 'log-4',
-    tenantId: 'tenant-2',
-    userId: 'user-owner-2',
-    userName: 'David Matsinhe',
-    action: 'TABLE_ACCESS_GENERATE',
-    resource: 'Acesso Digital',
-    details: 'Geração de novos códigos QR para o salão náutico',
-    timestamp: '2026-10-15T14:10:00Z'
-  },
-  {
-    id: 'log-5',
-    tenantId: 'tenant-3',
-    userId: 'user-super',
-    userName: 'Carlos Silva (Super Admin)',
-    action: 'TENANT_PROVISION',
-    resource: 'Urban Dining Lda',
-    details: 'Criação do tenant e provisionamento de base de dados mockada',
-    timestamp: '2026-10-14T09:30:00Z'
+const logs = ref<PlatformAuditLog[]>([])
+const isLoading = ref(true)
+const searchQuery = ref('')
+const selectedActionFilter = ref('all')
+
+onMounted(async () => {
+  try {
+    logs.value = await auditService.getLogs()
+  } finally {
+    isLoading.value = false
   }
-])
+})
+
+const filteredLogs = computed(() => {
+  return logs.value.filter(log => {
+    const matchesSearch = !searchQuery.value ||
+      log.userName.toLowerCase().includes(searchQuery.value.toLowerCase()) ||
+      log.action.toLowerCase().includes(searchQuery.value.toLowerCase()) ||
+      log.details.toLowerCase().includes(searchQuery.value.toLowerCase()) ||
+      log.resource.toLowerCase().includes(searchQuery.value.toLowerCase())
+
+    const matchesAction = selectedActionFilter.value === 'all' || log.action.includes(selectedActionFilter.value)
+
+    return matchesSearch && matchesAction
+  })
+})
+
+const formatTime = (isoString?: string) => {
+  if (!isoString) return ''
+  const d = new Date(isoString)
+  return `${d.toLocaleDateString('pt-MZ')} às ${d.toLocaleTimeString('pt-MZ', { hour: '2-digit', minute: '2-digit' })}`
+}
+
+const getActionColorClass = (action: string) => {
+  if (action.includes('upgrade') || action.includes('renewed')) return 'text-success'
+  if (action.includes('locked') || action.includes('suspended')) return 'text-warning'
+  if (action.includes('delete') || action.includes('refused')) return 'text-danger'
+  return 'text-primary'
+}
 </script>
 
 <template>
   <div class="super-page">
     <div class="page-top-header">
       <div>
-        <h1 class="page-title">Registo de Auditoria & Atividade</h1>
-        <p class="page-subtitle">Rastreabilidade completa de ações administrativas em todos os tenants</p>
+        <h1 class="page-title">Registo de Atividades & Auditoria</h1>
+        <p class="page-subtitle">Rastreamento de acessos, eventos de faturação, modificações de planos e segurança</p>
       </div>
     </div>
 
-    <div class="super-card log-card">
-      <div class="log-timeline">
+    <!-- Filter Bar -->
+    <div class="filters-bar">
+      <div class="search-wrap">
+        <Search :size="16" class="search-icon" />
+        <input
+          type="text"
+          v-model="searchQuery"
+          placeholder="Pesquisar por utilizador, ação, recurso ou detalhe..."
+          class="search-input"
+        />
+      </div>
+
+      <div class="filter-group">
+        <Filter :size="15" />
+        <select v-model="selectedActionFilter" class="filter-select">
+          <option value="all">Todas as Ações</option>
+          <option value="plan">Planos & Subscrições</option>
+          <option value="menu">Menu & Tema</option>
+          <option value="nfc">Acesso NFC</option>
+          <option value="company">Empresas (Tenants)</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- Logs Container -->
+    <div class="super-card">
+      <div v-if="isLoading" class="loading-state">
+        Carregando registos de auditoria...
+      </div>
+
+      <div v-else class="logs-timeline">
         <div
-          v-for="log in logs"
+          v-for="log in filteredLogs"
           :key="log.id"
-          class="log-item"
+          class="log-row"
         >
-          <div class="log-icon-col">
-            <div class="log-icon-circle">
-              <Activity :size="16" />
+          <div class="log-indicator">
+            <div class="log-icon">
+              <Activity :size="15" />
             </div>
-            <div class="log-line"></div>
           </div>
 
-          <div class="log-content">
-            <div class="log-header-line">
-              <span class="log-action">{{ log.action }}</span>
-              <span class="log-resource">• {{ log.resource }}</span>
-              <span class="log-time">{{ new Date(log.timestamp).toLocaleString('pt-PT') }}</span>
+          <div class="log-body">
+            <div class="log-header">
+              <span class="log-action font-mono" :class="getActionColorClass(log.action)">
+                {{ log.action }}
+              </span>
+              <span class="log-time">
+                <Clock :size="12" />
+                {{ formatTime(log.createdAt) }}
+              </span>
             </div>
 
-            <p class="log-desc">{{ log.details }}</p>
+            <div class="log-resource">
+              Alvo: <strong>{{ log.resource }}</strong>
+              <span v-if="log.tenantId" class="tenant-pill font-mono">{{ log.tenantId }}</span>
+            </div>
 
-            <div class="log-user-meta">
+            <p class="log-details">{{ log.details }}</p>
+
+            <div class="log-user">
               <UserCheck :size="13" />
-              <span>Realizado por <strong>{{ log.userName }}</strong></span>
+              <span>Operador: <strong>{{ log.userName }}</strong></span>
             </div>
           </div>
+        </div>
+
+        <div v-if="filteredLogs.length === 0" class="empty-state">
+          Nenhum registo de auditoria corresponde aos filtros atuais.
         </div>
       </div>
     </div>
@@ -121,115 +151,167 @@ const logs = ref<PlatformAuditLog[]>([
 .page-subtitle {
   font-size: 0.875rem;
   color: #94a3b8;
+  margin-top: 0.2rem;
+}
+
+.filters-bar {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.search-wrap {
+  display: flex;
+  align-items: center;
+  background: #1e293b;
+  border: 1px solid #334155;
+  border-radius: 8px;
+  padding: 0 0.85rem;
+  flex: 1;
+  max-width: 450px;
+}
+
+.search-icon {
+  color: #64748b;
+  margin-right: 0.5rem;
+}
+
+.search-input {
+  width: 100%;
+  background: transparent;
+  border: none;
+  padding: 0.65rem 0;
+  color: #ffffff;
+  font-size: 0.875rem;
+  outline: none;
+}
+
+.filter-group {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: #94a3b8;
+}
+
+.filter-select {
+  background: #1e293b;
+  border: 1px solid #334155;
+  border-radius: 8px;
+  padding: 0.65rem 0.85rem;
+  color: #ffffff;
+  font-size: 0.875rem;
+  outline: none;
 }
 
 .super-card {
-  background: #0f172a;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: var(--radius-lg);
-  padding: 1.5rem;
+  background: #1e293b;
+  border: 1px solid #334155;
+  border-radius: 12px;
+  padding: 1.25rem;
 }
 
-.log-timeline {
+.loading-state,
+.empty-state {
+  color: #94a3b8;
+  text-align: center;
+  padding: 3rem 0;
+  font-size: 0.875rem;
+}
+
+.logs-timeline {
   display: flex;
   flex-direction: column;
   gap: 1rem;
 }
 
-.log-item {
+.log-row {
   display: flex;
   gap: 1rem;
+  padding: 1rem;
+  background: #0f172a;
+  border: 1px solid #334155;
+  border-radius: 10px;
 }
 
-.log-icon-col {
+.log-indicator {
   display: flex;
   flex-direction: column;
   align-items: center;
 }
 
-.log-icon-circle {
+.log-icon {
   width: 32px;
   height: 32px;
-  border-radius: 50%;
-  background: rgba(124, 58, 237, 0.2);
-  color: #a78bfa;
-  border: 1px solid rgba(124, 58, 237, 0.3);
+  border-radius: 8px;
+  background: rgba(56, 189, 248, 0.12);
+  color: #38bdf8;
   display: flex;
   align-items: center;
   justify-content: center;
 }
 
-.log-line {
+.log-body {
   flex: 1;
-  width: 1px;
-  background: rgba(255, 255, 255, 0.1);
-  margin-top: 0.5rem;
 }
 
-.log-content {
-  flex: 1;
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid rgba(255, 255, 255, 0.06);
-  border-radius: var(--radius-md);
-  padding: 1rem;
+.log-header {
   display: flex;
-  flex-direction: column;
-  gap: 0.35rem;
+  justify-content: space-between;
+  align-items: center;
 }
-
-.log-header-line {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    font-size: 0.8125rem;
-    flex-wrap: wrap;
-  }
 
 .log-action {
+  font-size: 0.8125rem;
   font-weight: 700;
-  color: #c4b5fd;
-}
-
-.log-resource {
-  color: #94a3b8;
+  text-transform: uppercase;
 }
 
 .log-time {
-  margin-left: auto;
+  font-size: 0.75rem;
+  color: #64748b;
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.log-resource {
+  font-size: 0.8125rem;
+  color: #cbd5e1;
+  margin: 0.35rem 0 0.2rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.tenant-pill {
+  font-size: 0.6875rem;
+  color: #94a3b8;
+  background: #1e293b;
+  padding: 0.15rem 0.45rem;
+  border-radius: 4px;
+}
+
+.log-details {
+  font-size: 0.8125rem;
+  color: #94a3b8;
+  margin: 0.25rem 0 0.65rem;
+  line-height: 1.4;
+}
+
+.log-user {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
   font-size: 0.75rem;
   color: #64748b;
 }
 
-.log-desc {
-  font-size: 0.875rem;
+.log-user strong {
   color: #cbd5e1;
 }
 
-.log-user-meta {
-  display: flex;
-  align-items: center;
-  gap: 0.35rem;
-  font-size: 0.75rem;
-  color: #94a3b8;
-  margin-top: 0.25rem;
-  flex-wrap: wrap;
-}
-
-@media (max-width: 560px) {
-  .page-title {
-    font-size: 1.375rem;
-  }
-
-  .page-subtitle {
-    font-size: 0.8125rem;
-  }
-
-  .super-card {
-    padding: 0.875rem;
-  }
-
-  .log-time {
-    margin-left: auto;
-  }
-}
+.text-success { color: #34d399; }
+.text-warning { color: #fbbf24; }
+.text-danger { color: #f87171; }
+.text-primary { color: #38bdf8; }
 </style>

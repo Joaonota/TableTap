@@ -31,3 +31,33 @@ export function buildMenuUrl(restaurant: Pick<Restaurant, 'slug'>, table: Pick<T
 export function normalizeMenuUrl(url: string): string {
   return url.trim().replace(/\/+$/, '')
 }
+
+export interface NfcUrlValidation {
+  valid: boolean
+  reason?: string
+}
+
+/**
+ * Validação do URL antes de iniciar uma escrita NDEF.
+ * A Web NFC grava URI records; apenas HTTP(S) absolutos fazem sentido aqui.
+ */
+export function validateNfcUrl(url: string): NfcUrlValidation {
+  const value = (url ?? '').trim()
+  if (!value) return { valid: false, reason: 'O URL a gravar está vazio.' }
+  if (/\s/.test(value)) return { valid: false, reason: 'O URL contém espaços ou caracteres inválidos.' }
+
+  let parsed: URL
+  try {
+    parsed = new URL(value)
+  } catch {
+    return { valid: false, reason: 'O URL não é absoluto ou está mal formado.' }
+  }
+
+  if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') {
+    return { valid: false, reason: 'Apenas endereços HTTP(S) podem ser gravados como URL NDEF.' }
+  }
+  if (!parsed.hostname) {
+    return { valid: false, reason: 'O URL não contém um domínio válido.' }
+  }
+  return { valid: true }
+}

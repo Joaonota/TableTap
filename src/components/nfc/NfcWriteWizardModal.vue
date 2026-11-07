@@ -1,13 +1,14 @@
 <script setup lang="ts">
 import { ref, computed, watch, onUnmounted } from 'vue'
-import type { NfcTag, NfcOpState, ParsedNfcRead, Table } from '@/types'
+import type { NfcErrorCode, NfcTag, NfcOpState, NFCWriteOutcome, ParsedNfcRead, Table } from '@/types'
 import { NfcError } from '@/types'
 import { useNfcStore } from '@/stores/nfc'
 import { useTenantStore } from '@/stores/tenant'
 import { useTableStore } from '@/stores/table'
 import { useToastStore } from '@/stores/toast'
-import { nfcService, stateFromError } from '@/services/nfc/nfcService'
-import { buildMenuUrl } from '@/services/nfc/nfcUrl'
+import { nfcService, stateFromError, TAG_COMPATIBILITY_ERROR_CODES } from '@/services/nfc/nfcService'
+import { getAdapterAvailability } from '@/services/nfc/nfcAdapters'
+import { buildMenuUrl, validateNfcUrl } from '@/services/nfc/nfcUrl'
 import { tableService } from '@/services'
 import AppModal from '@/components/ui/AppModal.vue'
 import AppButton from '@/components/ui/AppButton.vue'
@@ -26,7 +27,10 @@ import {
   Users,
   Info,
   Copy,
-  AlertTriangle
+  AlertTriangle,
+  CheckCircle2,
+  XCircle,
+  ShieldAlert
 } from 'lucide-vue-next'
 
 interface Props {
@@ -61,6 +65,8 @@ const qrDataUrl = ref('')
 
 const savedRecord = ref<NfcTag | null>(null)
 const errorMessage = ref<string | null>(null)
+const errorHint = ref<string | null>(null)
+const errorCode = ref<NfcErrorCode | null>(null)
 const technicalError = ref<string | null>(null)
 
 /** Resultado real da verificação (null = ainda sem verificação). */
@@ -68,7 +74,7 @@ const verifyStatus = ref<'verified' | 'different' | 'no_url' | 'unreadable' | 'c
 const verifyFoundUrl = ref<string | null>(null)
 const verifyTechnical = ref<string | null>(null)
 /** Último outcome físico bem-sucedido (para registo no store). */
-const lastOutcome = ref<{ url: string; writtenAt: string; detections: ParsedNfcRead[] } | null>(null)
+const lastOutcome = ref<NFCWriteOutcome | null>(null)
 
 let detectionsRef: ParsedNfcRead[] = []
 
@@ -131,14 +137,37 @@ const menuUrl = computed(() => {
 const precheckError = computed(() => nfcService.checkPreconditions())
 const isSupported = computed(() => nfcService.isSupported())
 const isSecure = computed(() => nfcService.isSecureContext())
+const caps = computed(() => nfcService.getCapabilities())
+const adapterAvailability = computed(() => getAdapterAvailability())
+const activeAdapter = computed(() => adapterAvailability.value.find(a => a.id === 'web-nfc'))
+
+const urlValidation = computed(() => validateNfcUrl(menuUrl.value))
+
+const compatibilityTone = computed(() => {
+  if (precheckError.value) return 'bad'
+  if (!caps.value.writeApiSupported) return 'bad'
+  return 'ok'
+})
 
 const canStartWrite = computed(() =>
   !currentRestaurant.value ||
   !currentTable.value ||
+  !menuUrl.value ||
+  !urlValidation.value.valid ||
   isRecordProtected.value ||
   (isRewrite.value && !confirmOverwrite.value) ||
   !!precheckError.value
 )
+
+const isTagCompatibilityError = computed(() =>
+  !!errorCode.value && TAG_COMPATIBILITY_ERROR_CODES.includes(errorCode.value)
+)
+
+const writeConfirmed = computed(() => !!lastOutcome.value)
+const readConfirmed = computed(() =>
+  ['verified', 'different', 'no_url'].includes(verifyStatus.value ?? '')
+)
+const contentValidated = computed(() => verifyStatus.value === 'verified')
 
 const tableStatusBadge = computed(() => {
   const rec = existingRecord.value
@@ -187,6 +216,8 @@ watch(
     opState.value = 'idle'
     savedRecord.value = null
     errorMessage.value = null
+    errorHint.value = null
+    errorCode.value = null
     technicalError.value = null
     confirmOverwrite.value = false
     verifyStatus.value = null
@@ -216,7 +247,11 @@ const setState = (s: NfcOpState) => {
 }
 
 /** Verificação real: nova leitura + comparação do URL. */
-const runVerification = async (record: NfcTag, outcome: { url: string; writtenAt: string; detections: ParsedNfcRead[] }) => {
+const runVerification = async (
+  record: NfcTag,
+  outcome: NFCWriteOutcome,
+  options: { retry?: boolean } = {}
+) => {
   setState('verifying')
   try {
     const result = await nfcService.verifyUrl(outcome.url, {
@@ -226,13 +261,18 @@ const runVerification = async (record: NfcTag, outcome: { url: string; writtenAt
     verifyFoundUrl.value = result.foundUrl
     verifyTechnical.value = null
 
-    // Registo com verificação real (o store emite toasts/eventos)
-    savedRecord.value = nfcStore.registerWrite({
-      record,
-      outcome,
-      verification: result.status,
-      foundUrl: result.foundUrl
-    })
+    if (options.retry) {
+      // Re-verificação NÃO é outra gravação: não incrementar writeCount.
+      savedRecord.value = nfcStore.registerVerify(record, result.status, result.foundUrl)
+    } else {
+      // Registo com verificação real (o store emite toasts/eventos)
+      savedRecord.value = nfcStore.registerWrite({
+        record,
+        outcome,
+        verification: result.status,
+        foundUrl: result.foundUrl
+      })
+    }
     setState(result.status === 'verified' ? 'verified' : 'verify_failed')
   } catch (e) {
     const err = e instanceof NfcError ? e : new NfcError('unknown', 'Falha na verificação.')
@@ -241,11 +281,13 @@ const runVerification = async (record: NfcTag, outcome: { url: string; writtenAt
     verifyFoundUrl.value = null
     verifyTechnical.value = err.technical
 
-    savedRecord.value = nfcStore.registerWrite({
-      record,
-      outcome,
-      verification: err.code === 'cancelled' ? 'cancelled' : 'unreadable'
-    })
+    if (!options.retry) {
+      savedRecord.value = nfcStore.registerWrite({
+        record,
+        outcome,
+        verification: err.code === 'cancelled' ? 'cancelled' : 'unreadable'
+      })
+    }
     setState('verify_failed')
   }
 }
@@ -276,22 +318,39 @@ const startWrite = async () => {
     phase.value = 'result'
     setState('failed')
     errorMessage.value = 'Etiqueta protegida contra alterações.'
+    errorHint.value = null
+    errorCode.value = null
     technicalError.value = null
     return
   }
 
-  // Pré-condições físicas (suporte + HTTPS)
+  // URL válido (absoluto HTTP/HTTPS) antes de qualquer operação física
+  if (!urlValidation.value.valid) {
+    phase.value = 'result'
+    setState('failed')
+    errorMessage.value = urlValidation.value.reason || 'O URL a gravar não é válido.'
+    errorHint.value = null
+    errorCode.value = 'invalid_url'
+    technicalError.value = null
+    return
+  }
+
+  // Pré-condições físicas (suporte + escrita + HTTPS)
   const pre = precheckError.value
   if (pre) {
     phase.value = 'result'
     setState(stateFromError(pre))
     errorMessage.value = pre.message
+    errorHint.value = pre.hint
+    errorCode.value = pre.code
     technicalError.value = pre.technical
     return
   }
 
   phase.value = 'running'
   errorMessage.value = null
+  errorHint.value = null
+  errorCode.value = null
   technicalError.value = null
   verifyStatus.value = null
   verifyFoundUrl.value = null
@@ -333,11 +392,15 @@ const startWrite = async () => {
       // Cancelada antes da escrita — sem escurecer o registo com falsas falhas
       setState('cancelled')
       errorMessage.value = 'Operação cancelada.'
+      errorHint.value = null
+      errorCode.value = null
       technicalError.value = null
       nfcStore.registerCancellation(record)
     } else {
       setState(stateFromError(err))
       errorMessage.value = err.message
+      errorHint.value = err.hint
+      errorCode.value = err.code
       technicalError.value = err.technical
       // Registo honesto da falha — sem fingir sucesso
       nfcStore.registerWriteFailure(record, `${err.message} (detalhe técnico: ${err.technical})`)
@@ -350,7 +413,7 @@ const startWrite = async () => {
 const retryVerification = () => {
   const record = savedRecord.value
   const outcome = lastOutcome.value
-  if (record && outcome) void runVerification(record, outcome)
+  if (record && outcome) void runVerification(record, outcome, { retry: true })
 }
 
 const cancelOperation = () => {
@@ -362,6 +425,8 @@ const backToConfig = () => {
   phase.value = 'config'
   opState.value = 'idle'
   errorMessage.value = null
+  errorHint.value = null
+  errorCode.value = null
   technicalError.value = null
   verifyStatus.value = null
   verifyFoundUrl.value = null
@@ -408,10 +473,12 @@ const stateMessage = computed(() => {
   }
 })
 
-/** Estado exibido pelo bloco de verificação (inclui 'different'/'no_url'). */
+/** Estado exibido pelo bloco de verificação (inclui 'different'/'no_url'/'unreadable'). */
 const verifyDisplayState = computed(() => {
   if (verifyStatus.value === 'different') return 'different' as const
   if (verifyStatus.value === 'no_url') return 'no_url' as const
+  if (verifyStatus.value === 'unreadable') return 'unreadable' as const
+  if (verifyStatus.value === 'cancelled') return 'cancelled' as const
   return opState.value
 })
 
@@ -587,21 +654,37 @@ const formatDateTime = (iso?: string) => {
           </div>
         </div>
 
+        <div class="compatibility-box" :class="`tone-${compatibilityTone}`">
+          <component :is="compatibilityTone === 'ok' ? CheckCircle2 : ShieldAlert" :size="18" />
+          <div>
+            <strong>{{ caps.compatibilitySummary }}</strong>
+            <p v-if="activeAdapter">Método atual: <strong>{{ activeAdapter.label }}</strong>.</p>
+          </div>
+        </div>
+
         <div class="requirements-box">
-          <div class="req-item" :class="{ ok: isSupported, bad: !isSupported }">
-            <span>{{ isSupported ? 'Web NFC API disponível neste navegador' : 'Web NFC API não disponível (requer Chrome/Edge no Android ou ChromeOS)' }}</span>
+          <div class="req-item" :class="{ ok: caps.apiSupported, bad: !caps.apiSupported }">
+            <span>{{ caps.apiSupported ? 'Web NFC API disponível neste navegador' : 'Web NFC API não disponível neste navegador' }}</span>
+          </div>
+          <div class="req-item" :class="{ ok: caps.writeApiSupported, bad: !caps.writeApiSupported }">
+            <span>{{ caps.writeApiSupported ? 'Escrita NDEF disponível' : 'Escrita NDEF não disponível' }}</span>
           </div>
           <div class="req-item" :class="{ ok: isSecure, bad: !isSecure }">
             <span>{{ isSecure ? 'Contexto seguro (HTTPS) OK' : 'A página precisa de HTTPS para o NFC' }}</span>
           </div>
-          <div class="req-item ok">
-            <span>NFC ativado no dispositivo + etiqueta NDEF compatível (ex.: NTAG213/215/216)</span>
+          <div class="req-item warn">
+            <span>NFC físico: não verificável pela Web NFC até uma operação real. Confirme que está ligado.</span>
           </div>
+        </div>
+
+        <div v-if="!urlValidation.valid && menuUrl" class="url-warning">
+          <AlertCircle :size="15" />
+          <span>{{ urlValidation.reason }}</span>
         </div>
 
         <div class="instruction-banner">
           <Info :size="16" />
-          <span>Encoste a etiqueta NFC na <strong>parte traseira do dispositivo</strong> e mantenha o contacto até à conclusão.</span>
+          <span>Encoste uma etiqueta <strong>NDEF gravável (NTAG213/215/216)</strong> na parte traseira do dispositivo e mantenha o contacto até à conclusão.</span>
         </div>
       </template>
 
@@ -642,9 +725,26 @@ const formatDateTime = (iso?: string) => {
         <template v-if="isFailureResult">
           <div class="error-card">
             <AlertCircle :size="20" />
-            <div>
+            <div class="error-body">
               <strong>{{ errorMessage || 'A operação não foi concluída.' }}</strong>
-              <p class="error-technical font-mono" v-if="technicalError">{{ technicalError }}</p>
+              <p v-if="errorHint" class="error-hint">{{ errorHint }}</p>
+
+              <div v-if="isTagCompatibilityError" class="tag-guidance">
+                <ShieldAlert :size="15" />
+                <div>
+                  <strong>Compatibilidade da etiqueta</strong>
+                  <p>
+                    A Web NFC só grava etiquetas NFC Forum Type 2/4 formatadas em NDEF e graváveis.
+                    Não é possível concluir que a etiqueta está defeituosa. Experimente outra etiqueta
+                    (NTAG213/215/216) e confirme que não está bloqueada.
+                  </p>
+                </div>
+              </div>
+
+              <details v-if="technicalError" class="tech-details">
+                <summary>Detalhes técnicos</summary>
+                <pre class="error-technical font-mono">{{ technicalError }}</pre>
+              </details>
             </div>
           </div>
         </template>
@@ -656,6 +756,31 @@ const formatDateTime = (iso?: string) => {
             :found-url="verifyFoundUrl"
             :technical="verifyTechnical"
           />
+
+          <div class="verification-levels">
+            <div class="level-row" :class="{ done: writeConfirmed }">
+              <CheckCircle2 v-if="writeConfirmed" :size="15" />
+              <XCircle v-else :size="15" />
+              <span>1. Escrita física concluída</span>
+              <strong>{{ writeConfirmed ? 'Sim' : 'Não' }}</strong>
+            </div>
+            <div class="level-row" :class="{ done: readConfirmed }">
+              <CheckCircle2 v-if="readConfirmed" :size="15" />
+              <XCircle v-else :size="15" />
+              <span>2. Leitura independente confirmada</span>
+              <strong>{{ readConfirmed ? 'Sim' : (verifyStatus === 'unreadable' || verifyStatus === 'cancelled' ? 'Não foi possível' : 'Não') }}</strong>
+            </div>
+            <div class="level-row" :class="{ done: contentValidated }">
+              <CheckCircle2 v-if="contentValidated" :size="15" />
+              <XCircle v-else :size="15" />
+              <span>3. Conteúdo validado (URL igual)</span>
+              <strong>{{ contentValidated ? 'Sim' : 'Não' }}</strong>
+            </div>
+          </div>
+
+          <p v-if="verifyStatus === 'unreadable' || verifyStatus === 'cancelled'" class="verify-note">
+            Gravação concluída, mas a verificação independente não foi possível.
+          </p>
 
           <div class="result-summary">
             <div class="summary-row">
@@ -741,7 +866,7 @@ const formatDateTime = (iso?: string) => {
           size="md"
           @click="isFailureResult ? backToConfig() : emit('close')"
         >
-          {{ isFailureResult ? 'Tentar novamente' : 'Concluir' }}
+          {{ isTagCompatibilityError ? 'Tentar com outra etiqueta' : (isFailureResult ? 'Tentar novamente' : 'Concluir') }}
         </AppButton>
       </template>
     </template>
@@ -991,6 +1116,34 @@ const formatDateTime = (iso?: string) => {
 
 .req-item.ok { background: #f0fdf4; color: #166534; }
 .req-item.bad { background: #fef2f2; color: #991b1b; }
+.req-item.warn { background: #fffbeb; color: #92400e; }
+
+.compatibility-box {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.65rem;
+  border-radius: var(--radius-md);
+  padding: 0.8rem 1rem;
+  font-size: 0.82rem;
+  line-height: 1.45;
+}
+
+.compatibility-box :deep(svg) { flex-shrink: 0; margin-top: 0.1rem; }
+.compatibility-box p { margin: 0.2rem 0 0; font-size: 0.75rem; opacity: 0.85; }
+.compatibility-box.tone-ok { background: #f0fdf4; border: 1px solid #bbf7d0; color: #166534; }
+.compatibility-box.tone-bad { background: #fffbeb; border: 1px solid #fde68a; color: #92400e; }
+
+.url-warning {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  color: #991b1b;
+  border-radius: var(--radius-md);
+  padding: 0.55rem 0.8rem;
+  font-size: 0.78rem;
+}
 
 .instruction-banner {
   display: flex;
@@ -1109,11 +1262,82 @@ const formatDateTime = (iso?: string) => {
   align-items: flex-start;
 }
 
+.error-body { display: flex; flex-direction: column; gap: 0.5rem; min-width: 0; }
+
+.error-hint {
+  margin: 0;
+  font-size: 0.78rem;
+  line-height: 1.45;
+  color: #7f1d1d;
+}
+
+.tag-guidance {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  background: #fff7ed;
+  border: 1px solid #fed7aa;
+  border-radius: var(--radius-md);
+  padding: 0.55rem 0.75rem;
+  font-size: 0.75rem;
+  color: #9a3412;
+  line-height: 1.45;
+}
+
+.tag-guidance p { margin: 0.2rem 0 0; }
+.tag-guidance :deep(svg) { flex-shrink: 0; margin-top: 0.1rem; }
+
+.tech-details {
+  font-size: 0.72rem;
+  color: #7f1d1d;
+}
+
+.tech-details summary {
+  cursor: pointer;
+  font-weight: 700;
+  user-select: none;
+}
+
 .error-technical {
-  margin: 0.3rem 0 0;
+  margin: 0.35rem 0 0;
   font-size: 0.7rem;
   word-break: break-all;
+  white-space: pre-wrap;
   opacity: 0.85;
+}
+
+.verification-levels {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  padding: 0.7rem 0.9rem;
+  background: #ffffff;
+}
+
+.level-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.78rem;
+  color: #b45309;
+}
+
+.level-row :deep(svg) { flex-shrink: 0; }
+
+.level-row span { flex: 1; }
+.level-row strong { font-size: 0.75rem; }
+.level-row.done { color: #15803d; }
+
+.verify-note {
+  margin: 0;
+  font-size: 0.78rem;
+  color: #92400e;
+  background: #fffbeb;
+  border: 1px solid #fde68a;
+  border-radius: var(--radius-md);
+  padding: 0.55rem 0.8rem;
 }
 
 .result-summary {

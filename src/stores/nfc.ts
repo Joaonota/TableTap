@@ -231,11 +231,14 @@ export const useNfcStore = defineStore('nfc', () => {
     )
 
     // 2. Escrita concluída (a promise de write() terminou com sucesso)
+    const completedAt = nowIso()
     record.status = 'active'
     record.url = outcome.url
     record.lastWrittenAt = outcome.writtenAt
     record.writeCount += 1
     record.ndefType = NDEF_URI_TYPE
+    record.verificationState = 'written_only'
+    record.lastVerification = verification
     setLastOperation(record, isRewrite ? 'rewrite' : 'write')
 
     pushEvent(
@@ -248,7 +251,11 @@ export const useNfcStore = defineStore('nfc', () => {
 
     // 3. Verificação real (leitura de retorno — só se o browser permitir)
     if (verification === 'verified') {
-      record.lastVerifiedAt = nowIso()
+      // Leitura efetiva + conteúdo igual ao esperado
+      record.lastReadConfirmedAt = completedAt
+      record.lastContentValidatedAt = completedAt
+      record.lastVerifiedAt = completedAt
+      record.verificationState = 'content_validated'
       pushEvent(
         record,
         'verified',
@@ -258,16 +265,25 @@ export const useNfcStore = defineStore('nfc', () => {
       )
       toastStore.success('Gravação concluída!', `Etiqueta verificada — Mesa ${record.tableNumber}.`)
     } else {
+      // A leitura pode ter acontecido (conteúdo diferente/sem URL) ou não.
+      if (verification === 'different' || verification === 'no_url') {
+        record.lastReadConfirmedAt = completedAt
+        record.verificationState = 'read_confirmed'
+      }
       pushEvent(
         record,
         'verify_failed',
         'Verificação não confirmada',
-        'Não foi possível confirmar que o conteúdo gravado corresponde ao endereço esperado. O conteúdo foi gravado, mas a etiqueta fica marcada como NÃO validada.',
+        verification === 'unreadable' || verification === 'cancelled'
+          ? 'A escrita física foi concluída, mas a verificação independente não foi possível. A etiqueta não é marcada como validada.'
+          : 'O conteúdo lido não corresponde ao endereço esperado. A etiqueta não é marcada como validada.',
         params.actor
       )
       toastStore.warning(
-        'Gravação sem verificação',
-        'A escrita terminou, mas o conteúdo não pôde ser confirmado por nova leitura.'
+        'Gravação sem validação',
+        verification === 'unreadable' || verification === 'cancelled'
+          ? 'Gravação concluída, mas a verificação independente não foi possível.'
+          : 'A escrita terminou, mas o conteúdo não corresponde ao esperado.'
       )
     }
 
@@ -308,6 +324,10 @@ export const useNfcStore = defineStore('nfc', () => {
    * (Etiquetas com URLs desconhecidos não são associadas a nenhuma mesa.)
    */
   const registerRead = (record: NfcTag, read: ParsedNfcRead) => {
+    record.lastReadConfirmedAt = nowIso()
+    if (record.verificationState !== 'content_validated') {
+      record.verificationState = 'read_confirmed'
+    }
     const found = read.url ? normalizeMenuUrl(read.url) : null
     const expected = normalizeMenuUrl(record.url)
     if (found === expected) {
@@ -328,11 +348,19 @@ export const useNfcStore = defineStore('nfc', () => {
   /** Resultado real do verificador (detalhes/após-verificação). */
   const registerVerify = (record: NfcTag, status: 'verified' | 'different' | 'no_url', foundUrl?: string | null) => {
     setLastOperation(record, 'verify')
+    const verifiedAt = nowIso()
     if (status === 'verified') {
-      record.lastVerifiedAt = nowIso()
+      record.lastReadConfirmedAt = verifiedAt
+      record.lastContentValidatedAt = verifiedAt
+      record.lastVerifiedAt = verifiedAt
+      record.verificationState = 'content_validated'
+      record.lastVerification = status
       pushEvent(record, 'verified', 'Conteúdo verificado', `Leitura confirma o URL gravado: ${record.url}.`)
       toastStore.success('Verificação concluída', 'Etiqueta verificada com sucesso.')
     } else if (status === 'different') {
+      record.lastReadConfirmedAt = verifiedAt
+      record.verificationState = 'read_confirmed'
+      record.lastVerification = status
       pushEvent(
         record,
         'verify_failed',
@@ -341,6 +369,9 @@ export const useNfcStore = defineStore('nfc', () => {
       )
       toastStore.warning('Verificação divergente', 'Conteúdo físico não corresponde ao endereço esperado.')
     } else {
+      record.lastReadConfirmedAt = verifiedAt
+      record.verificationState = 'read_confirmed'
+      record.lastVerification = status
       pushEvent(
         record,
         'verify_failed',

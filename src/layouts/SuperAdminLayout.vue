@@ -15,7 +15,13 @@ import {
   ArrowLeft,
   LayoutDashboard,
   Menu,
-  X
+  X,
+  Zap,
+  UtensilsCrossed,
+  ShoppingBag,
+  DollarSign,
+  BarChart3,
+  Settings
 } from 'lucide-vue-next'
 
 const router = useRouter()
@@ -98,6 +104,38 @@ const isMobileSidebarOpen = ref(false)
             <span>Utilizadores do Sistema</span>
           </router-link>
 
+          <div class="nav-category">OPERAÇÃO & VISUAL</div>
+
+          <router-link
+            to="/super-admin/menus"
+            class="super-nav-link"
+            :class="{ 'is-active': route.path === '/super-admin/menus' }"
+            @click="isMobileSidebarOpen = false"
+          >
+            <UtensilsCrossed :size="18" />
+            <span>Menus Digitais</span>
+          </router-link>
+
+          <router-link
+            to="/super-admin/pedidos"
+            class="super-nav-link"
+            :class="{ 'is-active': route.path === '/super-admin/pedidos' }"
+            @click="isMobileSidebarOpen = false"
+          >
+            <ShoppingBag :size="18" />
+            <span>Pedidos Globais</span>
+          </router-link>
+
+          <router-link
+            to="/super-admin/pagamentos"
+            class="super-nav-link"
+            :class="{ 'is-active': route.path === '/super-admin/pagamentos' }"
+            @click="isMobileSidebarOpen = false"
+          >
+            <DollarSign :size="18" />
+            <span>Pagamentos & Gateways</span>
+          </router-link>
+
           <div class="nav-category">MONETIZAÇÃO & SAAS</div>
 
           <router-link
@@ -111,6 +149,16 @@ const isMobileSidebarOpen = ref(false)
           </router-link>
 
           <router-link
+            to="/super-admin/funcionalidades"
+            class="super-nav-link"
+            :class="{ 'is-active': route.path === '/super-admin/funcionalidades' }"
+            @click="isMobileSidebarOpen = false"
+          >
+            <Zap :size="18" />
+            <span>Matriz Funcionalidades</span>
+          </router-link>
+
+          <router-link
             to="/super-admin/subscricoes"
             class="super-nav-link"
             :class="{ 'is-active': route.path === '/super-admin/subscricoes' }"
@@ -121,6 +169,16 @@ const isMobileSidebarOpen = ref(false)
           </router-link>
 
           <router-link
+            to="/super-admin/relatorios"
+            class="super-nav-link"
+            :class="{ 'is-active': route.path === '/super-admin/relatorios' }"
+            @click="isMobileSidebarOpen = false"
+          >
+            <BarChart3 :size="18" />
+            <span>Relatórios Executivos</span>
+          </router-link>
+
+          <router-link
             to="/super-admin/atividade"
             class="super-nav-link"
             :class="{ 'is-active': route.path === '/super-admin/atividade' }"
@@ -128,6 +186,16 @@ const isMobileSidebarOpen = ref(false)
           >
             <Activity :size="18" />
             <span>Auditoria & Atividade</span>
+          </router-link>
+
+          <router-link
+            to="/super-admin/configuracoes"
+            class="super-nav-link"
+            :class="{ 'is-active': route.path === '/super-admin/configuracoes' }"
+            @click="isMobileSidebarOpen = false"
+          >
+            <Settings :size="18" />
+            <span>Configurações SaaS</span>
           </router-link>
         </div>
       </aside>
