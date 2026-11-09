@@ -74,77 +74,77 @@ export interface Restaurant {
   createdAt: string
 }
 
+export const TABLE_AREAS = ['Sala Principal', 'Esplanada', 'Varanda', 'Piso 1', 'Bar', 'Privado'] as const
+export type TableArea = (typeof TABLE_AREAS)[number]
+
+/**
+ * Estado operacional da mesa.
+ *  - free:        sem sessão ativa, disponível para clientes;
+ *  - occupied:    existe uma sessão ativa (só muda através da sessão);
+ *  - unavailable: bloqueada pelo restaurante (manutenção, reserva, etc.).
+ *
+ * Pedidos pendentes, chamadas de garçom e pedidos de conta NÃO são estados
+ * da mesa — são indicadores derivados de pedidos/atendimentos da sessão.
+ */
+export type TableStatus = 'free' | 'occupied' | 'unavailable'
+
 export interface Table {
   id: string
   tenantId: string
   restaurantId: string
   number: string
   name?: string
-  area: 'Sala Principal' | 'Esplanada' | 'Varanda' | 'Piso 1' | 'Bar' | 'Privado'
+  /**
+   * Identificador permanente usado na URL pública (ex.: "mesa-08").
+   * Gerado na criação e nunca alterado — a etiqueta NFC física contém a URL
+   * construída a partir dele, por isso mudar o número/nome não a invalida.
+   */
+  slug: string
+  area: TableArea
   capacity: number
   status: TableStatus
-  publicUrl: string
-  qrCodeUrl?: string
-  nfcTagId?: string
-  activeOrderId?: string
+  /** Sessão ativa atual (presente apenas quando status === 'occupied'). */
   activeSessionId?: string
-  activeCustomerName?: string
-  partySize?: number
-  sessionStartedAt?: string
-  lastActivityAt?: string
+  /** Mesa desativada administrativamente — URL pública mostra "indisponível". */
   isActive: boolean
+  createdAt: string
+  updatedAt: string
 }
 
-export type TableSessionStatus =
-  | 'active'
-  | 'awaiting_bill'
-  | 'closing'
-  | 'closed'
+export type TableSessionStatus = 'active' | 'closed' | 'cancelled'
+
+/** Pessoa/dispositivo que participa numa sessão de mesa. */
+export interface SessionParticipant {
+  id: string
+  name: string
+  joinedAt: string
+  isPrimary: boolean
+}
 
 export interface TableSession {
   id: string
   tenantId: string
   restaurantId: string
   tableId: string
-  customerName: string
-  partySize?: number
   status: TableSessionStatus
   startedAt: string
+  /** Data/hora de encerramento ou cancelamento. */
   closedAt?: string
+  closedBy?: string
+  cancelReason?: string
+  /** Cliente principal (quem iniciou a sessão), quando aplicável. */
+  primaryCustomerName?: string
+  participants: SessionParticipant[]
+  partySize?: number
   notes?: string
   orderIds: string[]
+  /** Total dos pedidos não cancelados associados à sessão (MT). */
+  total: number
+  /** Quando algum participante pediu a conta. */
+  billRequestedAt?: string
 }
 
-export type TableStatus =
-  | 'free'
-  | 'occupied'
-  | 'has_order'
-  | 'waiting_service'
-  | 'waiting_bill'
-  | 'unavailable'
-
-export interface DigitalAccess {
-  id: string
-  tenantId: string
-  restaurantId: string
-  tableId: string
-  tableNumber: string
-  url: string
-  qrCodeDataUrl?: string
-  nfcTagUid?: string
-  nfcStatus: 'unprogrammed' | 'programmed' | 'simulated'
-  scanCount: number
-  lastScannedAt?: string
-  createdAt: string
-  updatedAt: string
-}
-
-// ==========================================
-// NFC REAL — re-export of src/types/nfc.ts
-// (registry, timeline, capabilities, errors)
-// ==========================================
-
-export * from './nfc'
+export * from './nfcTag'
 
 // ==========================================
 // PLANS, FEATURES & LIMITS (SaaS)
@@ -381,8 +381,10 @@ export interface DashboardMetrics {
   totalOrders: number
   totalRevenue: number
   averageTicket: number
+  totalTables: number
   occupiedTables: number
   availableTables: number
+  unavailableTables: number
   pendingOrders: number
   preparingOrders: number
   readyOrders: number

@@ -36,7 +36,7 @@ import {
           <li><CheckCircle2 :size="16" /> Alternância rápida de produtos indisponíveis</li>
           <li><CheckCircle2 :size="16" /> Cálculo automático de taxas (IVA 16%) e gorjeta</li>
         </ul>
-        <router-link to="/menu/sabores-maputo/01">
+        <router-link to="/m/sabores-maputo/mesa-01">
           <AppButton variant="primary">Ver Menu em Ação</AppButton>
         </router-link>
       </div>

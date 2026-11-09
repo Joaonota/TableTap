@@ -56,7 +56,7 @@ const getStatusBadge = (status: Order['status']) => {
   <AppModal
     :is-open="isOpen"
     title="Pedidos na Sua Mesa"
-    :subtitle="session ? `Sessão de ${session.customerName} • ${orders.length} ${orders.length === 1 ? 'pedido' : 'pedidos'}` : ''"
+    :subtitle="session ? `${session.participants.length > 1 ? `${session.participants.length} pessoas na mesa` : `Sessão de ${session.primaryCustomerName ?? 'Mesa'}`} • ${orders.length} ${orders.length === 1 ? 'pedido' : 'pedidos'}` : ''"
     max-width="560px"
     @close="emit('close')"
   >
@@ -68,8 +68,8 @@ const getStatusBadge = (status: Order['status']) => {
           <span class="summary-amount">{{ totalAccumulated.toLocaleString('pt-MZ') }} MT</span>
         </div>
         <div class="summary-right">
-          <AppBadge :variant="session?.status === 'awaiting_bill' ? 'warning' : 'success'">
-            {{ session?.status === 'awaiting_bill' ? 'Aguardar Conta' : 'Sessão Ativa' }}
+          <AppBadge :variant="session?.billRequestedAt ? 'warning' : 'success'">
+            {{ session?.billRequestedAt ? 'Conta pedida' : 'Sessão ativa' }}
           </AppBadge>
         </div>
       </div>
@@ -137,7 +137,7 @@ const getStatusBadge = (status: Order['status']) => {
         Fechar
       </AppButton>
       <AppButton
-        v-if="session?.status !== 'awaiting_bill' && session?.status !== 'closed'"
+        v-if="session?.status === 'active'"
         variant="primary"
         size="md"
         @click="emit('order-more')"
@@ -148,7 +148,7 @@ const getStatusBadge = (status: Order['status']) => {
         Pedir Mais Alguma Coisa
       </AppButton>
       <AppButton
-        v-if="session?.status !== 'awaiting_bill' && session?.status !== 'closed' && orders.length > 0"
+        v-if="!session?.billRequestedAt && session?.status === 'active' && orders.length > 0"
         variant="outline"
         size="md"
         @click="emit('request-bill')"

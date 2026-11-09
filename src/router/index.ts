@@ -26,7 +26,7 @@ import ServiceRequestsPage from '@/pages/service/ServiceRequestsPage.vue'
 import TablesPage from '@/pages/tables/TablesPage.vue'
 import ProductsPage from '@/pages/products/ProductsPage.vue'
 import CategoriesPage from '@/pages/categories/CategoriesPage.vue'
-import DigitalAccessPage from '@/pages/digital-access/DigitalAccessPage.vue'
+import NfcTagsPage from '@/pages/nfc-tags/NfcTagsPage.vue'
 import PaymentsPage from '@/pages/payments/PaymentsPage.vue'
 import StaffPage from '@/pages/staff/StaffPage.vue'
 import ReportsPage from '@/pages/reports/ReportsPage.vue'
@@ -48,6 +48,7 @@ import SuperOrdersPage from '@/pages/super-admin/SuperOrdersPage.vue'
 import SuperPaymentsPage from '@/pages/super-admin/SuperPaymentsPage.vue'
 import SuperReportsPage from '@/pages/super-admin/SuperReportsPage.vue'
 import SuperSettingsPage from '@/pages/super-admin/SuperSettingsPage.vue'
+import SuperNfcTagsPage from '@/pages/super-admin/SuperNfcTagsPage.vue'
 
 // Error Pages
 import NotFoundPage from '@/pages/errors/NotFoundPage.vue'
@@ -67,12 +68,20 @@ const routes: RouteRecordRaw[] = [
     ]
   },
 
-  // Public Customer Digital Menu & Order Tracking
+  // Menu público da mesa — URL permanente gravada na etiqueta NFC e no QR Code
+  {
+    path: '/m/:restaurantSlug/:tableSlug',
+    component: CustomerMenuLayout,
+    children: [
+      { path: '', name: 'customer-menu', component: CustomerMenuPage }
+    ]
+  },
+  // URL antiga (/menu/:restaurante/:numero) — continua a resolver a mesa pelo número
   {
     path: '/menu/:restaurantSlug/:tableCode',
     component: CustomerMenuLayout,
     children: [
-      { path: '', name: 'customer-menu', component: CustomerMenuPage }
+      { path: '', name: 'customer-menu-legacy', component: CustomerMenuPage }
     ]
   },
   {
@@ -106,7 +115,8 @@ const routes: RouteRecordRaw[] = [
       { path: 'menu/categorias', name: 'admin-categories', component: CategoriesPage },
       { path: 'menu/personalizacao', name: 'admin-menu-customization', component: MenuBuilderPage },
       { path: 'meu-plano', name: 'admin-my-plan', component: MeuPlanoPage },
-      { path: 'acesso-digital', name: 'admin-digital-access', component: DigitalAccessPage },
+      { path: 'tags-nfc', name: 'admin-nfc-tags', component: NfcTagsPage },
+      { path: 'acesso-digital', redirect: '/app/tags-nfc' },
       { path: 'pagamentos', name: 'admin-payments', component: PaymentsPage },
       { path: 'funcionarios', name: 'admin-staff', component: StaffPage },
       { path: 'relatorios', name: 'admin-reports', component: ReportsPage },
@@ -132,6 +142,7 @@ const routes: RouteRecordRaw[] = [
       { path: 'subscricoes', name: 'super-subscriptions', component: SubscriptionsPage },
       { path: 'relatorios', name: 'super-reports', component: SuperReportsPage },
       { path: 'atividade', name: 'super-activity', component: ActivityLogPage },
+      { path: 'etiquetas-nfc', name: 'super-nfc-tags', component: SuperNfcTagsPage },
       { path: 'configuracoes', name: 'super-settings', component: SuperSettingsPage }
     ]
   },

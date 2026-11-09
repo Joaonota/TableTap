@@ -47,7 +47,7 @@ const handleConfirm = () => {
   <AppModal
     :is-open="isOpen"
     title="Pedir a Conta da Mesa"
-    :subtitle="session ? `Mesa • ${session.customerName}` : ''"
+    :subtitle="session?.primaryCustomerName ? `Mesa de ${session.primaryCustomerName}` : ''"
     max-width="520px"
     @close="emit('close')"
   >

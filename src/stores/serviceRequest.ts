@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
-import type { ServiceRequest, ServiceRequestStatus, ServiceRequestType } from '@/types'
-import { serviceRequestService, tableService } from '@/services'
+import type { Restaurant, ServiceRequest, ServiceRequestStatus, ServiceRequestType } from '@/types'
+import { serviceRequestService } from '@/services'
 import { useTenantStore } from './tenant'
 import { useAuthStore } from './auth'
 import { useToastStore } from './toast'
@@ -37,7 +37,12 @@ export const useServiceRequestStore = defineStore('serviceRequest', () => {
     }
   }
 
+  /**
+   * Pedido de atendimento feito pelo cliente no menu público.
+   * O restaurante vem da URL da mesa (não do contexto do painel admin).
+   */
   const createCustomerRequest = async (
+    restaurant: Pick<Restaurant, 'id' | 'tenantId'>,
     tableId: string,
     tableNumber: string,
     type: ServiceRequestType,
@@ -45,10 +50,10 @@ export const useServiceRequestStore = defineStore('serviceRequest', () => {
     tableSessionId?: string,
     customerName?: string
   ) => {
-    if (!tenantStore.currentRestaurant) return
+    const restaurantRequests = await serviceRequestService.getRequests(restaurant.id)
 
     // Prevent duplicate active requests of the same type on the same table
-    const existingActive = requests.value.find(
+    const existingActive = restaurantRequests.find(
       r => r.tableId === tableId && r.type === type && (r.status === 'new' || r.status === 'in_progress')
     )
     if (existingActive) {
@@ -62,8 +67,8 @@ export const useServiceRequestStore = defineStore('serviceRequest', () => {
     try {
       const typeLabel = serviceTypeLabels[type] || 'Atendimento'
       const created = await serviceRequestService.createRequest({
-        tenantId: tenantStore.currentRestaurant.tenantId,
-        restaurantId: tenantStore.currentRestaurant.id,
+        tenantId: restaurant.tenantId,
+        restaurantId: restaurant.id,
         tableId,
         tableNumber,
         tableSessionId,
@@ -72,19 +77,12 @@ export const useServiceRequestStore = defineStore('serviceRequest', () => {
         status: 'new',
         notes
       })
-      requests.value.unshift(created)
-
-      // Update table status if appropriate
-      if (type === 'bill') {
-        await tableService.updateTable(tableId, { status: 'waiting_bill' })
-      } else {
-        await tableService.updateTable(tableId, { status: 'waiting_service' })
-      }
+      if (tenantStore.currentRestaurant?.id === restaurant.id) requests.value.unshift(created)
 
       // Create counter notification
       await notificationStore.createNotification({
-        tenantId: tenantStore.currentRestaurant.tenantId,
-        restaurantId: tenantStore.currentRestaurant.id,
+        tenantId: restaurant.tenantId,
+        restaurantId: restaurant.id,
         type: type === 'bill' ? 'bill_requested' : type === 'waiter_call' ? 'waiter_call' : 'service_request',
         title: type === 'bill' ? 'Pedido de Conta' : type === 'waiter_call' ? 'Cliente solicita atendimento' : `Solicitação: ${typeLabel}`,
         message: `Mesa ${tableNumber}${customerName ? ` (${customerName})` : ''} solicitou ${typeLabel.toLowerCase()}.${notes ? ` Nota: "${notes}"` : ''}`,
@@ -114,19 +112,6 @@ export const useServiceRequestStore = defineStore('serviceRequest', () => {
       const index = requests.value.findIndex(r => r.id === requestId)
       if (index !== -1) {
         requests.value[index] = updated
-      }
-
-      // Check if table has any other pending requests
-      const otherActive = requests.value.some(
-        r => r.tableId === updated.tableId && r.id !== updated.id && (r.status === 'new' || r.status === 'in_progress')
-      )
-      if (!otherActive && (status === 'completed' || status === 'cancelled')) {
-        // Return table to occupied or has_order
-        const tbl = await tableService.getTableById(updated.tableId)
-        if (tbl && (tbl.status === 'waiting_service' || tbl.status === 'waiting_bill')) {
-          const nextStatus = tbl.activeOrderId ? 'has_order' : tbl.activeSessionId ? 'occupied' : 'free'
-          await tableService.updateTable(updated.tableId, { status: nextStatus })
-        }
       }
 
       const statusMsg = status === 'completed' ? 'Concluído' : status === 'in_progress' ? 'Em atendimento' : 'Cancelado'

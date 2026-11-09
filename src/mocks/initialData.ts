@@ -14,7 +14,8 @@ import type {
   Plan,
   Subscription,
   SubscriptionHistory,
-  DigitalAccess,
+  NfcTag,
+  NfcTagEvent,
   CustomerReview,
   MenuCustomization,
   PlatformAuditLog,
@@ -41,7 +42,8 @@ export interface MockDatabase {
   staff: StaffMember[]
   plans: Plan[]
   subscriptions: Subscription[]
-  digitalAccessList: DigitalAccess[]
+  nfcTags: NfcTag[]
+  nfcTagEvents: NfcTagEvent[]
   reviews: CustomerReview[]
   menuCustomizations: MenuCustomization[]
   auditLogs: PlatformAuditLog[]
@@ -347,187 +349,24 @@ export const initialUsers: User[] = [
   }
 ]
 
+const TABLE_CREATED_AT = '2024-01-17T09:00:00Z'
+
 export const initialTables: Table[] = [
   // Sabores Maputo (rest-1)
-  {
-    id: 'tbl-1',
-    tenantId: 'tenant-1',
-    restaurantId: 'rest-1',
-    number: '01',
-    name: 'Mesa Vista Jardim',
-    area: 'Sala Principal',
-    capacity: 4,
-    status: 'occupied',
-    publicUrl: '/menu/sabores-maputo/01',
-    nfcTagId: 'NFC-SMP-01',
-    activeOrderId: 'ord-101',
-    activeSessionId: 'sess-101',
-    activeCustomerName: 'João Cossa',
-    partySize: 2,
-    sessionStartedAt: '2026-10-16T11:00:00Z',
-    lastActivityAt: '2026-10-16T11:20:00Z',
-    isActive: true
-  },
-  {
-    id: 'tbl-2',
-    tenantId: 'tenant-1',
-    restaurantId: 'rest-1',
-    number: '02',
-    name: 'Mesa Central',
-    area: 'Sala Principal',
-    capacity: 2,
-    status: 'has_order',
-    publicUrl: '/menu/sabores-maputo/02',
-    nfcTagId: 'NFC-SMP-02',
-    activeOrderId: 'ord-102',
-    activeSessionId: 'sess-102',
-    activeCustomerName: 'Dra. Marta Chissano',
-    partySize: 2,
-    sessionStartedAt: '2026-10-16T11:20:00Z',
-    lastActivityAt: '2026-10-16T11:32:00Z',
-    isActive: true
-  },
-  {
-    id: 'tbl-3',
-    tenantId: 'tenant-1',
-    restaurantId: 'rest-1',
-    number: '03',
-    name: 'Mesa Familiar',
-    area: 'Sala Principal',
-    capacity: 6,
-    status: 'waiting_service',
-    publicUrl: '/menu/sabores-maputo/03',
-    nfcTagId: 'NFC-SMP-03',
-    lastActivityAt: '2026-10-16T11:40:00Z',
-    isActive: true
-  },
-  {
-    id: 'tbl-4',
-    tenantId: 'tenant-1',
-    restaurantId: 'rest-1',
-    number: '04',
-    name: 'Esplanada Brisa',
-    area: 'Esplanada',
-    capacity: 4,
-    status: 'waiting_bill',
-    publicUrl: '/menu/sabores-maputo/04',
-    nfcTagId: 'NFC-SMP-04',
-    activeOrderId: 'ord-104',
-    activeSessionId: 'sess-104',
-    activeCustomerName: 'Paulo Tembe',
-    partySize: 4,
-    sessionStartedAt: '2026-10-16T10:40:00Z',
-    lastActivityAt: '2026-10-16T11:15:00Z',
-    isActive: true
-  },
-  {
-    id: 'tbl-5',
-    tenantId: 'tenant-1',
-    restaurantId: 'rest-1',
-    number: '05',
-    name: 'Esplanada Pérgula',
-    area: 'Esplanada',
-    capacity: 4,
-    status: 'free',
-    publicUrl: '/menu/sabores-maputo/05',
-    nfcTagId: 'NFC-SMP-05',
-    isActive: true
-  },
-  {
-    id: 'tbl-6',
-    tenantId: 'tenant-1',
-    restaurantId: 'rest-1',
-    number: '06',
-    name: 'Varanda Lounge',
-    area: 'Varanda',
-    capacity: 2,
-    status: 'free',
-    publicUrl: '/menu/sabores-maputo/06',
-    nfcTagId: 'NFC-SMP-06',
-    isActive: true
-  },
-  {
-    id: 'tbl-7',
-    tenantId: 'tenant-1',
-    restaurantId: 'rest-1',
-    number: '07',
-    name: 'Balcão Cocktail',
-    area: 'Bar',
-    capacity: 2,
-    status: 'free',
-    publicUrl: '/menu/sabores-maputo/07',
-    nfcTagId: 'NFC-SMP-07',
-    isActive: true
-  },
-  {
-    id: 'tbl-8',
-    tenantId: 'tenant-1',
-    restaurantId: 'rest-1',
-    number: '08',
-    name: 'Sala VIP Privada',
-    area: 'Privado',
-    capacity: 10,
-    status: 'unavailable',
-    publicUrl: '/menu/sabores-maputo/08',
-    nfcTagId: 'NFC-SMP-08',
-    isActive: true
-  },
+  { id: 'tbl-1', tenantId: 'tenant-1', restaurantId: 'rest-1', number: '01', name: 'Mesa Vista Jardim', slug: 'mesa-01', area: 'Sala Principal', capacity: 4, status: 'occupied', activeSessionId: 'sess-101', isActive: true, createdAt: TABLE_CREATED_AT, updatedAt: '2026-10-16T11:00:00Z' },
+  { id: 'tbl-2', tenantId: 'tenant-1', restaurantId: 'rest-1', number: '02', name: 'Mesa Central', slug: 'mesa-02', area: 'Sala Principal', capacity: 2, status: 'occupied', activeSessionId: 'sess-102', isActive: true, createdAt: TABLE_CREATED_AT, updatedAt: '2026-10-16T11:20:00Z' },
+  { id: 'tbl-3', tenantId: 'tenant-1', restaurantId: 'rest-1', number: '03', name: 'Mesa Familiar', slug: 'mesa-03', area: 'Sala Principal', capacity: 6, status: 'occupied', activeSessionId: 'sess-103', isActive: true, createdAt: TABLE_CREATED_AT, updatedAt: '2026-10-16T10:50:00Z' },
+  { id: 'tbl-4', tenantId: 'tenant-1', restaurantId: 'rest-1', number: '04', name: 'Esplanada Brisa', slug: 'mesa-04', area: 'Esplanada', capacity: 4, status: 'occupied', activeSessionId: 'sess-104', isActive: true, createdAt: TABLE_CREATED_AT, updatedAt: '2026-10-16T10:40:00Z' },
+  { id: 'tbl-5', tenantId: 'tenant-1', restaurantId: 'rest-1', number: '05', name: 'Esplanada Pérgula', slug: 'mesa-05', area: 'Esplanada', capacity: 4, status: 'free', isActive: true, createdAt: TABLE_CREATED_AT, updatedAt: '2026-10-16T09:30:00Z' },
+  { id: 'tbl-6', tenantId: 'tenant-1', restaurantId: 'rest-1', number: '06', name: 'Varanda Lounge', slug: 'mesa-06', area: 'Varanda', capacity: 2, status: 'free', isActive: true, createdAt: TABLE_CREATED_AT, updatedAt: TABLE_CREATED_AT },
+  { id: 'tbl-7', tenantId: 'tenant-1', restaurantId: 'rest-1', number: '07', name: 'Balcão Cocktail', slug: 'mesa-07', area: 'Bar', capacity: 2, status: 'free', isActive: true, createdAt: TABLE_CREATED_AT, updatedAt: TABLE_CREATED_AT },
+  { id: 'tbl-8', tenantId: 'tenant-1', restaurantId: 'rest-1', number: '08', name: 'Sala VIP Privada', slug: 'mesa-08', area: 'Privado', capacity: 10, status: 'unavailable', isActive: true, createdAt: TABLE_CREATED_AT, updatedAt: '2026-10-15T18:00:00Z' },
   // Sabores Matola (rest-2)
-  {
-    id: 'tbl-201',
-    tenantId: 'tenant-1',
-    restaurantId: 'rest-2',
-    number: 'M1',
-    name: 'Mesa Jardim Matola',
-    area: 'Esplanada',
-    capacity: 4,
-    status: 'free',
-    publicUrl: '/menu/sabores-matola/M1',
-    nfcTagId: 'NFC-SMT-01',
-    isActive: true
-  },
-  {
-    id: 'tbl-202',
-    tenantId: 'tenant-1',
-    restaurantId: 'rest-2',
-    number: 'M2',
-    name: 'Mesa Familiar Matola',
-    area: 'Sala Principal',
-    capacity: 8,
-    status: 'occupied',
-    publicUrl: '/menu/sabores-matola/M2',
-    nfcTagId: 'NFC-SMT-02',
-    activeOrderId: 'ord-201',
-    isActive: true
-  },
+  { id: 'tbl-201', tenantId: 'tenant-1', restaurantId: 'rest-2', number: 'M1', name: 'Mesa Jardim Matola', slug: 'mesa-m1', area: 'Esplanada', capacity: 4, status: 'free', isActive: true, createdAt: TABLE_CREATED_AT, updatedAt: TABLE_CREATED_AT },
+  { id: 'tbl-202', tenantId: 'tenant-1', restaurantId: 'rest-2', number: 'M2', name: 'Mesa Familiar Matola', slug: 'mesa-m2', area: 'Sala Principal', capacity: 8, status: 'free', isActive: true, createdAt: TABLE_CREATED_AT, updatedAt: TABLE_CREATED_AT },
   // Ocean Restaurant (rest-4, tenant-2)
-  {
-    id: 'tbl-401',
-    tenantId: 'tenant-2',
-    restaurantId: 'rest-4',
-    number: 'O-01',
-    name: 'Deck Baía Mar',
-    area: 'Varanda',
-    capacity: 4,
-    status: 'free',
-    publicUrl: '/menu/ocean-restaurant/O-01',
-    nfcTagId: 'NFC-OCN-01',
-    isActive: true
-  },
-  {
-    id: 'tbl-402',
-    tenantId: 'tenant-2',
-    restaurantId: 'rest-4',
-    number: 'O-02',
-    name: 'Salão Náutico',
-    area: 'Sala Principal',
-    capacity: 6,
-    status: 'has_order',
-    publicUrl: '/menu/ocean-restaurant/O-02',
-    nfcTagId: 'NFC-OCN-02',
-    activeOrderId: 'ord-401',
-    isActive: true
-  }
+  { id: 'tbl-401', tenantId: 'tenant-2', restaurantId: 'rest-4', number: 'O-01', name: 'Deck Baía Mar', slug: 'mesa-o-01', area: 'Varanda', capacity: 4, status: 'free', isActive: true, createdAt: TABLE_CREATED_AT, updatedAt: TABLE_CREATED_AT },
+  { id: 'tbl-402', tenantId: 'tenant-2', restaurantId: 'rest-4', number: 'O-02', name: 'Salão Náutico', slug: 'mesa-o-02', area: 'Sala Principal', capacity: 6, status: 'occupied', activeSessionId: 'sess-401', isActive: true, createdAt: TABLE_CREATED_AT, updatedAt: '2026-10-16T11:00:00Z' }
 ]
 
 export const initialCategories: Category[] = [
@@ -1115,6 +954,7 @@ export const initialOrders: Order[] = [
     restaurantId: 'rest-1',
     tableId: 'tbl-1',
     tableNumber: '01',
+    tableSessionId: 'sess-101',
     orderCode: '#ORD-101',
     type: 'dine_in',
     status: 'preparing',
@@ -1164,6 +1004,7 @@ export const initialOrders: Order[] = [
     restaurantId: 'rest-1',
     tableId: 'tbl-2',
     tableNumber: '02',
+    tableSessionId: 'sess-102',
     orderCode: '#ORD-102',
     type: 'dine_in',
     status: 'received',
@@ -1206,6 +1047,7 @@ export const initialOrders: Order[] = [
     restaurantId: 'rest-1',
     tableId: 'tbl-3',
     tableNumber: '03',
+    tableSessionId: 'sess-103',
     orderCode: '#ORD-103',
     type: 'dine_in',
     status: 'ready',
@@ -1250,6 +1092,7 @@ export const initialOrders: Order[] = [
     restaurantId: 'rest-1',
     tableId: 'tbl-4',
     tableNumber: '04',
+    tableSessionId: 'sess-104',
     orderCode: '#ORD-104',
     type: 'dine_in',
     status: 'delivered',
@@ -1327,7 +1170,9 @@ export const initialOrders: Order[] = [
     id: 'ord-106',
     tenantId: 'tenant-1',
     restaurantId: 'rest-1',
+    tableId: 'tbl-5',
     tableNumber: '05',
+    tableSessionId: 'sess-090',
     orderCode: '#ORD-106',
     type: 'dine_in',
     status: 'cancelled',
@@ -1362,6 +1207,7 @@ export const initialOrders: Order[] = [
     restaurantId: 'rest-4',
     tableId: 'tbl-402',
     tableNumber: 'O-02',
+    tableSessionId: 'sess-401',
     orderCode: '#ORD-401',
     type: 'dine_in',
     status: 'preparing',
@@ -1838,114 +1684,117 @@ export const initialSubscriptions: Subscription[] = [
   }
 ]
 
-export const initialDigitalAccessList: DigitalAccess[] = [
+/**
+ * Sessões de mesa. O campo `total` é recalculado a partir dos pedidos quando
+ * a base mock é criada (ver mockStorage), para não duplicar valores aqui.
+ */
+export const initialTableSessions: TableSession[] = [
   {
-    id: 'da-1',
-    tenantId: 'tenant-1',
-    restaurantId: 'rest-1',
-    tableId: 'tbl-1',
-    tableNumber: '01',
-    url: '/menu/sabores-maputo/01',
-    nfcTagUid: 'NFC-SMP-01',
-    nfcStatus: 'simulated',
-    scanCount: 142,
-    lastScannedAt: '2026-10-16T11:15:00Z',
-    createdAt: '2024-01-17T09:00:00Z',
-    updatedAt: '2026-10-16T11:15:00Z'
+    id: 'sess-101', tenantId: 'tenant-1', restaurantId: 'rest-1', tableId: 'tbl-1',
+    status: 'active', startedAt: '2026-10-16T11:00:00Z',
+    primaryCustomerName: 'João Cossa', partySize: 2, notes: 'Mesa de aniversário',
+    participants: [
+      { id: 'part-101-1', name: 'João Cossa', joinedAt: '2026-10-16T11:00:00Z', isPrimary: true },
+      { id: 'part-101-2', name: 'Ana Cossa', joinedAt: '2026-10-16T11:04:00Z', isPrimary: false }
+    ],
+    orderIds: ['ord-101'], total: 0
   },
   {
-    id: 'da-2',
-    tenantId: 'tenant-1',
-    restaurantId: 'rest-1',
-    tableId: 'tbl-2',
-    tableNumber: '02',
-    url: '/menu/sabores-maputo/02',
-    nfcTagUid: 'NFC-SMP-02',
-    nfcStatus: 'simulated',
-    scanCount: 98,
-    lastScannedAt: '2026-10-16T11:32:00Z',
-    createdAt: '2024-01-17T09:00:00Z',
-    updatedAt: '2026-10-16T11:32:00Z'
+    id: 'sess-102', tenantId: 'tenant-1', restaurantId: 'rest-1', tableId: 'tbl-2',
+    status: 'active', startedAt: '2026-10-16T11:20:00Z',
+    primaryCustomerName: 'Dra. Marta Chissano', partySize: 2, notes: 'Almoço de negócios',
+    participants: [{ id: 'part-102-1', name: 'Dra. Marta Chissano', joinedAt: '2026-10-16T11:20:00Z', isPrimary: true }],
+    orderIds: ['ord-102'], total: 0
   },
   {
-    id: 'da-3',
-    tenantId: 'tenant-1',
-    restaurantId: 'rest-1',
-    tableId: 'tbl-3',
-    tableNumber: '03',
-    url: '/menu/sabores-maputo/03',
-    nfcTagUid: 'NFC-SMP-03',
-    nfcStatus: 'simulated',
-    scanCount: 115,
-    lastScannedAt: '2026-10-16T10:45:00Z',
-    createdAt: '2024-01-17T09:00:00Z',
-    updatedAt: '2026-10-16T10:45:00Z'
+    id: 'sess-103', tenantId: 'tenant-1', restaurantId: 'rest-1', tableId: 'tbl-3',
+    status: 'active', startedAt: '2026-10-16T10:50:00Z',
+    primaryCustomerName: 'Família Mabunda', partySize: 5,
+    participants: [{ id: 'part-103-1', name: 'Família Mabunda', joinedAt: '2026-10-16T10:50:00Z', isPrimary: true }],
+    orderIds: ['ord-103'], total: 0
   },
   {
-    id: 'da-4',
-    tenantId: 'tenant-1',
-    restaurantId: 'rest-1',
-    tableId: 'tbl-4',
-    tableNumber: '04',
-    url: '/menu/sabores-maputo/04',
-    nfcTagUid: 'NFC-SMP-04',
-    nfcStatus: 'simulated',
-    scanCount: 84,
-    lastScannedAt: '2026-10-16T10:15:00Z',
-    createdAt: '2024-01-17T09:00:00Z',
-    updatedAt: '2026-10-16T10:15:00Z'
+    id: 'sess-104', tenantId: 'tenant-1', restaurantId: 'rest-1', tableId: 'tbl-4',
+    status: 'active', startedAt: '2026-10-16T10:40:00Z', billRequestedAt: '2026-10-16T11:15:00Z',
+    primaryCustomerName: 'Paulo Tembe', partySize: 4,
+    participants: [{ id: 'part-104-1', name: 'Paulo Tembe', joinedAt: '2026-10-16T10:40:00Z', isPrimary: true }],
+    orderIds: ['ord-104'], total: 0
   },
   {
-    id: 'da-5',
-    tenantId: 'tenant-1',
-    restaurantId: 'rest-1',
-    tableId: 'tbl-5',
-    tableNumber: '05',
-    url: '/menu/sabores-maputo/05',
-    nfcTagUid: 'NFC-SMP-05',
-    nfcStatus: 'unprogrammed',
-    scanCount: 41,
-    createdAt: '2024-01-17T09:00:00Z',
-    updatedAt: '2024-01-17T09:00:00Z'
+    id: 'sess-090', tenantId: 'tenant-1', restaurantId: 'rest-1', tableId: 'tbl-5',
+    status: 'cancelled', startedAt: '2026-10-16T09:00:00Z', closedAt: '2026-10-16T09:30:00Z',
+    closedBy: 'Rui Mondlane', cancelReason: 'Cliente saiu antes de ser servido.',
+    primaryCustomerName: 'Cliente Esplanada',
+    participants: [{ id: 'part-090-1', name: 'Cliente Esplanada', joinedAt: '2026-10-16T09:00:00Z', isPrimary: true }],
+    orderIds: ['ord-106'], total: 0
+  },
+  {
+    id: 'sess-401', tenantId: 'tenant-2', restaurantId: 'rest-4', tableId: 'tbl-402',
+    status: 'active', startedAt: '2026-10-16T11:00:00Z',
+    participants: [],
+    orderIds: ['ord-401'], total: 0
   }
 ]
 
-export const initialTableSessions: TableSession[] = [
-  {
-    id: 'sess-101',
-    tenantId: 'tenant-1',
-    restaurantId: 'rest-1',
-    tableId: 'tbl-1',
-    customerName: 'João Cossa',
-    partySize: 2,
-    status: 'active',
-    startedAt: '2026-10-16T11:00:00Z',
-    notes: 'Mesa de aniversário',
-    orderIds: ['ord-101']
-  },
-  {
-    id: 'sess-102',
-    tenantId: 'tenant-1',
-    restaurantId: 'rest-1',
-    tableId: 'tbl-2',
-    customerName: 'Dra. Marta Chissano',
-    partySize: 2,
-    status: 'active',
-    startedAt: '2026-10-16T11:20:00Z',
-    notes: 'Almoço de negócios',
-    orderIds: ['ord-102']
-  },
-  {
-    id: 'sess-104',
-    tenantId: 'tenant-1',
-    restaurantId: 'rest-1',
-    tableId: 'tbl-4',
-    customerName: 'Paulo Tembe',
-    partySize: 4,
-    status: 'awaiting_bill',
-    startedAt: '2026-10-16T10:40:00Z',
-    orderIds: ['ord-104']
+// ==========================================
+// ETIQUETAS NFC (registo administrativo — sem gravação pelo browser)
+// ==========================================
+
+export const initialNfcTags: NfcTag[] = [
+  { id: 'nfc-1', code: 'TAG-00001', tenantId: 'tenant-1', restaurantId: 'rest-1', tableId: 'tbl-1', targetPath: '/m/sabores-maputo/mesa-01', configuredPath: '/m/sabores-maputo/mesa-01', status: 'active', configuredAt: '2026-10-01T10:00:00Z', configuredBy: 'Equipa TapMenu', createdAt: '2026-09-28T09:00:00Z', updatedAt: '2026-10-02T15:00:00Z' },
+  { id: 'nfc-2', code: 'TAG-00002', tenantId: 'tenant-1', restaurantId: 'rest-1', tableId: 'tbl-2', targetPath: '/m/sabores-maputo/mesa-02', configuredPath: '/m/sabores-maputo/mesa-02', status: 'active', configuredAt: '2026-10-01T10:05:00Z', configuredBy: 'Equipa TapMenu', createdAt: '2026-09-28T09:00:00Z', updatedAt: '2026-10-02T15:00:00Z' },
+  { id: 'nfc-3', code: 'TAG-00003', tenantId: 'tenant-1', restaurantId: 'rest-1', tableId: 'tbl-3', targetPath: '/m/sabores-maputo/mesa-03', configuredPath: '/m/sabores-maputo/mesa-03', status: 'active', configuredAt: '2026-10-01T10:10:00Z', configuredBy: 'Equipa TapMenu', createdAt: '2026-09-28T09:00:00Z', updatedAt: '2026-10-02T15:00:00Z' },
+  { id: 'nfc-4', code: 'TAG-00004', tenantId: 'tenant-1', restaurantId: 'rest-1', tableId: 'tbl-4', targetPath: '/m/sabores-maputo/mesa-04', configuredPath: '/m/sabores-maputo/mesa-04', status: 'configured', configuredAt: '2026-10-14T16:00:00Z', configuredBy: 'Equipa TapMenu', createdAt: '2026-09-28T09:00:00Z', updatedAt: '2026-10-14T16:00:00Z' },
+  { id: 'nfc-5', code: 'TAG-00005', tenantId: 'tenant-1', restaurantId: 'rest-1', tableId: 'tbl-5', targetPath: '/m/sabores-maputo/mesa-05', status: 'pending', createdAt: '2026-09-28T09:00:00Z', updatedAt: '2026-10-14T16:20:00Z' },
+  { id: 'nfc-6', code: 'TAG-00006', tenantId: 'tenant-1', restaurantId: 'rest-1', tableId: 'tbl-6', targetPath: '/m/sabores-maputo/mesa-06', configuredPath: '/m/sabores-maputo/mesa-07', status: 'reassignment_pending', configuredAt: '2026-10-01T10:20:00Z', configuredBy: 'Equipa TapMenu', createdAt: '2026-09-28T09:00:00Z', updatedAt: '2026-10-15T12:00:00Z' },
+  { id: 'nfc-7', code: 'TAG-00007', tenantId: 'tenant-1', restaurantId: 'rest-1', status: 'pending', createdAt: '2026-10-14T09:00:00Z', updatedAt: '2026-10-14T09:00:00Z' },
+  { id: 'nfc-8', code: 'TAG-00008', tenantId: 'tenant-1', restaurantId: 'rest-1', configuredPath: '/m/sabores-maputo/mesa-08', status: 'disabled', configuredAt: '2026-10-01T10:30:00Z', configuredBy: 'Equipa TapMenu', notes: 'Etiqueta danificada.', createdAt: '2026-09-28T09:00:00Z', updatedAt: '2026-10-12T11:00:00Z' },
+  { id: 'nfc-9', code: 'TAG-00009', tenantId: 'tenant-1', restaurantId: 'rest-2', tableId: 'tbl-201', targetPath: '/m/sabores-matola/mesa-m1', configuredPath: '/m/sabores-matola/mesa-m1', status: 'active', configuredAt: '2026-10-03T10:00:00Z', configuredBy: 'Equipa TapMenu', createdAt: '2026-10-02T09:00:00Z', updatedAt: '2026-10-04T10:00:00Z' },
+  { id: 'nfc-10', code: 'TAG-00010', tenantId: 'tenant-2', restaurantId: 'rest-4', tableId: 'tbl-401', targetPath: '/m/ocean-restaurant/mesa-o-01', status: 'pending', createdAt: '2026-10-10T09:00:00Z', updatedAt: '2026-10-10T09:30:00Z' }
+]
+
+const tagEvent = (
+  tagId: string,
+  seq: number,
+  type: NfcTagEvent['type'],
+  createdAt: string,
+  description: string,
+  extra: Partial<NfcTagEvent> = {}
+): NfcTagEvent => ({ id: `${tagId}-evt-${seq}`, tagId, type, createdAt, description, actor: 'Equipa TapMenu', ...extra })
+
+/** Histórico típico: registo → associação → configuração física → instalação. */
+const installedTagHistory = (
+  tagId: string,
+  tableLabel: string,
+  path: string,
+  dates: { registered: string; configured: string; activated?: string }
+): NfcTagEvent[] => {
+  const events = [
+    tagEvent(tagId, 1, 'registered', dates.registered, 'Etiqueta registada no inventário.', { toStatus: 'pending' }),
+    tagEvent(tagId, 2, 'associated', dates.registered, `Associada à ${tableLabel}.`, { tableLabel, path }),
+    tagEvent(tagId, 3, 'configured', dates.configured, 'Configuração física registada: URL gravada pela equipa com aplicação externa.', { path, fromStatus: 'pending', toStatus: 'configured' })
+  ]
+  if (dates.activated) {
+    events.push(tagEvent(tagId, 4, 'activated', dates.activated, 'Instalação na mesa confirmada.', { fromStatus: 'configured', toStatus: 'active' }))
   }
+  return events
+}
+
+export const initialNfcTagEvents: NfcTagEvent[] = [
+  ...installedTagHistory('nfc-1', 'Mesa 01', '/m/sabores-maputo/mesa-01', { registered: '2026-09-28T09:00:00Z', configured: '2026-10-01T10:00:00Z', activated: '2026-10-02T15:00:00Z' }),
+  ...installedTagHistory('nfc-2', 'Mesa 02', '/m/sabores-maputo/mesa-02', { registered: '2026-09-28T09:00:00Z', configured: '2026-10-01T10:05:00Z', activated: '2026-10-02T15:00:00Z' }),
+  ...installedTagHistory('nfc-3', 'Mesa 03', '/m/sabores-maputo/mesa-03', { registered: '2026-09-28T09:00:00Z', configured: '2026-10-01T10:10:00Z', activated: '2026-10-02T15:00:00Z' }),
+  ...installedTagHistory('nfc-4', 'Mesa 04', '/m/sabores-maputo/mesa-04', { registered: '2026-09-28T09:00:00Z', configured: '2026-10-14T16:00:00Z' }),
+  tagEvent('nfc-5', 1, 'registered', '2026-09-28T09:00:00Z', 'Etiqueta registada no inventário.', { toStatus: 'pending' }),
+  tagEvent('nfc-5', 2, 'associated', '2026-10-14T16:20:00Z', 'Associada à Mesa 05.', { tableLabel: 'Mesa 05', path: '/m/sabores-maputo/mesa-05', actor: 'Rui Mondlane' }),
+  ...installedTagHistory('nfc-6', 'Mesa 07', '/m/sabores-maputo/mesa-07', { registered: '2026-09-28T09:00:00Z', configured: '2026-10-01T10:20:00Z', activated: '2026-10-02T15:00:00Z' }),
+  tagEvent('nfc-6', 5, 'association_changed', '2026-10-15T12:00:00Z', 'Reatribuída da Mesa 07 para a Mesa 06. A etiqueta tem de ser regravada pela equipa.', { tableLabel: 'Mesa 06', path: '/m/sabores-maputo/mesa-06', fromStatus: 'active', toStatus: 'reassignment_pending', actor: 'Rui Mondlane' }),
+  tagEvent('nfc-7', 1, 'registered', '2026-10-14T09:00:00Z', 'Etiqueta registada no inventário.', { toStatus: 'pending' }),
+  ...installedTagHistory('nfc-8', 'Mesa 08', '/m/sabores-maputo/mesa-08', { registered: '2026-09-28T09:00:00Z', configured: '2026-10-01T10:30:00Z', activated: '2026-10-02T15:00:00Z' }),
+  tagEvent('nfc-8', 5, 'disabled', '2026-10-12T11:00:00Z', 'Desativada: Etiqueta danificada.', { fromStatus: 'active', toStatus: 'disabled', actor: 'Rui Mondlane' }),
+  ...installedTagHistory('nfc-9', 'Mesa M1', '/m/sabores-matola/mesa-m1', { registered: '2026-10-02T09:00:00Z', configured: '2026-10-03T10:00:00Z', activated: '2026-10-04T10:00:00Z' }),
+  tagEvent('nfc-10', 1, 'registered', '2026-10-10T09:00:00Z', 'Etiqueta registada no inventário.', { toStatus: 'pending' }),
+  tagEvent('nfc-10', 2, 'associated', '2026-10-10T09:30:00Z', 'Associada à Mesa O-01.', { tableLabel: 'Mesa O-01', path: '/m/ocean-restaurant/mesa-o-01' })
 ]
 
 export const initialNotifications: Notification[] = [

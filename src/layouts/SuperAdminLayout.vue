@@ -21,7 +21,8 @@ import {
   ShoppingBag,
   DollarSign,
   BarChart3,
-  Settings
+  Settings,
+  Nfc
 } from 'lucide-vue-next'
 
 const router = useRouter()
@@ -186,6 +187,16 @@ const isMobileSidebarOpen = ref(false)
           >
             <Activity :size="18" />
             <span>Auditoria & Atividade</span>
+          </router-link>
+
+          <router-link
+            to="/super-admin/etiquetas-nfc"
+            class="super-nav-link"
+            :class="{ 'is-active': route.path === '/super-admin/etiquetas-nfc' }"
+            @click="isMobileSidebarOpen = false"
+          >
+            <Nfc :size="18" />
+            <span>Etiquetas NFC</span>
           </router-link>
 
           <router-link

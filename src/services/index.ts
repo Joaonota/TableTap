@@ -1,30 +1,16 @@
-import {
-  MockCompanyRepository,
-  MockRestaurantRepository,
-  MockUserRepository,
-  MockTableRepository,
-  MockCategoryRepository,
-  MockProductRepository,
-  MockOrderRepository,
-  MockDigitalAccessRepository,
-  MockPaymentRepository,
-  MockServiceRequestRepository,
-  MockStaffRepository,
-  MockPlanRepository,
-  MockSubscriptionRepository,
-  MockMenuCustomizationRepository,
-  MockAuditLogRepository,
-  MockPlatformConfigRepository,
-  MockTableSessionRepository,
-  MockNotificationRepository
-} from '@/repositories/mock'
+import { repositories } from '@/repositories'
+import type { TableInput, StartSessionInput, RegisterNfcTagsInput } from '@/repositories/interfaces'
 import { mockStorage } from '@/repositories/mock/mockStorage'
+import { countTables } from '@/domain/tableRules'
 import type {
   User,
   Company,
   Restaurant,
   Table,
   TableSession,
+  SessionParticipant,
+  NfcTag,
+  NfcTagEvent,
   Notification,
   Category,
   Product,
@@ -35,35 +21,36 @@ import type {
   Plan,
   Subscription,
   SubscriptionHistory,
-  DigitalAccess,
   OrderStatus,
   PaymentStatus,
   ServiceRequestStatus,
   DashboardMetrics,
-  MenuCustomization,
   PlatformAuditLog,
   PlatformConfig
 } from '@/types'
 
-// Repositories instances
-const companyRepo = new MockCompanyRepository()
-const restaurantRepo = new MockRestaurantRepository()
-const userRepo = new MockUserRepository()
-const tableRepo = new MockTableRepository()
-const tableSessionRepo = new MockTableSessionRepository()
-const notificationRepo = new MockNotificationRepository()
-const categoryRepo = new MockCategoryRepository()
-const productRepo = new MockProductRepository()
-const orderRepo = new MockOrderRepository()
-const digitalAccessRepo = new MockDigitalAccessRepository()
-const paymentRepo = new MockPaymentRepository()
-const serviceRequestRepo = new MockServiceRequestRepository()
-const staffRepo = new MockStaffRepository()
-const planRepo = new MockPlanRepository()
-const subscriptionRepo = new MockSubscriptionRepository()
-const menuCustomizationRepo = new MockMenuCustomizationRepository()
-const auditRepo = new MockAuditLogRepository()
-const platformConfigRepo = new MockPlatformConfigRepository()
+export type { TableInput, StartSessionInput, RegisterNfcTagsInput }
+
+// Repositórios (fonte única em src/repositories/index.ts)
+const {
+  companies: companyRepo,
+  restaurants: restaurantRepo,
+  users: userRepo,
+  tables: tableRepo,
+  tableSessions: tableSessionRepo,
+  nfcTags: nfcTagRepo,
+  notifications: notificationRepo,
+  categories: categoryRepo,
+  products: productRepo,
+  orders: orderRepo,
+  payments: paymentRepo,
+  serviceRequests: serviceRequestRepo,
+  staff: staffRepo,
+  plans: planRepo,
+  subscriptions: subscriptionRepo,
+  auditLogs: auditRepo,
+  platformConfig: platformConfigRepo
+} = repositories
 
 // ================= AuthService =================
 export const authService = {
@@ -162,7 +149,7 @@ export const productService = {
   }
 }
 
-// ================= Table & Digital Access Services =================
+// ================= Mesas =================
 export const tableService = {
   async getTables(restaurantId: string): Promise<Table[]> {
     return tableRepo.getByRestaurant(restaurantId)
@@ -170,35 +157,81 @@ export const tableService = {
   async getTableById(id: string): Promise<Table | null> {
     return tableRepo.getById(id)
   },
-  async getTableByNumber(restaurantId: string, number: string): Promise<Table | null> {
-    return tableRepo.getByNumber(restaurantId, number)
+  async createTable(restaurantId: string, input: TableInput): Promise<Table> {
+    return tableRepo.create(restaurantId, input)
   },
-  async createTable(data: Omit<Table, 'id'>): Promise<Table> {
-    return tableRepo.create(data)
+  async updateTable(id: string, input: Partial<TableInput>): Promise<Table> {
+    return tableRepo.update(id, input)
   },
-  async updateTable(id: string, updates: Partial<Table>): Promise<Table> {
-    return tableRepo.update(id, updates)
+  async setTableStatus(id: string, status: 'free' | 'unavailable'): Promise<Table> {
+    return tableRepo.setStatus(id, status)
   },
-  async deleteTable(id: string): Promise<boolean> {
-    return tableRepo.delete(id)
+  async setTableActive(id: string, isActive: boolean): Promise<Table> {
+    return tableRepo.setActive(id, isActive)
+  },
+  async deleteTable(id: string, actor: string): Promise<boolean> {
+    return tableRepo.delete(id, actor)
   }
 }
 
-export const digitalAccessService = {
-  async getAccessList(restaurantId: string): Promise<DigitalAccess[]> {
-    return digitalAccessRepo.getByRestaurant(restaurantId)
+// ================= Acesso público (URL da etiqueta / QR Code) =================
+export interface PublicTableContext {
+  restaurant: Restaurant
+  table: Table
+  /** Sessão ativa no momento do acesso (null se a mesa estiver livre). */
+  activeSession: TableSession | null
+}
+
+export const publicTableService = {
+  /**
+   * Resolve a URL pública: restaurante → mesa → estado atual.
+   * Aceita o slug permanente (/m/:restaurante/:mesa) e, por compatibilidade,
+   * o número da mesa usado nas URLs antigas (/menu/:restaurante/:numero).
+   */
+  async resolve(restaurantSlug: string, tableKey: string): Promise<PublicTableContext | null> {
+    const restaurant = await restaurantRepo.getBySlug(restaurantSlug)
+    if (!restaurant) return null
+    const table = (await tableRepo.getBySlug(restaurant.id, tableKey)) ?? (await tableRepo.getByNumber(restaurant.id, tableKey))
+    if (!table) return null
+    const activeSession = await tableSessionRepo.getActiveByTable(table.id)
+    return { restaurant, table, activeSession }
+  }
+}
+
+// ================= Etiquetas NFC (gestão administrativa) =================
+export const nfcTagService = {
+  async getAllTags(): Promise<NfcTag[]> {
+    return nfcTagRepo.getAll()
   },
-  async getAccessById(id: string): Promise<DigitalAccess | null> {
-    return digitalAccessRepo.getById(id)
+  async getTags(restaurantId: string): Promise<NfcTag[]> {
+    return nfcTagRepo.getByRestaurant(restaurantId)
   },
-  async createAccess(data: Omit<DigitalAccess, 'id' | 'createdAt' | 'updatedAt'>): Promise<DigitalAccess> {
-    return digitalAccessRepo.create(data)
+  async getTagByTable(tableId: string): Promise<NfcTag | null> {
+    return nfcTagRepo.getByTable(tableId)
   },
-  async updateAccess(id: string, updates: Partial<DigitalAccess>): Promise<DigitalAccess> {
-    return digitalAccessRepo.update(id, updates)
+  async getHistory(tagId: string): Promise<NfcTagEvent[]> {
+    return nfcTagRepo.getHistory(tagId)
   },
-  async recordScan(id: string): Promise<void> {
-    return digitalAccessRepo.recordScan(id)
+  async registerTags(input: RegisterNfcTagsInput, actor: string): Promise<NfcTag[]> {
+    return nfcTagRepo.register(input, actor)
+  },
+  async assignToTable(tagId: string, tableId: string, actor: string): Promise<NfcTag> {
+    return nfcTagRepo.assign(tagId, tableId, actor)
+  },
+  async unassign(tagId: string, actor: string): Promise<NfcTag> {
+    return nfcTagRepo.unassign(tagId, actor)
+  },
+  async markConfigured(tagId: string, actor: string, notes?: string): Promise<NfcTag> {
+    return nfcTagRepo.markConfigured(tagId, actor, notes)
+  },
+  async activate(tagId: string, actor: string): Promise<NfcTag> {
+    return nfcTagRepo.activate(tagId, actor)
+  },
+  async disable(tagId: string, actor: string, reason?: string): Promise<NfcTag> {
+    return nfcTagRepo.disable(tagId, actor, reason)
+  },
+  async reactivate(tagId: string, actor: string): Promise<NfcTag> {
+    return nfcTagRepo.reactivate(tagId, actor)
   }
 }
 
@@ -387,8 +420,7 @@ export const reportService = {
     const totalRevenue = validOrders.reduce((sum, o) => sum + o.total, 0)
     const averageTicket = validOrders.length > 0 ? totalRevenue / validOrders.length : 0
 
-    const occupiedTables = tables.filter(t => t.status === 'occupied' || t.status === 'has_order').length
-    const availableTables = tables.filter(t => t.status === 'free').length
+    const tableCounts = countTables(tables)
 
     const pendingOrders = orders.filter(o => o.status === 'received' || o.status === 'confirmed').length
     const preparingOrders = orders.filter(o => o.status === 'preparing').length
@@ -401,8 +433,10 @@ export const reportService = {
       totalOrders: orders.length,
       totalRevenue: Math.round(totalRevenue * 100) / 100,
       averageTicket: Math.round(averageTicket * 100) / 100,
-      occupiedTables,
-      availableTables,
+      totalTables: tableCounts.total,
+      occupiedTables: tableCounts.occupied,
+      availableTables: tableCounts.free,
+      unavailableTables: tableCounts.unavailable,
       pendingOrders,
       preparingOrders,
       readyOrders,
@@ -465,39 +499,35 @@ export const tableSessionService = {
   async getSessions(restaurantId: string): Promise<TableSession[]> {
     return tableSessionRepo.getByRestaurant(restaurantId)
   },
+  async getSessionsByTable(tableId: string): Promise<TableSession[]> {
+    return tableSessionRepo.getByTable(tableId)
+  },
   async getActiveSessionByTable(tableId: string): Promise<TableSession | null> {
     return tableSessionRepo.getActiveByTable(tableId)
   },
   async getSessionById(id: string): Promise<TableSession | null> {
     return tableSessionRepo.getById(id)
   },
-  async startSession(data: {
-    tenantId: string
-    restaurantId: string
-    tableId: string
-    customerName: string
-    partySize?: number
-    notes?: string
-  }): Promise<TableSession> {
-    const session = await tableSessionRepo.create({
-      tenantId: data.tenantId,
-      restaurantId: data.restaurantId,
-      tableId: data.tableId,
-      customerName: data.customerName,
-      partySize: data.partySize,
-      status: 'active',
-      notes: data.notes
-    })
-    return session
+  /** Livre → Ocupada. */
+  async startSession(input: StartSessionInput): Promise<{ session: TableSession; participant: SessionParticipant | null }> {
+    return tableSessionRepo.start(input)
+  },
+  async joinSession(sessionId: string, name: string): Promise<{ session: TableSession; participant: SessionParticipant }> {
+    return tableSessionRepo.join(sessionId, name)
   },
   async addOrderToSession(sessionId: string, orderId: string): Promise<TableSession> {
     return tableSessionRepo.addOrder(sessionId, orderId)
   },
-  async updateSessionStatus(sessionId: string, status: TableSession['status']): Promise<TableSession> {
-    return tableSessionRepo.update(sessionId, { status })
+  async requestBill(sessionId: string): Promise<TableSession> {
+    return tableSessionRepo.requestBill(sessionId)
   },
-  async closeSession(sessionId: string): Promise<TableSession> {
-    return tableSessionRepo.closeSession(sessionId)
+  /** Ocupada → Livre (sessão encerrada). */
+  async closeSession(sessionId: string, actor: string): Promise<TableSession> {
+    return tableSessionRepo.close(sessionId, actor)
+  },
+  /** Ocupada → Livre (sessão cancelada). */
+  async cancelSession(sessionId: string, actor: string, reason?: string): Promise<TableSession> {
+    return tableSessionRepo.cancel(sessionId, actor, reason)
   }
 }
 

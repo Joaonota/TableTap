@@ -135,9 +135,11 @@ export const useCartStore = defineStore('cart', () => {
     let isAdditional = false
     if (options.tableSessionId) {
       const sess = await tableSessionService.getSessionById(options.tableSessionId)
-      if (sess && sess.orderIds && sess.orderIds.length > 0) {
-        isAdditional = true
+      // Validar antes de criar o pedido: evita pedidos órfãos de sessões encerradas.
+      if (!sess || sess.status !== 'active') {
+        throw new Error('A sessão desta mesa já foi encerrada. Atualize a página para iniciar uma nova.')
       }
+      isAdditional = sess.orderIds.length > 0
     }
 
     const orderData = {

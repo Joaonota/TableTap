@@ -6,6 +6,9 @@ import { useOrderStore } from '@/stores/order'
 import { useSubscriptionStore } from '@/stores/subscription'
 import { reportService } from '@/services'
 import MetricCard from '@/components/ui/MetricCard.vue'
+import TableGrid from '@/components/tables/TableGrid.vue'
+import TableDetailDrawer from '@/components/tables/TableDetailDrawer.vue'
+import { useTableStore } from '@/stores/table'
 import AppBadge from '@/components/ui/AppBadge.vue'
 import AppButton from '@/components/ui/AppButton.vue'
 import type { DashboardMetrics } from '@/types'
@@ -28,14 +31,18 @@ const router = useRouter()
 const tenantStore = useTenantStore()
 const orderStore = useOrderStore()
 const subscriptionStore = useSubscriptionStore()
+const tableStore = useTableStore()
+const selectedTableId = ref<string | null>(null)
 
 const timePeriod = ref<'today' | '7days' | '30days'>('today')
 const metrics = ref<DashboardMetrics>({
   totalOrders: 0,
   totalRevenue: 0,
   averageTicket: 0,
+  totalTables: 0,
   occupiedTables: 0,
   availableTables: 0,
+  unavailableTables: 0,
   pendingOrders: 0,
   preparingOrders: 0,
   readyOrders: 0,
@@ -56,7 +63,8 @@ const loadDashboardData = async () => {
       reportService.getDashboardMetrics(restId),
       reportService.getSalesByDay(restId),
       reportService.getTopProducts(restId),
-      subscriptionStore.fetchSubscriptionData()
+      subscriptionStore.fetchSubscriptionData(),
+      tableStore.loadTables()
     ])
     metrics.value = m
     salesChartData.value = sales
@@ -158,12 +166,56 @@ const maxSalesAmount = () => {
 
       <MetricCard
         title="Ocupação das Mesas"
-        :value="`${metrics.occupiedTables} / ${metrics.occupiedTables + metrics.availableTables}`"
+        :value="`${tableStore.counts.occupied} / ${tableStore.counts.total}`"
         variant="warning"
         :icon="Grid"
-        :subtitle="`${metrics.availableTables} mesas livres no momento`"
+        :subtitle="`${tableStore.counts.free} livres · ${tableStore.counts.unavailable} indisponíveis`"
       />
     </div>
+
+    <!-- Mesas: estado em tempo real -->
+    <section class="tables-panel" aria-labelledby="tables-panel-title">
+      <div class="tables-panel-head">
+        <h2 id="tables-panel-title" class="tables-panel-title">Mesas</h2>
+        <router-link to="/app/mesas" class="tables-panel-link">
+          Gerir mesas <ArrowRight :size="14" />
+        </router-link>
+      </div>
+      <dl class="table-counts">
+        <div class="count-item">
+          <dt>Total</dt>
+          <dd>{{ tableStore.counts.total }}</dd>
+        </div>
+        <div class="count-item is-free">
+          <dt>Livres</dt>
+          <dd>{{ tableStore.counts.free }}</dd>
+        </div>
+        <div class="count-item is-occupied">
+          <dt>Ocupadas</dt>
+          <dd>{{ tableStore.counts.occupied }}</dd>
+        </div>
+        <div class="count-item is-unavailable">
+          <dt>Indisponíveis</dt>
+          <dd>{{ tableStore.counts.unavailable }}</dd>
+        </div>
+      </dl>
+      <p v-if="tableStore.hasLoaded && tableStore.tables.length === 0" class="tables-empty">
+        Ainda não há mesas. <router-link to="/app/mesas">Criar mesas</router-link>
+      </p>
+      <TableGrid
+        v-else
+        compact
+        :tables="tableStore.tables"
+        :sessions-by-table="tableStore.activeSessionByTableId"
+        @select="t => (selectedTableId = t.id)"
+      />
+    </section>
+
+    <TableDetailDrawer
+      :table-id="selectedTableId"
+      @close="selectedTableId = null"
+      @edit="router.push('/app/mesas')"
+    />
 
     <!-- Secondary Status Metrics -->
     <div class="sub-metrics-row">
@@ -572,6 +624,97 @@ const maxSalesAmount = () => {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   gap: 1.25rem;
+}
+
+.tables-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  padding: 1.25rem;
+  background: #fff;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-xl);
+}
+
+.tables-panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.tables-panel-title {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.tables-panel-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--color-primary-700);
+}
+
+.table-counts {
+  margin: 0;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
+.count-item {
+  padding: 0.75rem 0.875rem;
+  border-radius: var(--radius-lg);
+  background: var(--color-neutral-50);
+  border: 1px solid var(--border-color);
+}
+
+.count-item dt {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.count-item dd {
+  margin: 0.15rem 0 0;
+  font-family: var(--font-heading);
+  font-size: 1.6rem;
+  font-weight: 800;
+  line-height: 1.1;
+}
+
+.count-item.is-free dd {
+  color: var(--color-success-600);
+}
+
+.count-item.is-occupied dd {
+  color: var(--color-primary-700);
+}
+
+.count-item.is-unavailable dd {
+  color: var(--color-neutral-500);
+}
+
+.tables-empty {
+  margin: 0;
+  font-size: 0.875rem;
+  color: var(--text-muted);
+}
+
+@media (max-width: 650px) {
+  .table-counts {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .tables-panel {
+    padding: 1rem;
+  }
 }
 
 .sub-metrics-row {

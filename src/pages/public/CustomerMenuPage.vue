@@ -1,30 +1,27 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { restaurantService, tableService, productService, categoryService, orderService } from '@/services'
+import { productService, categoryService, orderService } from '@/services'
 import { useCartStore, type CartCustomization } from '@/stores/cart'
 import { useTableSessionStore } from '@/stores/tableSession'
 import { useServiceRequestStore } from '@/stores/serviceRequest'
 import { useToastStore } from '@/stores/toast'
 import type {
-  Restaurant,
-  Table,
   Product,
   Category,
   ProductVariant,
   ProductAddon,
   PaymentMethod,
   ServiceRequestType,
-  Order,
-  TableSession
+  Order
 } from '@/types'
 
 // UI Components
 import AppButton from '@/components/ui/AppButton.vue'
 import AppModal from '@/components/ui/AppModal.vue'
 import AppBadge from '@/components/ui/AppBadge.vue'
-import WelcomeTableModal from '@/components/menu/WelcomeTableModal.vue'
-import OccupiedNoticeScreen from '@/components/menu/OccupiedNoticeScreen.vue'
+import TableAccessScreen from '@/components/menu/TableAccessScreen.vue'
+import SessionNameModal from '@/components/menu/SessionNameModal.vue'
 import UnavailableNoticeScreen from '@/components/menu/UnavailableNoticeScreen.vue'
 import SessionHistoryModal from '@/components/menu/SessionHistoryModal.vue'
 import BillRequestModal from '@/components/menu/BillRequestModal.vue'
@@ -50,7 +47,8 @@ import {
   Users,
   ShieldCheck,
   ChevronRight,
-  Info
+  Info,
+  UserPlus
 } from 'lucide-vue-next'
 
 const route = useRoute()
@@ -60,22 +58,29 @@ const tableSessionStore = useTableSessionStore()
 const serviceRequestStore = useServiceRequestStore()
 const toastStore = useToastStore()
 
+/**
+ * Fluxo: NFC/QR → URL da mesa → restaurante + mesa → estado atual → experiência.
+ * Rotas: /m/:restaurantSlug/:tableSlug (permanente) e /menu/:restaurantSlug/:tableCode (antiga).
+ */
 const restaurantSlug = computed(() => route.params.restaurantSlug as string)
-const tableCode = computed(() => route.params.tableCode as string)
+const tableKey = computed(() => (route.params.tableSlug ?? route.params.tableCode) as string)
+const tableCode = tableKey
 
-const restaurant = ref<Restaurant | null>(null)
-const table = ref<Table | null>(null)
+const restaurant = computed(() => tableSessionStore.restaurant)
+const table = computed(() => tableSessionStore.table)
+const accessState = computed(() => tableSessionStore.accessState)
+
 const categories = ref<Category[]>([])
 const products = ref<Product[]>([])
 const sessionOrders = ref<Order[]>([])
 const isLoading = ref(true)
 
-// Navigation & Access States
-const isWelcomeModalOpen = ref(false)
-const isBrowseOnly = ref(false)
-const isOccupiedByOther = ref(false)
-const isTableUnavailable = ref(false)
-const isSubmittingOccupation = ref(false)
+/** O cliente já passou do ecrã inicial (Ver Menu / iniciou / juntou-se). */
+const hasEnteredMenu = ref(false)
+
+// Modal de nome (iniciar ou juntar-se)
+const isNameModalOpen = ref(false)
+const nameModalMode = computed<'start' | 'join'>(() => (accessState.value === 'occupied' ? 'join' : 'start'))
 
 // Modals
 const isSessionHistoryOpen = ref(false)
@@ -107,76 +112,75 @@ const serviceType = ref<ServiceRequestType>('waiter_call')
 const serviceNotes = ref('')
 const isSubmittingService = ref(false)
 
+const activeSession = computed(() => tableSessionStore.currentSession)
+/** Este dispositivo participa na sessão ativa da mesa. */
+const isSessionActive = computed(() => tableSessionStore.isParticipant && activeSession.value?.status === 'active')
+
+const showAccessScreen = computed(
+  () => !hasEnteredMenu.value && !isSessionActive.value && (accessState.value === 'free' || accessState.value === 'occupied')
+)
+
+const checkoutCtaLabel = computed(() => {
+  if (isSessionActive.value) return 'Rever & Confirmar Pedido'
+  return accessState.value === 'occupied' ? 'Juntar-me à mesa para pedir' : 'Iniciar sessão para pedir'
+})
+
 const loadSessionOrders = async () => {
-  if (!restaurant.value || !tableSessionStore.currentSession) {
+  const session = activeSession.value
+  if (!restaurant.value || !session || !isSessionActive.value) {
     sessionOrders.value = []
     return
   }
   const allOrders = await orderService.getOrders(restaurant.value.id)
-  const orderIds = tableSessionStore.currentSession.orderIds || []
-  sessionOrders.value = allOrders.filter(
-    o => orderIds.includes(o.id) || (o.tableSessionId === tableSessionStore.currentSession?.id)
-  )
+  sessionOrders.value = allOrders.filter(o => session.orderIds.includes(o.id) || o.tableSessionId === session.id)
 }
 
-onMounted(async () => {
+const loadMenu = async () => {
   isLoading.value = true
+  hasEnteredMenu.value = false
   try {
-    const foundRest = await restaurantService.getRestaurantBySlug(restaurantSlug.value)
-    if (!foundRest) {
-      router.push('/404')
+    await tableSessionStore.loadTable(restaurantSlug.value, tableKey.value)
+    if (!restaurant.value || !table.value) {
+      router.replace({ name: 'not-found', params: { pathMatch: route.path.substring(1).split('/') } })
       return
     }
-    restaurant.value = foundRest
+    cartStore.setRestaurantAndTable(restaurant.value, table.value)
 
-    // Find table
-    const foundTable = await tableService.getTableByNumber(foundRest.id, tableCode.value)
-    if (!foundTable) {
-      router.push('/404')
-      return
-    }
-    table.value = foundTable
-
-    // Set cart context
-    cartStore.setRestaurantAndTable(foundRest, foundTable)
-
-    // Load products and categories
     const [cats, prods] = await Promise.all([
-      categoryService.getCategories(foundRest.id),
-      productService.getProducts(foundRest.id)
+      categoryService.getCategories(restaurant.value.id),
+      productService.getProducts(restaurant.value.id)
     ])
-    categories.value = cats
-    products.value = prods
+    categories.value = cats.filter(c => c.isActive)
+    products.value = prods.filter(p => p.isActive)
 
-    // Inspect table session status
-    if (foundTable.status === 'unavailable') {
-      isTableUnavailable.value = true
-      return
-    }
-
-    const inspectResult = await tableSessionStore.inspectTableSession(foundRest, foundTable)
-
-    if (inspectResult.isOccupiedByOther) {
-      // Table occupied by another person
-      isOccupiedByOther.value = true
-    } else if (inspectResult.isOwner && inspectResult.session) {
-      // Current user is the owner of active session
-      isBrowseOnly.value = false
-      customerName.value = inspectResult.session.customerName
+    if (isSessionActive.value) {
+      customerName.value = tableSessionStore.participantName
       await loadSessionOrders()
-    } else {
-      // Table is free
-      isWelcomeModalOpen.value = true
     }
   } finally {
     isLoading.value = false
   }
-})
+}
+
+onMounted(loadMenu)
+watch(() => [restaurantSlug.value, tableKey.value], loadMenu)
+
+/** Ao voltar à página, o estado da mesa pode ter mudado (ex.: sessão encerrada). */
+const onVisibilityChange = async () => {
+  if (document.visibilityState !== 'visible' || !table.value) return
+  const wasParticipant = isSessionActive.value
+  await tableSessionStore.refresh()
+  if (wasParticipant && !isSessionActive.value) {
+    hasEnteredMenu.value = false
+    toastStore.info('Sessão encerrada', 'A sessão desta mesa foi encerrada pelo restaurante.')
+  }
+  await loadSessionOrders()
+}
+onMounted(() => document.addEventListener('visibilitychange', onVisibilityChange))
+onUnmounted(() => document.removeEventListener('visibilitychange', onVisibilityChange))
 
 // Keep orders updated if session changes
-watch(() => tableSessionStore.currentSession?.orderIds.length, async () => {
-  await loadSessionOrders()
-})
+watch(() => activeSession.value?.orderIds.length, loadSessionOrders)
 
 const filteredProducts = computed(() => {
   return products.value.filter(p => {
@@ -188,43 +192,27 @@ const filteredProducts = computed(() => {
   })
 })
 
-const activeSession = computed(() => tableSessionStore.currentSession)
-const isSessionActive = computed(() => {
-  return !!activeSession.value && tableSessionStore.isSessionOwner && activeSession.value.status !== 'closed'
-})
-
-// Handle Option 1: Browse Menu Only
-const handleBrowseOnly = () => {
-  isWelcomeModalOpen.value = false
-  isBrowseOnly.value = true
-  isOccupiedByOther.value = false
-  toastStore.info('Modo de Consulta', 'Pode explorar os itens do menu e adicionar ao seu carrinho antes de ocupar a mesa.')
+const handleViewMenu = () => {
+  hasEnteredMenu.value = true
 }
 
-// Handle Option 2: Occupy Table
-const handleOccupyTable = async (payload: { customerName: string; partySize?: number; notes?: string }) => {
-  if (!restaurant.value || !table.value) return
-  isSubmittingOccupation.value = true
-  try {
-    const session = await tableSessionStore.occupyTable({
-      restaurant: restaurant.value,
-      table: table.value,
-      customerName: payload.customerName,
-      partySize: payload.partySize,
-      notes: payload.notes
-    })
-    customerName.value = payload.customerName
-    isWelcomeModalOpen.value = false
-    isBrowseOnly.value = false
-    isOccupiedByOther.value = false
-    // If cart has items from browsing, keep them!
-    if (cartStore.itemCount > 0) {
-      toastStore.success('Mesa Pronta', 'Os itens que escolheu continuam no seu carrinho prontos para confirmação!')
-    }
-  } catch (e) {
-    toastStore.error('Não foi possível ocupar a mesa', (e as Error).message)
-  } finally {
-    isSubmittingOccupation.value = false
+const openSessionModal = () => {
+  isNameModalOpen.value = true
+}
+
+/** Mesa livre → iniciar sessão; mesa ocupada → juntar-se à sessão existente. */
+const handleSessionNameSubmit = async (payload: { name: string; partySize?: number; notes?: string }) => {
+  const session =
+    nameModalMode.value === 'join'
+      ? await tableSessionStore.joinSession(payload.name)
+      : await tableSessionStore.startSession(payload)
+  if (!session) return
+  isNameModalOpen.value = false
+  hasEnteredMenu.value = true
+  customerName.value = tableSessionStore.participantName
+  await loadSessionOrders()
+  if (cartStore.itemCount > 0) {
+    toastStore.success('Pronto para pedir', 'Os itens que escolheu continuam no carrinho.')
   }
 }
 
@@ -283,9 +271,9 @@ const handleAddToCart = () => {
 
 // Checkout handler
 const handleCheckoutClick = () => {
-  // If in browse-only mode without active session, prompt occupation first!
+  // Sem participação na sessão: pedir o nome primeiro (iniciar ou juntar-se).
   if (!isSessionActive.value) {
-    isWelcomeModalOpen.value = true
+    openSessionModal()
     return
   }
   cartStore.isCartOpen = true
@@ -308,6 +296,7 @@ const handleConfirmOrder = async () => {
     })
 
     cartStore.isCartOpen = false
+    await tableSessionStore.refresh()
     await loadSessionOrders()
 
     toastStore.success(
@@ -316,6 +305,7 @@ const handleConfirmOrder = async () => {
     )
   } catch (e) {
     toastStore.error('Erro ao enviar pedido', (e as Error).message)
+    await tableSessionStore.refresh()
   } finally {
     isSubmittingOrder.value = false
   }
@@ -327,12 +317,13 @@ const handleSendServiceRequest = async () => {
   isSubmittingService.value = true
   try {
     await serviceRequestStore.createCustomerRequest(
+      restaurant.value,
       table.value.id,
       table.value.number,
       serviceType.value,
       serviceNotes.value,
-      activeSession.value?.id,
-      customerName.value || activeSession.value?.customerName
+      isSessionActive.value ? activeSession.value?.id : undefined,
+      tableSessionStore.participantName || customerName.value || undefined
     )
     isServiceModalOpen.value = false
     serviceNotes.value = ''
@@ -343,19 +334,8 @@ const handleSendServiceRequest = async () => {
 
 // Bill request
 const handleConfirmBill = async (payload: { paymentMethod: PaymentMethod; notes?: string; totalAmount: number }) => {
-  if (!restaurant.value || !table.value || !activeSession.value) return
-  try {
-    await tableSessionStore.requestBill({
-      restaurant: restaurant.value,
-      table: table.value,
-      session: activeSession.value,
-      totalAmount: payload.totalAmount,
-      notes: payload.notes
-    })
-    isBillModalOpen.value = false
-  } catch (e) {
-    console.error('Erro ao pedir conta', e)
-  }
+  const updated = await tableSessionStore.requestBill(payload.totalAmount)
+  if (updated) isBillModalOpen.value = false
 }
 
 const handleOrderMore = () => {
@@ -372,37 +352,41 @@ const handleOrderMore = () => {
     <p class="loading-text">A preparar o menu digital da mesa...</p>
   </div>
 
-  <!-- Scenario C: Table Unavailable -->
+  <!-- Mesa indisponível ou desativada -->
   <UnavailableNoticeScreen
-    v-else-if="isTableUnavailable && restaurant"
+    v-else-if="accessState === 'unavailable' && restaurant"
     :restaurant="restaurant"
     :table="table"
     @call-service="isServiceModalOpen = true"
     @go-home="router.push('/')"
   />
 
-  <!-- Scenario B: Table Occupied by Other Visitor -->
-  <OccupiedNoticeScreen
-    v-else-if="isOccupiedByOther && restaurant && table"
+  <!-- Ecrã inicial: mesa livre ou ocupada (nunca bloqueia o menu) -->
+  <TableAccessScreen
+    v-else-if="showAccessScreen && restaurant && table"
     :restaurant="restaurant"
     :table="table"
-    :session="tableSessionStore.currentSession"
-    @browse-menu="handleBrowseOnly"
+    :state="accessState === 'occupied' ? 'occupied' : 'free'"
+    :session="activeSession"
+    @view-menu="handleViewMenu"
+    @start-session="openSessionModal"
+    @join-session="openSessionModal"
     @call-service="isServiceModalOpen = true"
   />
 
-  <!-- Scenario A & Active Menu Experience -->
+  <!-- Menu -->
   <div v-else-if="restaurant" class="menu-page">
-    <!-- Active Session or Browsing Status Banner -->
+    <!-- Este dispositivo participa na sessão da mesa -->
     <div v-if="isSessionActive" class="session-status-banner">
       <div class="banner-inner">
         <div class="session-meta">
           <div class="live-indicator">
             <span class="pulsing-dot"></span>
-            <strong>Mesa {{ table?.number }} • Olá, {{ activeSession?.customerName }}!</strong>
+            <strong>Mesa {{ table?.number }} • Olá, {{ tableSessionStore.participantName }}!</strong>
           </div>
           <span class="session-sub-text">
-            {{ sessionOrders.length === 0 ? 'Sessão iniciada • Faça o seu primeiro pedido' : `${sessionOrders.length} ${sessionOrders.length === 1 ? 'pedido enviado' : 'pedidos enviados'} nesta sessão` }}
+            {{ sessionOrders.length === 0 ? 'Sessão ativa • Faça o primeiro pedido' : `${sessionOrders.length} ${sessionOrders.length === 1 ? 'pedido' : 'pedidos'} na sessão da mesa` }}
+            <template v-if="(activeSession?.participants.length ?? 0) > 1"> • {{ activeSession?.participants.length }} pessoas ligadas</template>
           </span>
         </div>
 
@@ -426,7 +410,7 @@ const handleOrderMore = () => {
           </button>
 
           <button
-            v-if="sessionOrders.length > 0 && activeSession?.status !== 'awaiting_bill'"
+            v-if="sessionOrders.length > 0 && !activeSession?.billRequestedAt"
             type="button"
             class="banner-btn warning"
             @click="isBillModalOpen = true"
@@ -447,16 +431,18 @@ const handleOrderMore = () => {
       </div>
     </div>
 
-    <!-- Browse Only Banner (When browsing without occupation) -->
-    <div v-else-if="isBrowseOnly" class="browse-only-banner">
+    <!-- A ver o menu sem participar na sessão -->
+    <div v-else class="browse-only-banner">
       <div class="browse-inner">
         <div class="browse-text">
           <Eye :size="18" class="browse-icon" />
-          <span>Está em <strong>Modo de Consulta</strong> da Mesa {{ table?.number }}. Para enviar pedidos à cozinha, ocupe a mesa.</span>
+          <span v-if="accessState === 'occupied'">A <strong>Mesa {{ table?.number }}</strong> está ocupada. Junte-se à sessão para pedir a partir do seu telemóvel.</span>
+          <span v-else>A <strong>Mesa {{ table?.number }}</strong> está disponível. Inicie a sessão para enviar pedidos.</span>
         </div>
-        <button type="button" class="occupy-now-btn" @click="isWelcomeModalOpen = true">
-          <UtensilsCrossed :size="14" />
-          <span>Ocupar Mesa Agora</span>
+        <button type="button" class="occupy-now-btn" @click="openSessionModal">
+          <UserPlus v-if="accessState === 'occupied'" :size="14" />
+          <UtensilsCrossed v-else :size="14" />
+          <span>{{ accessState === 'occupied' ? 'Juntar-me à mesa' : 'Iniciar sessão' }}</span>
         </button>
       </div>
     </div>
@@ -616,14 +602,14 @@ const handleOrderMore = () => {
               <h3 class="widget-title">Mesa {{ table?.number }}</h3>
             </div>
             <AppBadge :variant="isSessionActive ? 'success' : 'neutral'">
-              {{ isSessionActive ? 'Sessão Ativa' : 'Modo Consulta' }}
+              {{ isSessionActive ? 'Na sessão' : accessState === 'occupied' ? 'Mesa ocupada' : 'Mesa livre' }}
             </AppBadge>
           </div>
 
           <div v-if="isSessionActive" class="widget-body">
             <div class="session-user-line">
               <span class="user-label">Cliente:</span>
-              <strong class="user-val">{{ activeSession?.customerName }}</strong>
+              <strong class="user-val">{{ tableSessionStore.participantName }}</strong>
             </div>
             <div v-if="activeSession?.partySize" class="session-user-line">
               <span class="user-label">Pessoas:</span>
@@ -651,7 +637,7 @@ const handleOrderMore = () => {
             </div>
 
             <button
-              v-if="sessionOrders.length > 0 && activeSession?.status !== 'awaiting_bill'"
+              v-if="sessionOrders.length > 0 && !activeSession?.billRequestedAt"
               type="button"
               class="request-bill-sidebar-btn"
               @click="isBillModalOpen = true"
@@ -663,10 +649,10 @@ const handleOrderMore = () => {
 
           <div v-else class="widget-body not-occupied">
             <p class="widget-hint">
-              Está a navegar no menu. Para enviar pedidos à cozinha, ocupe a mesa com o seu nome.
+              {{ accessState === 'occupied' ? 'Esta mesa já tem uma sessão ativa. Junte-se para enviar pedidos.' : 'Para enviar pedidos à cozinha, inicie a sessão da mesa com o seu nome.' }}
             </p>
-            <AppButton variant="primary" size="md" class="full-width" @click="isWelcomeModalOpen = true">
-              Ocupar Mesa Agora
+            <AppButton variant="primary" size="md" class="full-width" @click="openSessionModal">
+              {{ accessState === 'occupied' ? 'Juntar-me à mesa' : 'Iniciar sessão' }}
             </AppButton>
           </div>
         </div>
@@ -730,7 +716,7 @@ const handleOrderMore = () => {
               class="full-width"
               @click="handleCheckoutClick"
             >
-              {{ isSessionActive ? 'Rever & Confirmar Pedido' : 'Ocupar Mesa para Concluir' }}
+              {{ checkoutCtaLabel }}
             </AppButton>
           </div>
         </div>
@@ -1016,98 +1002,6 @@ const handleOrderMore = () => {
       </template>
     </AppModal>
 
-    <!-- Service Request Modal (Chamar Garçom) -->
-    <AppModal
-      :is-open="isServiceModalOpen"
-      title="Atendimento na Mesa"
-      :subtitle="`Mesa ${table?.number || tableCode}`"
-      max-width="480px"
-      @close="isServiceModalOpen = false"
-    >
-      <div class="service-modal-content">
-        <p class="service-subhead">
-          Como podemos ajudá-lo de imediato? Selecione o motivo do pedido de assistência:
-        </p>
-
-        <div class="service-options-grid">
-          <button
-            type="button"
-            class="service-option-btn"
-            :class="{ 'is-selected': serviceType === 'waiter_call' }"
-            @click="serviceType = 'waiter_call'"
-          >
-            <BellRing :size="20" />
-            <span>Chamar Garçom</span>
-          </button>
-
-          <button
-            type="button"
-            class="service-option-btn"
-            :class="{ 'is-selected': serviceType === 'water' }"
-            @click="serviceType = 'water'"
-          >
-            <span>Pedir Água</span>
-          </button>
-
-          <button
-            type="button"
-            class="service-option-btn"
-            :class="{ 'is-selected': serviceType === 'cutlery' }"
-            @click="serviceType = 'cutlery'"
-          >
-            <span>Pedir Talheres</span>
-          </button>
-
-          <button
-            type="button"
-            class="service-option-btn"
-            :class="{ 'is-selected': serviceType === 'bill' }"
-            @click="serviceType = 'bill'"
-          >
-            <span>Pedir a Conta</span>
-          </button>
-
-          <button
-            type="button"
-            class="service-option-btn"
-            :class="{ 'is-selected': serviceType === 'general_help' }"
-            @click="serviceType = 'general_help'"
-          >
-            <span>Assistência Geral</span>
-          </button>
-        </div>
-
-        <textarea
-          v-model="serviceNotes"
-          placeholder="Alguma nota adicional? (opcional)"
-          rows="2"
-          class="notes-textarea"
-        ></textarea>
-      </div>
-
-      <template #footer>
-        <AppButton variant="secondary" @click="isServiceModalOpen = false">Cancelar</AppButton>
-        <AppButton
-          variant="primary"
-          :loading="isSubmittingService"
-          @click="handleSendServiceRequest"
-        >
-          Enviar Solicitação à Equipa
-        </AppButton>
-      </template>
-    </AppModal>
-
-    <!-- Welcome Modal for Free Table (Scenario A) -->
-    <WelcomeTableModal
-      v-if="table"
-      :is-open="isWelcomeModalOpen"
-      :restaurant="restaurant"
-      :table="table"
-      :is-submitting="isSubmittingOccupation"
-      @browse-menu="handleBrowseOnly"
-      @occupy-table="handleOccupyTable"
-    />
-
     <!-- Session Orders History Modal -->
     <SessionHistoryModal
       :is-open="isSessionHistoryOpen"
@@ -1127,6 +1021,99 @@ const handleOrderMore = () => {
       @confirm-bill="handleConfirmBill"
     />
   </div>
+
+  <!-- Service Request Modal (Chamar Garçom) -->
+  <AppModal
+    :is-open="isServiceModalOpen"
+    title="Atendimento na Mesa"
+    :subtitle="`Mesa ${table?.number || tableCode}`"
+    max-width="480px"
+    @close="isServiceModalOpen = false"
+  >
+    <div class="service-modal-content">
+      <p class="service-subhead">
+        Como podemos ajudá-lo de imediato? Selecione o motivo do pedido de assistência:
+      </p>
+
+      <div class="service-options-grid">
+        <button
+          type="button"
+          class="service-option-btn"
+          :class="{ 'is-selected': serviceType === 'waiter_call' }"
+          @click="serviceType = 'waiter_call'"
+        >
+          <BellRing :size="20" />
+          <span>Chamar Garçom</span>
+        </button>
+
+        <button
+          type="button"
+          class="service-option-btn"
+          :class="{ 'is-selected': serviceType === 'water' }"
+          @click="serviceType = 'water'"
+        >
+          <span>Pedir Água</span>
+        </button>
+
+        <button
+          type="button"
+          class="service-option-btn"
+          :class="{ 'is-selected': serviceType === 'cutlery' }"
+          @click="serviceType = 'cutlery'"
+        >
+          <span>Pedir Talheres</span>
+        </button>
+
+        <button
+          type="button"
+          class="service-option-btn"
+          :class="{ 'is-selected': serviceType === 'bill' }"
+          @click="serviceType = 'bill'"
+        >
+          <span>Pedir a Conta</span>
+        </button>
+
+        <button
+          type="button"
+          class="service-option-btn"
+          :class="{ 'is-selected': serviceType === 'general_help' }"
+          @click="serviceType = 'general_help'"
+        >
+          <span>Assistência Geral</span>
+        </button>
+      </div>
+
+      <textarea
+        v-model="serviceNotes"
+        placeholder="Alguma nota adicional? (opcional)"
+        rows="2"
+        class="notes-textarea"
+      ></textarea>
+    </div>
+
+    <template #footer>
+      <AppButton variant="secondary" @click="isServiceModalOpen = false">Cancelar</AppButton>
+      <AppButton
+        variant="primary"
+        :loading="isSubmittingService"
+        @click="handleSendServiceRequest"
+      >
+        Enviar Solicitação à Equipa
+      </AppButton>
+    </template>
+  </AppModal>
+
+  <!-- Nome do cliente: iniciar sessão (mesa livre) ou juntar-se (mesa ocupada) -->
+  <SessionNameModal
+    v-if="table"
+    :is-open="isNameModalOpen"
+    :mode="nameModalMode"
+    :table-number="table.number"
+    :max-party-size="table.capacity"
+    :is-submitting="tableSessionStore.isSubmitting"
+    @close="isNameModalOpen = false"
+    @submit="handleSessionNameSubmit"
+  />
 </template>
 
 <style scoped>

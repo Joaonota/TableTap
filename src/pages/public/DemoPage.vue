@@ -37,7 +37,7 @@ import {
             Abra a rota do menu simulando um cliente que encostou o telemóvel na tag NFC ou leu o QR Code da <strong>Mesa 01 do restaurante Sabores Maputo</strong>.
           </p>
           <div class="step-actions">
-            <router-link to="/menu/sabores-maputo/01" target="_blank">
+            <router-link to="/m/sabores-maputo/mesa-01" target="_blank">
               <AppButton variant="primary">
                 <span>Abrir Menu da Mesa 01</span>
                 <ExternalLink :size="15" />
@@ -103,15 +103,15 @@ import {
         <div class="step-content-card">
           <div class="step-header">
             <QrCode :size="22" class="step-icon" />
-            <h3>Acesso Digital (QR Code & NFC)</h3>
+            <h3>Mesas, Etiquetas NFC & QR Code</h3>
           </div>
           <p>
-            Gere o código QR localmente na hora para qualquer mesa, copie a URL direta e teste a simulação da gravação de tags NFC com registo no histórico de auditoria.
+            Cada mesa tem uma URL permanente. A equipa TapMenu grava essa URL nas etiquetas NFC com uma aplicação externa; no painel acompanha o estado de cada etiqueta, copia a URL e gera o QR Code.
           </p>
           <div class="step-actions">
-            <router-link to="/app/acesso-digital">
+            <router-link to="/app/tags-nfc">
               <AppButton variant="primary">
-                <span>Ver Módulo Acesso Digital</span>
+                <span>Ver Etiquetas NFC</span>
                 <ArrowRight :size="15" />
               </AppButton>
             </router-link>

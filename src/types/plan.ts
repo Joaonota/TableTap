@@ -40,7 +40,7 @@ export interface FeatureCatalogEntry {
 export const FEATURE_CATALOG: FeatureCatalogEntry[] = [
   { key: 'MENU_DIGITAL', name: 'Menu Digital', description: 'Criação e edição de produtos, categorias e descrições', module: 'Menu & Mesas' },
   { key: 'QR_CODE', name: 'QR Code', description: 'Gestão e impressão de códigos QR por mesa', module: 'Menu & Mesas' },
-  { key: 'NFC', name: 'Tap Digital (NFC)', description: 'Leitura, gravação e verificação de tags NFC por mesa', module: 'Menu & Mesas' },
+  { key: 'NFC', name: 'Tap Digital (NFC)', description: 'URL permanente por mesa, gestão de etiquetas NFC e QR Code', module: 'Menu & Mesas' },
   { key: 'ORDERS', name: 'Pedidos no Menu', description: 'Clientes efetuam pedidos no menu digital', module: 'Operação' },
   { key: 'KDS', name: 'Ecrã de Cozinha (KDS)', description: 'Kitchen Display System com estações cozinha e bar', module: 'Operação' },
   { key: 'WAITER_CALL', name: 'Chamada de Atendimento', description: 'Solicitações digitais: empregado, conta, talheres', module: 'Operação' },

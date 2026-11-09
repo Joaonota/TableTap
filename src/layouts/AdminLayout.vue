@@ -12,6 +12,7 @@ import DemoBanner from '@/components/ui/DemoBanner.vue'
 import AppToast from '@/components/ui/AppToast.vue'
 import NotificationDropdown from '@/components/ui/NotificationDropdown.vue'
 import AppLogo from '@/components/ui/AppLogo.vue'
+import { buildTablePath } from '@/domain/publicUrl'
 import {
   LayoutDashboard,
   UtensilsCrossed,
@@ -20,7 +21,7 @@ import {
   Grid,
   ShoppingBag,
   FolderTree,
-  QrCode,
+  Nfc,
   CreditCard,
   Users,
   BarChart3,
@@ -47,6 +48,13 @@ const tableStore = useTableStore()
 const notificationStore = useNotificationStore()
 
 const isMobileSidebarOpen = ref(false)
+
+/** Atalho para o menu público (URL permanente da primeira mesa ativa). */
+const firstTablePath = computed(() => {
+  const restaurant = tenantStore.currentRestaurant
+  const table = tableStore.tables.find(t => t.isActive)
+  return restaurant && table ? buildTablePath(restaurant.slug, table.slug) : ''
+})
 
 const activePendingOrdersCount = computed(() => {
   return orderStore.orders.filter(o => o.status === 'received').length
@@ -164,11 +172,11 @@ onMounted(async () => {
       <div class="topbar-right">
         <!-- Live Public Menu Shortcut -->
         <a
-          v-if="tenantStore.currentRestaurant"
-          :href="`/menu/${tenantStore.currentRestaurant.slug}/01`"
+          v-if="firstTablePath"
+          :href="firstTablePath"
           target="_blank"
           class="public-menu-link"
-          title="Abrir Menu Público da Mesa 01"
+          title="Abrir o menu público da primeira mesa"
         >
           <span>Ver Menu Público</span>
           <ExternalLink :size="14" />
@@ -297,13 +305,13 @@ onMounted(async () => {
             </router-link>
 
             <router-link
-              to="/app/acesso-digital"
+              to="/app/tags-nfc"
               class="nav-link"
-              :class="{ 'is-active': route.path === '/app/acesso-digital' }"
+              :class="{ 'is-active': route.path === '/app/tags-nfc' }"
               @click="isMobileSidebarOpen = false"
             >
-              <QrCode :size="18" />
-              <span>Acesso NFC & QR</span>
+              <Nfc :size="18" />
+              <span>Etiquetas NFC</span>
             </router-link>
 
             <router-link

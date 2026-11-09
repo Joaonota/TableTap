@@ -14,7 +14,9 @@ import type {
   Plan,
   Subscription,
   SubscriptionHistory,
-  DigitalAccess,
+  NfcTag,
+  NfcTagEvent,
+  SessionParticipant,
   OrderStatus,
   PaymentStatus,
   ServiceRequestStatus,
@@ -46,13 +48,27 @@ export interface IUserRepository {
   getByTenant(tenantId: string): Promise<User[]>
 }
 
+/** Dados editáveis de uma mesa. O slug (URL) é gerado na criação e é imutável. */
+export interface TableInput {
+  number: string
+  name?: string
+  area: Table['area']
+  capacity: number
+}
+
 export interface ITableRepository {
   getByRestaurant(restaurantId: string): Promise<Table[]>
   getById(id: string): Promise<Table | null>
+  /** Resolve a mesa pela URL pública (slug permanente). */
+  getBySlug(restaurantId: string, slug: string): Promise<Table | null>
   getByNumber(restaurantId: string, number: string): Promise<Table | null>
-  create(table: Omit<Table, 'id'>): Promise<Table>
-  update(id: string, updates: Partial<Table>): Promise<Table>
-  delete(id: string): Promise<boolean>
+  create(restaurantId: string, input: TableInput): Promise<Table>
+  update(id: string, input: Partial<TableInput>): Promise<Table>
+  /** Livre ⇄ Indisponível. 'occupied' só acontece através de uma sessão. */
+  setStatus(id: string, status: 'free' | 'unavailable'): Promise<Table>
+  setActive(id: string, isActive: boolean): Promise<Table>
+  /** Remove a mesa; recusa se tiver sessão ativa e desassocia etiquetas. */
+  delete(id: string, actor: string): Promise<boolean>
 }
 
 export interface ICategoryRepository {
@@ -76,14 +92,6 @@ export interface IOrderRepository {
   create(order: Omit<Order, 'id' | 'orderCode' | 'createdAt' | 'updatedAt' | 'history'>): Promise<Order>
   updateStatus(id: string, status: OrderStatus, updatedBy: string, note?: string): Promise<Order>
   updatePaymentStatus(id: string, paymentStatus: PaymentStatus): Promise<Order>
-}
-
-export interface IDigitalAccessRepository {
-  getByRestaurant(restaurantId: string): Promise<DigitalAccess[]>
-  getById(id: string): Promise<DigitalAccess | null>
-  create(access: Omit<DigitalAccess, 'id' | 'createdAt' | 'updatedAt'>): Promise<DigitalAccess>
-  update(id: string, updates: Partial<DigitalAccess>): Promise<DigitalAccess>
-  recordScan(id: string): Promise<void>
 }
 
 export interface IPaymentRepository {
@@ -142,14 +150,58 @@ export interface IPlatformConfigRepository {
   update(updates: Partial<PlatformConfig>): Promise<PlatformConfig>
 }
 
+export interface StartSessionInput {
+  tableId: string
+  primaryCustomerName?: string
+  partySize?: number
+  notes?: string
+}
+
 export interface ITableSessionRepository {
   getByRestaurant(restaurantId: string): Promise<TableSession[]>
+  /** Histórico completo da mesa (mais recentes primeiro). */
+  getByTable(tableId: string): Promise<TableSession[]>
   getActiveByTable(tableId: string): Promise<TableSession | null>
   getById(id: string): Promise<TableSession | null>
-  create(session: Omit<TableSession, 'id' | 'startedAt' | 'orderIds'>): Promise<TableSession>
-  update(id: string, updates: Partial<TableSession>): Promise<TableSession>
+  /** Inicia sessão e coloca a mesa como Ocupada. Recusa se a mesa não estiver livre. */
+  start(input: StartSessionInput): Promise<{ session: TableSession; participant: SessionParticipant | null }>
+  /** Outro cliente/dispositivo junta-se à sessão ativa da mesa. */
+  join(sessionId: string, name: string): Promise<{ session: TableSession; participant: SessionParticipant }>
   addOrder(sessionId: string, orderId: string): Promise<TableSession>
-  closeSession(sessionId: string): Promise<TableSession>
+  requestBill(sessionId: string): Promise<TableSession>
+  /** Encerra a sessão e liberta a mesa (Ocupada → Livre). */
+  close(sessionId: string, actor: string): Promise<TableSession>
+  /** Cancela a sessão e liberta a mesa. */
+  cancel(sessionId: string, actor: string, reason?: string): Promise<TableSession>
+}
+
+export interface RegisterNfcTagsInput {
+  restaurantId: string
+  /** Códigos físicos já impressos; se vazio, gera `quantity` códigos sequenciais. */
+  codes?: string[]
+  quantity?: number
+  notes?: string
+}
+
+/**
+ * Registo administrativo de etiquetas NFC. Nenhuma operação grava hardware:
+ * `markConfigured` regista que a equipa TapMenu gravou a URL com uma
+ * aplicação externa.
+ */
+export interface INfcTagRepository {
+  getAll(): Promise<NfcTag[]>
+  getByRestaurant(restaurantId: string): Promise<NfcTag[]>
+  getById(id: string): Promise<NfcTag | null>
+  getByTable(tableId: string): Promise<NfcTag | null>
+  getHistory(tagId: string): Promise<NfcTagEvent[]>
+  register(input: RegisterNfcTagsInput, actor: string): Promise<NfcTag[]>
+  /** Associa/altera/reatribui a mesa. Estado resultante segue as regras de domínio. */
+  assign(tagId: string, tableId: string, actor: string): Promise<NfcTag>
+  unassign(tagId: string, actor: string): Promise<NfcTag>
+  markConfigured(tagId: string, actor: string, notes?: string): Promise<NfcTag>
+  activate(tagId: string, actor: string): Promise<NfcTag>
+  disable(tagId: string, actor: string, reason?: string): Promise<NfcTag>
+  reactivate(tagId: string, actor: string): Promise<NfcTag>
 }
 
 export interface INotificationRepository {

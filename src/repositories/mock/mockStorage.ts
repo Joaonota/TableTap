@@ -14,38 +14,56 @@ import {
   initialStaff,
   initialPlans,
   initialSubscriptions,
-  initialDigitalAccessList,
+  initialNfcTags,
+  initialNfcTagEvents,
   initialMenuCustomizations,
   initialPlatformAuditLogs,
   initialPlatformConfig
 } from '@/mocks/initialData'
 import { generateHistoricalReviews } from '@/mocks/historicalData'
-import type { MenuCustomization, PlatformAuditLog, PlatformConfig } from '@/types'
+import type { PlatformAuditLog } from '@/types'
+import { sumOrderTotals } from '@/domain/tableRules'
 
-const STORAGE_KEY = 'tapmenu_mock_database_v3'
+const STORAGE_KEY = 'tapmenu_mock_database_v4'
+
+/** Chaves de versões anteriores (inclui o antigo registo local de gravação Web NFC). */
+const LEGACY_KEYS = ['tapmenu_mock_database_v3', 'tapmenu_nfc_registry_v2', 'tapmenu_nfc_tags_store_v1']
+
+const clone = <T>(value: T): T => JSON.parse(JSON.stringify(value))
+
+/** Totais das sessões derivados dos pedidos (fonte única: os pedidos). */
+function recomputeSessionTotals(db: MockDatabase): void {
+  for (const session of db.tableSessions) {
+    const orders = db.orders.filter(o => session.orderIds.includes(o.id) || o.tableSessionId === session.id)
+    session.total = sumOrderTotals(orders)
+  }
+}
 
 function getInitialDatabase(): MockDatabase {
-  return {
-    companies: JSON.parse(JSON.stringify(initialCompanies)),
-    restaurants: JSON.parse(JSON.stringify(initialRestaurants)),
-    users: JSON.parse(JSON.stringify(initialUsers)),
-    tables: JSON.parse(JSON.stringify(initialTables)),
-    tableSessions: JSON.parse(JSON.stringify(initialTableSessions)),
-    notifications: JSON.parse(JSON.stringify(initialNotifications)),
-    categories: JSON.parse(JSON.stringify(initialCategories)),
-    products: JSON.parse(JSON.stringify(initialProducts)),
-    orders: JSON.parse(JSON.stringify(initialOrders)),
-    payments: JSON.parse(JSON.stringify(initialPayments)),
-    serviceRequests: JSON.parse(JSON.stringify(initialServiceRequests)),
-    staff: JSON.parse(JSON.stringify(initialStaff)),
-    plans: JSON.parse(JSON.stringify(initialPlans)),
-    subscriptions: JSON.parse(JSON.stringify(initialSubscriptions)),
-    digitalAccessList: JSON.parse(JSON.stringify(initialDigitalAccessList)),
+  const db: MockDatabase = {
+    companies: clone(initialCompanies),
+    restaurants: clone(initialRestaurants),
+    users: clone(initialUsers),
+    tables: clone(initialTables),
+    tableSessions: clone(initialTableSessions),
+    notifications: clone(initialNotifications),
+    categories: clone(initialCategories),
+    products: clone(initialProducts),
+    orders: clone(initialOrders),
+    payments: clone(initialPayments),
+    serviceRequests: clone(initialServiceRequests),
+    staff: clone(initialStaff),
+    plans: clone(initialPlans),
+    subscriptions: clone(initialSubscriptions),
+    nfcTags: clone(initialNfcTags),
+    nfcTagEvents: clone(initialNfcTagEvents),
     reviews: generateHistoricalReviews(),
-    menuCustomizations: JSON.parse(JSON.stringify(initialMenuCustomizations)),
-    auditLogs: JSON.parse(JSON.stringify(initialPlatformAuditLogs)),
-    platformConfig: JSON.parse(JSON.stringify(initialPlatformConfig))
+    menuCustomizations: clone(initialMenuCustomizations),
+    auditLogs: clone(initialPlatformAuditLogs),
+    platformConfig: clone(initialPlatformConfig)
   }
+  recomputeSessionTotals(db)
+  return db
 }
 
 export class MockStorageService {
@@ -65,31 +83,17 @@ export class MockStorageService {
 
   private loadFromStorage(): MockDatabase {
     try {
+      LEGACY_KEYS.forEach(key => localStorage.removeItem(key))
       const stored = localStorage.getItem(STORAGE_KEY)
       if (stored) {
-        const parsed = JSON.parse(stored)
-        // Basic schema check
-        if (parsed.companies && parsed.restaurants && parsed.products && parsed.orders && parsed.plans) {
-          if (!parsed.tableSessions) {
-            parsed.tableSessions = JSON.parse(JSON.stringify(initialTableSessions))
-          }
-          if (!parsed.notifications) {
-            parsed.notifications = JSON.parse(JSON.stringify(initialNotifications))
-          }
-          if (!parsed.menuCustomizations) {
-            parsed.menuCustomizations = JSON.parse(JSON.stringify(initialMenuCustomizations))
-          }
-          if (!parsed.auditLogs) {
-            parsed.auditLogs = JSON.parse(JSON.stringify(initialPlatformAuditLogs))
-          }
-          if (!parsed.platformConfig) {
-            parsed.platformConfig = JSON.parse(JSON.stringify(initialPlatformConfig))
-          }
+        const parsed = JSON.parse(stored) as Partial<MockDatabase>
+        // Verificação mínima do esquema v4
+        if (parsed.companies && parsed.restaurants && parsed.tables && parsed.tableSessions && parsed.nfcTags && parsed.nfcTagEvents && parsed.orders && parsed.plans) {
           return parsed as MockDatabase
         }
       }
     } catch (e) {
-      console.warn('TapMenu: Erro ao ler mock database v3 do localStorage. A reiniciar com dados padrão.', e)
+      console.warn('TapMenu: Erro ao ler a base mock do localStorage. A reiniciar com dados padrão.', e)
     }
 
     const initial = getInitialDatabase()

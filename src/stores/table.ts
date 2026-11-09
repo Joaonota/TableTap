@@ -1,136 +1,218 @@
 import { defineStore } from 'pinia'
-import { ref } from 'vue'
-import type { Table, TableStatus, DigitalAccess } from '@/types'
-import { tableService, digitalAccessService } from '@/services'
+import { ref, computed } from 'vue'
+import type { Table, TableSession } from '@/types'
+import { tableService, tableSessionService, type TableInput } from '@/services'
+import { countTables } from '@/domain/tableRules'
+import { buildTableUrl } from '@/domain/publicUrl'
+import { errorMessage } from '@/domain/errors'
 import { useTenantStore } from './tenant'
+import { useAuthStore } from './auth'
 import { useToastStore } from './toast'
-import QRCode from 'qrcode'
+import { useNfcTagStore } from './nfcTag'
+import { useNotificationStore } from './notification'
 
+/**
+ * Mesas do restaurante atual + sessões ativas (painel do restaurante).
+ * O estado "Ocupada" é consequência da sessão: startSession/closeSession/
+ * cancelSession são as únicas formas de entrar/sair desse estado.
+ */
 export const useTableStore = defineStore('table', () => {
   const tenantStore = useTenantStore()
+  const authStore = useAuthStore()
   const toastStore = useToastStore()
+  const nfcTagStore = useNfcTagStore()
+  const notificationStore = useNotificationStore()
 
   const tables = ref<Table[]>([])
-  const accessList = ref<DigitalAccess[]>([])
+  const activeSessions = ref<TableSession[]>([])
   const isLoading = ref(false)
+  const hasLoaded = ref(false)
+
+  const actor = () => authStore.currentUser?.name || 'Equipa do restaurante'
+
+  const counts = computed(() => countTables(tables.value))
+
+  const activeSessionByTableId = computed(() => new Map(activeSessions.value.map(s => [s.tableId, s])))
+
+  const tableUrl = (table: Table): string => {
+    const restaurant = tenantStore.currentRestaurant
+    return restaurant ? buildTableUrl(restaurant, table) : ''
+  }
 
   const loadTables = async () => {
-    if (!tenantStore.currentRestaurant) {
+    const restaurant = tenantStore.currentRestaurant
+    if (!restaurant) {
       tables.value = []
-      accessList.value = []
+      activeSessions.value = []
       return
     }
     isLoading.value = true
     try {
-      const restId = tenantStore.currentRestaurant.id
-      const [tbls, accesses] = await Promise.all([
-        tableService.getTables(restId),
-        digitalAccessService.getAccessList(restId)
+      const [tbls, sessions] = await Promise.all([
+        tableService.getTables(restaurant.id),
+        tableSessionService.getSessions(restaurant.id),
+        nfcTagStore.load([restaurant.id])
       ])
       tables.value = tbls
-      accessList.value = accesses
+      activeSessions.value = sessions.filter(s => s.status === 'active')
+      hasLoaded.value = true
+    } catch (e) {
+      toastStore.error('Erro ao carregar mesas', errorMessage(e))
     } finally {
       isLoading.value = false
     }
   }
 
-  const generateQrCode = async (text: string): Promise<string> => {
+  const replaceTable = (updated: Table) => {
+    const index = tables.value.findIndex(t => t.id === updated.id)
+    if (index === -1) tables.value.push(updated)
+    else tables.value[index] = updated
+  }
+
+  const refreshTable = async (tableId: string) => {
+    const [table, session] = await Promise.all([
+      tableService.getTableById(tableId),
+      tableSessionService.getActiveSessionByTable(tableId)
+    ])
+    if (table) replaceTable(table)
+    activeSessions.value = activeSessions.value.filter(s => s.tableId !== tableId)
+    if (session) activeSessions.value.push(session)
+  }
+
+  const createTable = async (input: TableInput) => {
+    const restaurant = tenantStore.currentRestaurant
+    if (!restaurant) return null
     try {
-      return await QRCode.toDataURL(text, {
-        width: 320,
-        margin: 2,
-        color: {
-          dark: '#1e40af',
-          light: '#ffffff'
-        }
-      })
+      const created = await tableService.createTable(restaurant.id, input)
+      replaceTable(created)
+      nfcTagStore.tables.push(created)
+      toastStore.success('Mesa criada', `Mesa ${created.number} — URL ${tableUrl(created)}`)
+      return created
     } catch (e) {
-      console.error('Erro ao gerar QR Code localmente', e)
-      return ''
+      toastStore.error('Não foi possível criar a mesa', errorMessage(e))
+      return null
     }
   }
 
-  const updateTableStatus = async (tableId: string, status: TableStatus) => {
+  const updateTable = async (id: string, input: Partial<TableInput>) => {
     try {
-      const updated = await tableService.updateTable(tableId, { status })
-      const index = tables.value.findIndex(t => t.id === tableId)
-      if (index !== -1) {
-        tables.value[index] = updated
-      }
-      toastStore.success(`Mesa ${updated.number} atualizada`, `Estado: ${status}`)
+      const updated = await tableService.updateTable(id, input)
+      replaceTable(updated)
+      toastStore.success('Mesa atualizada', 'A URL da mesa não mudou.')
       return updated
     } catch (e) {
-      toastStore.error('Erro ao atualizar mesa', (e as Error).message)
+      toastStore.error('Não foi possível guardar', errorMessage(e))
+      return null
     }
   }
 
-  const saveTable = async (tableData: Partial<Table> & { number: string; capacity: number; area: any }) => {
-    if (!tenantStore.currentRestaurant) return
+  const setStatus = async (id: string, status: 'free' | 'unavailable') => {
     try {
-      const rest = tenantStore.currentRestaurant
-      const publicUrl = `/menu/${rest.slug}/${tableData.number}`
-
-      if (tableData.id) {
-        const updated = await tableService.updateTable(tableData.id, tableData)
-        const index = tables.value.findIndex(t => t.id === tableData.id)
-        if (index !== -1) tables.value[index] = updated
-        toastStore.success('Mesa atualizada com sucesso')
-        return updated
-      } else {
-        const created = await tableService.createTable({
-          tenantId: rest.tenantId,
-          restaurantId: rest.id,
-          number: tableData.number,
-          name: tableData.name || `Mesa ${tableData.number}`,
-          area: tableData.area || 'Sala Principal',
-          capacity: tableData.capacity || 4,
-          status: 'free',
-          publicUrl,
-          nfcTagId: `NFC-${rest.slug.substring(0, 3).toUpperCase()}-${tableData.number}`,
-          isActive: true
-        })
-        tables.value.push(created)
-
-        // Create initial digital access
-        const access = await digitalAccessService.createAccess({
-          tenantId: rest.tenantId,
-          restaurantId: rest.id,
-          tableId: created.id,
-          tableNumber: created.number,
-          url: publicUrl,
-          nfcTagUid: created.nfcTagId,
-          nfcStatus: 'simulated',
-          scanCount: 0
-        })
-        accessList.value.push(access)
-
-        toastStore.success('Nova mesa criada!')
-        return created
-      }
+      const updated = await tableService.setTableStatus(id, status)
+      replaceTable(updated)
+      toastStore.success(`Mesa ${updated.number}`, status === 'free' ? 'Marcada como livre.' : 'Marcada como indisponível.')
+      return updated
     } catch (e) {
-      toastStore.error('Erro ao salvar mesa', (e as Error).message)
-      throw e
+      toastStore.error('Não foi possível alterar o estado', errorMessage(e))
+      return null
+    }
+  }
+
+  const setActive = async (id: string, isActive: boolean) => {
+    try {
+      const updated = await tableService.setTableActive(id, isActive)
+      replaceTable(updated)
+      toastStore.success(`Mesa ${updated.number}`, isActive ? 'Mesa ativada.' : 'Mesa desativada. A URL pública mostra a mesa como indisponível.')
+      return updated
+    } catch (e) {
+      toastStore.error('Não foi possível alterar a mesa', errorMessage(e))
+      return null
     }
   }
 
   const deleteTable = async (id: string) => {
+    const table = tables.value.find(t => t.id === id)
     try {
-      await tableService.deleteTable(id)
+      await tableService.deleteTable(id, actor())
       tables.value = tables.value.filter(t => t.id !== id)
-      toastStore.success('Mesa removida')
+      await nfcTagStore.reload()
+      toastStore.success('Mesa removida', table ? `Mesa ${table.number} removida.` : undefined)
+      return true
     } catch (e) {
-      toastStore.error('Erro ao remover mesa', (e as Error).message)
+      toastStore.error('Não foi possível remover', errorMessage(e))
+      return false
+    }
+  }
+
+  /** Abertura de sessão pela equipa (ex.: clientes sentados pelo empregado). */
+  const startSession = async (tableId: string, input: { primaryCustomerName?: string; partySize?: number; notes?: string }) => {
+    const restaurant = tenantStore.currentRestaurant
+    try {
+      const { session } = await tableSessionService.startSession({ tableId, ...input })
+      await refreshTable(tableId)
+      const table = tables.value.find(t => t.id === tableId)
+      if (restaurant && table) {
+        await notificationStore.createNotification({
+          tenantId: restaurant.tenantId,
+          restaurantId: restaurant.id,
+          type: 'table_occupied',
+          title: 'Sessão iniciada',
+          message: `Mesa ${table.number} ocupada${session.primaryCustomerName ? ` por ${session.primaryCustomerName}` : ''} (aberta por ${actor()}).`,
+          tableId,
+          tableNumber: table.number,
+          tableSessionId: session.id
+        })
+      }
+      toastStore.success('Sessão iniciada', `Mesa ${table?.number ?? ''} está agora ocupada.`)
+      return session
+    } catch (e) {
+      toastStore.error('Não foi possível iniciar a sessão', errorMessage(e))
+      return null
+    }
+  }
+
+  const closeSession = async (sessionId: string) => {
+    try {
+      const session = await tableSessionService.closeSession(sessionId, actor())
+      await refreshTable(session.tableId)
+      const table = tables.value.find(t => t.id === session.tableId)
+      toastStore.success('Sessão encerrada', `Mesa ${table?.number ?? ''} está livre. Total: ${session.total.toLocaleString('pt-MZ')} MT.`)
+      return session
+    } catch (e) {
+      toastStore.error('Não foi possível encerrar', errorMessage(e))
+      return null
+    }
+  }
+
+  const cancelSession = async (sessionId: string, reason?: string) => {
+    try {
+      const session = await tableSessionService.cancelSession(sessionId, actor(), reason)
+      await refreshTable(session.tableId)
+      toastStore.success('Sessão cancelada', 'A mesa está livre.')
+      return session
+    } catch (e) {
+      toastStore.error('Não foi possível cancelar', errorMessage(e))
+      return null
     }
   }
 
   return {
     tables,
-    accessList,
+    activeSessions,
     isLoading,
+    hasLoaded,
+    counts,
+    activeSessionByTableId,
+    tableUrl,
     loadTables,
-    generateQrCode,
-    updateTableStatus,
-    saveTable,
-    deleteTable
+    refreshTable,
+    createTable,
+    updateTable,
+    setStatus,
+    setActive,
+    deleteTable,
+    startSession,
+    closeSession,
+    cancelSession
   }
 })

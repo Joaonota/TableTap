@@ -66,7 +66,7 @@ const toggleFaq = (index: number) => {
         </p>
 
         <div class="hero-cta-group">
-          <router-link to="/menu/sabores-maputo/01">
+          <router-link to="/m/sabores-maputo/mesa-01">
             <AppButton size="lg" variant="primary">
               <template #icon-left>
                 <Smartphone :size="18" />
@@ -109,7 +109,7 @@ const toggleFaq = (index: number) => {
             <div class="mockup-dots">
               <span></span><span></span><span></span>
             </div>
-            <div class="mockup-url">tapmenu.co.mz/menu/sabores-maputo/01</div>
+            <div class="mockup-url">tapmenu.co.mz/m/sabores-maputo/mesa-01</div>
           </div>
           <div class="mockup-image-wrap">
             <img

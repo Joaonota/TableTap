@@ -1,224 +1,206 @@
 import { defineStore } from 'pinia'
-import { ref } from 'vue'
-import type { TableSession, Table, Restaurant } from '@/types'
-import { tableSessionService, tableService } from '@/services'
+import { ref, computed } from 'vue'
+import type { Restaurant, SessionParticipant, Table, TableSession } from '@/types'
+import { publicTableService, tableSessionService } from '@/services'
+import { DomainError, errorMessage } from '@/domain/errors'
+import { effectiveTableStatus } from '@/domain/tableRules'
 import { useNotificationStore } from './notification'
 import { useToastStore } from './toast'
 
-export interface LocalSessionToken {
+/**
+ * Experiência do cliente ao abrir a URL da mesa (NFC ou QR Code).
+ *
+ * Fluxo: URL → restaurante + mesa → estado atual → experiência.
+ * Vários telemóveis participam da MESMA sessão ativa da mesa; cada dispositivo
+ * guarda localmente apenas a referência à sua participação.
+ */
+
+interface DeviceParticipation {
   sessionId: string
-  customerName: string
-  partySize?: number
-  isOwner: boolean
+  participantId: string
+  name: string
 }
+
+const storageKey = (tableId: string) => `tapmenu_device_participation_${tableId}`
+
+function readParticipation(tableId: string): DeviceParticipation | null {
+  try {
+    const raw = localStorage.getItem(storageKey(tableId))
+    return raw ? (JSON.parse(raw) as DeviceParticipation) : null
+  } catch {
+    return null
+  }
+}
+
+function writeParticipation(tableId: string, value: DeviceParticipation | null) {
+  try {
+    if (value) localStorage.setItem(storageKey(tableId), JSON.stringify(value))
+    else localStorage.removeItem(storageKey(tableId))
+  } catch {
+    // Sem armazenamento local: a participação dura apenas esta visita.
+  }
+}
+
+export type TableAccessState = 'not_found' | 'unavailable' | 'free' | 'occupied'
 
 export const useTableSessionStore = defineStore('tableSession', () => {
   const notificationStore = useNotificationStore()
   const toastStore = useToastStore()
 
+  const restaurant = ref<Restaurant | null>(null)
+  const table = ref<Table | null>(null)
   const currentSession = ref<TableSession | null>(null)
-  const isSessionOwner = ref(false)
-  const isOccupiedByOther = ref(false)
+  const participation = ref<DeviceParticipation | null>(null)
   const isLoading = ref(false)
+  const isSubmitting = ref(false)
 
-  const getStorageKey = (restaurantSlug: string, tableNumber: string) => {
-    return `tapmenu_session_${restaurantSlug}_${tableNumber}`
+  const accessState = computed<TableAccessState>(() => {
+    if (!restaurant.value || !table.value) return 'not_found'
+    if (!restaurant.value.isActive) return 'unavailable'
+    const status = effectiveTableStatus(table.value)
+    if (status === 'unavailable') return 'unavailable'
+    return currentSession.value ? 'occupied' : 'free'
+  })
+
+  /** Este dispositivo participa na sessão ativa da mesa. */
+  const isParticipant = computed(
+    () => !!currentSession.value && !!participation.value && participation.value.sessionId === currentSession.value.id
+  )
+
+  const participantName = computed(() => (isParticipant.value ? participation.value?.name ?? '' : ''))
+
+  const applyContext = (ctx: { restaurant: Restaurant; table: Table; activeSession: TableSession | null } | null) => {
+    restaurant.value = ctx?.restaurant ?? null
+    table.value = ctx?.table ?? null
+    currentSession.value = ctx?.activeSession ?? null
+    if (!ctx) {
+      participation.value = null
+      return
+    }
+    const stored = readParticipation(ctx.table.id)
+    const session = ctx.activeSession
+    const valid = !!stored && !!session && stored.sessionId === session.id && session.participants.some(p => p.id === stored.participantId)
+    participation.value = valid ? stored : null
+    // Participação de uma sessão já encerrada: descartar.
+    if (stored && !valid) writeParticipation(ctx.table.id, null)
   }
 
-  const getLocalToken = (restaurantSlug: string, tableNumber: string): LocalSessionToken | null => {
+  /** Consulta o estado atual da mesa a partir da URL pública. */
+  const loadTable = async (restaurantSlug: string, tableKey: string) => {
+    isLoading.value = true
     try {
-      const data = localStorage.getItem(getStorageKey(restaurantSlug, tableNumber))
-      return data ? JSON.parse(data) : null
-    } catch {
+      applyContext(await publicTableService.resolve(restaurantSlug, tableKey))
+    } finally {
+      isLoading.value = false
+    }
+  }
+
+  const refresh = async () => {
+    if (!restaurant.value || !table.value) return
+    applyContext(await publicTableService.resolve(restaurant.value.slug, table.value.slug))
+  }
+
+  const rememberParticipant = (session: TableSession, participant: SessionParticipant) => {
+    currentSession.value = session
+    participation.value = { sessionId: session.id, participantId: participant.id, name: participant.name }
+    writeParticipation(session.tableId, participation.value)
+  }
+
+  /** Mesa livre → inicia a sessão (mesa passa a Ocupada). */
+  const startSession = async (input: { name: string; partySize?: number; notes?: string }) => {
+    if (!restaurant.value || !table.value) return null
+    isSubmitting.value = true
+    try {
+      const { session, participant } = await tableSessionService.startSession({
+        tableId: table.value.id,
+        primaryCustomerName: input.name,
+        partySize: input.partySize,
+        notes: input.notes
+      })
+      if (!participant) throw new DomainError('participant_name_required', 'Indique o seu nome.')
+      rememberParticipant(session, participant)
+      table.value = { ...table.value, status: 'occupied', activeSessionId: session.id }
+
+      await notificationStore.createNotification({
+        tenantId: restaurant.value.tenantId,
+        restaurantId: restaurant.value.id,
+        type: 'table_occupied',
+        title: 'Nova mesa ocupada',
+        message: `Mesa ${table.value.number} ocupada por ${participant.name}${input.partySize ? ` (${input.partySize} pessoas)` : ''}.`,
+        tableId: table.value.id,
+        tableNumber: table.value.number,
+        tableSessionId: session.id
+      })
+      toastStore.success('Sessão iniciada', `Bem-vindo(a), ${participant.name}.`)
+      return session
+    } catch (e) {
+      // Outra pessoa iniciou a sessão no mesmo instante: juntar-se a ela.
+      if (e instanceof DomainError && e.code === 'table_already_occupied') {
+        await refresh()
+        if (currentSession.value) return joinSession(input.name)
+      }
+      toastStore.error('Não foi possível iniciar a sessão', errorMessage(e))
+      return null
+    } finally {
+      isSubmitting.value = false
+    }
+  }
+
+  /** Mesa ocupada → este dispositivo junta-se à sessão existente. */
+  const joinSession = async (name: string) => {
+    if (!currentSession.value) return null
+    isSubmitting.value = true
+    try {
+      const { session, participant } = await tableSessionService.joinSession(currentSession.value.id, name)
+      rememberParticipant(session, participant)
+      toastStore.success('Juntou-se à mesa', `Os seus pedidos ficam na sessão da Mesa ${table.value?.number}.`)
+      return session
+    } catch (e) {
+      toastStore.error('Não foi possível juntar-se à mesa', errorMessage(e))
+      await refresh()
+      return null
+    } finally {
+      isSubmitting.value = false
+    }
+  }
+
+  const requestBill = async (totalAmount: number) => {
+    if (!restaurant.value || !table.value || !currentSession.value) return null
+    try {
+      const updated = await tableSessionService.requestBill(currentSession.value.id)
+      currentSession.value = updated
+      await notificationStore.createNotification({
+        tenantId: restaurant.value.tenantId,
+        restaurantId: restaurant.value.id,
+        type: 'bill_requested',
+        title: 'Pedido de Conta',
+        message: `Mesa ${table.value.number} (${participantName.value || 'Cliente'}) pediu a conta — Total: ${totalAmount.toLocaleString('pt-MZ')} MT`,
+        tableId: table.value.id,
+        tableNumber: table.value.number,
+        tableSessionId: updated.id
+      })
+      toastStore.success('Conta pedida', 'A equipa foi notificada e trará a conta à mesa.')
+      return updated
+    } catch (e) {
+      toastStore.error('Erro ao pedir a conta', errorMessage(e))
       return null
     }
   }
 
-  const setLocalToken = (restaurantSlug: string, tableNumber: string, token: LocalSessionToken) => {
-    try {
-      localStorage.setItem(getStorageKey(restaurantSlug, tableNumber), JSON.stringify(token))
-    } catch (e) {
-      console.warn('Erro ao guardar sessão localmente', e)
-    }
-  }
-
-  const clearLocalToken = (restaurantSlug: string, tableNumber: string) => {
-    try {
-      localStorage.removeItem(getStorageKey(restaurantSlug, tableNumber))
-    } catch (e) {
-      console.warn('Erro ao limpar sessão local', e)
-    }
-  }
-
-  const inspectTableSession = async (
-    restaurant: Restaurant,
-    table: Table
-  ): Promise<{
-    session: TableSession | null
-    isOwner: boolean
-    isOccupiedByOther: boolean
-    status: Table['status']
-  }> => {
-    isLoading.value = true
-    try {
-      // Fetch latest active session for this table from mock database
-      const activeSession = await tableSessionService.getActiveSessionByTable(table.id)
-      const token = getLocalToken(restaurant.slug, table.number)
-
-      currentSession.value = activeSession
-
-      if (activeSession) {
-        // If local token matches the active session ID, customer is the owner
-        if (token && token.sessionId === activeSession.id && token.isOwner) {
-          isSessionOwner.value = true
-          isOccupiedByOther.value = false
-        } else {
-          isSessionOwner.value = false
-          isOccupiedByOther.value = true
-        }
-      } else {
-        // No active session in database -> table is free (or unavailable)
-        isSessionOwner.value = false
-        isOccupiedByOther.value = false
-        if (token) {
-          // Stale token, clear it
-          clearLocalToken(restaurant.slug, table.number)
-        }
-      }
-
-      return {
-        session: activeSession,
-        isOwner: isSessionOwner.value,
-        isOccupiedByOther: isOccupiedByOther.value,
-        status: table.status
-      }
-    } finally {
-      isLoading.value = false
-    }
-  }
-
-  const occupyTable = async (options: {
-    restaurant: Restaurant
-    table: Table
-    customerName: string
-    partySize?: number
-    notes?: string
-  }): Promise<TableSession> => {
-    const trimmedName = options.customerName.trim()
-    if (!trimmedName) {
-      throw new Error('O nome do cliente é obrigatório para ocupar a mesa.')
-    }
-
-    // Verify current table state
-    const freshTable = await tableService.getTableById(options.table.id)
-    if (freshTable && freshTable.status !== 'free') {
-      // Check if already occupied
-      const existingSession = await tableSessionService.getActiveSessionByTable(options.table.id)
-      if (existingSession && existingSession.status !== 'closed') {
-        throw new Error(`A Mesa ${options.table.number} já está ocupada por ${existingSession.customerName}.`)
-      }
-    }
-
-    isLoading.value = true
-    try {
-      const session = await tableSessionService.startSession({
-        tenantId: options.restaurant.tenantId,
-        restaurantId: options.restaurant.id,
-        tableId: options.table.id,
-        customerName: trimmedName,
-        partySize: options.partySize,
-        notes: options.notes
-      })
-
-      currentSession.value = session
-      isSessionOwner.value = true
-      isOccupiedByOther.value = false
-
-      // Save local device ownership token
-      setLocalToken(options.restaurant.slug, options.table.number, {
-        sessionId: session.id,
-        customerName: trimmedName,
-        partySize: options.partySize,
-        isOwner: true
-      })
-
-      // Dispatch counter notification
-      await notificationStore.createNotification({
-        tenantId: options.restaurant.tenantId,
-        restaurantId: options.restaurant.id,
-        type: 'table_occupied',
-        title: 'Nova mesa ocupada',
-        message: `Mesa ${options.table.number} ocupada por ${trimmedName}${options.partySize ? ` (${options.partySize} pessoas)` : ''}.`,
-        tableId: options.table.id,
-        tableNumber: options.table.number,
-        tableSessionId: session.id
-      })
-
-      toastStore.success('Mesa Ocupada!', `Bem-vindo(a), ${trimmedName}. Já pode realizar pedidos diretamente do menu.`)
-      return session
-    } finally {
-      isLoading.value = false
-    }
-  }
-
-  const requestBill = async (options: {
-    restaurant: Restaurant
-    table: Table
-    session: TableSession
-    totalAmount: number
-    notes?: string
-  }) => {
-    try {
-      // Update session status to awaiting_bill
-      const updated = await tableSessionService.updateSessionStatus(options.session.id, 'awaiting_bill')
-      currentSession.value = updated
-
-      // Update table status to waiting_bill
-      await tableService.updateTable(options.table.id, { status: 'waiting_bill' })
-
-      // Dispatch counter notification
-      await notificationStore.createNotification({
-        tenantId: options.restaurant.tenantId,
-        restaurantId: options.restaurant.id,
-        type: 'bill_requested',
-        title: 'Pedido de Conta',
-        message: `Mesa ${options.table.number} (${options.session.customerName}) solicitou a conta — Total demonstrativo: ${options.totalAmount.toLocaleString('pt-MZ')} MT`,
-        tableId: options.table.id,
-        tableNumber: options.table.number,
-        tableSessionId: options.session.id
-      })
-
-      toastStore.success('Conta Solicitada', 'O balcão foi notificado. Um funcionário trará a conta até à sua mesa.')
-      return updated
-    } catch (e) {
-      toastStore.error('Erro ao pedir conta', (e as Error).message)
-      throw e
-    }
-  }
-
-  const closeSession = async (restaurant: Restaurant, table: Table, sessionId: string) => {
-    try {
-      const closed = await tableSessionService.closeSession(sessionId)
-      if (currentSession.value?.id === sessionId) {
-        currentSession.value = closed
-      }
-      clearLocalToken(restaurant.slug, table.number)
-      return closed
-    } catch (e) {
-      toastStore.error('Erro ao encerrar sessão', (e as Error).message)
-      throw e
-    }
-  }
-
   return {
+    restaurant,
+    table,
     currentSession,
-    isSessionOwner,
-    isOccupiedByOther,
+    participation,
     isLoading,
-    inspectTableSession,
-    occupyTable,
-    requestBill,
-    closeSession,
-    clearLocalToken
+    isSubmitting,
+    accessState,
+    isParticipant,
+    participantName,
+    loadTable,
+    refresh,
+    startSession,
+    joinSession,
+    requestBill
   }
 })
