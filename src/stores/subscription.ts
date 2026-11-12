@@ -3,6 +3,7 @@ import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import type { FeatureKey, LimitKey, Plan, Subscription } from '@/types'
 import { subscriptionService, planAccessService, type LimitCheckResult, type CanUseResult } from '@/services'
+import { LIMIT_CATALOG, type LimitScope } from '@/types/plan'
 import { useTenantStore } from './tenant'
 import { useToastStore } from './toast'
 
@@ -14,6 +15,7 @@ export interface ResourceUsageMetric {
   limit: number | null
   percentage: number
   reached: boolean
+  scope: LimitScope
 }
 
 export const useSubscriptionStore = defineStore('subscription', () => {
@@ -70,11 +72,12 @@ export const useSubscriptionStore = defineStore('subscription', () => {
     const tid = tenantId || activeTenantId.value
     if (!tid) return
 
-    const keys: LimitKey[] = ['RESTAURANTS', 'PRODUCTS', 'CATEGORIES', 'TABLES', 'STAFF', 'ORDERS_PER_MONTH']
     const metrics: Partial<Record<LimitKey, ResourceUsageMetric>> = {}
+    // Limites por restaurante: consumo do restaurante atualmente selecionado
+    const restaurantId = tenantStore.currentRestaurant?.tenantId === tid ? tenantStore.currentRestaurant.id : undefined
 
-    for (const key of keys) {
-      const check: LimitCheckResult = await planAccessService.isLimitReached(tid, key)
+    for (const { key, scope } of LIMIT_CATALOG) {
+      const check: LimitCheckResult = await planAccessService.isLimitReached(tid, key, restaurantId)
       metrics[key] = {
         key,
         name: check.resourceName,
@@ -82,7 +85,8 @@ export const useSubscriptionStore = defineStore('subscription', () => {
         current: check.current,
         limit: check.limit,
         percentage: check.percentage,
-        reached: check.reached
+        reached: check.reached,
+        scope
       }
     }
 

@@ -13,6 +13,7 @@ import {
   MockTableRepository,
   MockTableSessionRepository,
   MockNfcTagRepository,
+  MockPlanAccessRepository,
   MockCategoryRepository,
   MockProductRepository,
   MockOrderRepository,
@@ -33,6 +34,7 @@ import type {
   ITableRepository,
   ITableSessionRepository,
   INfcTagRepository,
+  IPlanAccessRepository,
   ICategoryRepository,
   IProductRepository,
   IOrderRepository,
@@ -54,6 +56,7 @@ export interface RepositoryRegistry {
   tables: ITableRepository
   tableSessions: ITableSessionRepository
   nfcTags: INfcTagRepository
+  planAccess: IPlanAccessRepository
   categories: ICategoryRepository
   products: IProductRepository
   orders: IOrderRepository
@@ -75,6 +78,7 @@ export const repositories: RepositoryRegistry = {
   tables: new MockTableRepository(),
   tableSessions: new MockTableSessionRepository(),
   nfcTags: new MockNfcTagRepository(),
+  planAccess: new MockPlanAccessRepository(),
   categories: new MockCategoryRepository(),
   products: new MockProductRepository(),
   orders: new MockOrderRepository(),

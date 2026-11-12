@@ -46,6 +46,13 @@ const hasCustomizationFeature = computed(() => {
   return subscriptionStore.hasFeature('MENU_CUSTOMIZATION')
 })
 
+/** Plano mais barato (configurado pelo Super Admin) que inclui a personalização. */
+const customizationPlanName = computed(() =>
+  [...subscriptionStore.availablePlans]
+    .filter(p => p.features?.some(f => f.featureKey === 'MENU_CUSTOMIZATION' && f.enabled))
+    .sort((a, b) => a.price - b.price)[0]?.name ?? ''
+)
+
 const loadRestaurantData = async () => {
   if (!currentRestaurant.value) return
   isLoadingContent.value = true
@@ -222,8 +229,8 @@ const handleReset = async () => {
     <!-- Upgrade Modal -->
     <UpgradeModal
       :is-open="isUpgradeModalOpen"
-      trigger-reason="Desbloqueie a Personalização Completa de Menus e Layouts no plano Pro."
-      required-plan-name="Pro"
+      :trigger-reason="customizationPlanName ? `Desbloqueie a Personalização Completa de Menus e Layouts no plano ${customizationPlanName}.` : 'Desbloqueie a Personalização Completa de Menus e Layouts.'"
+      :required-plan-name="customizationPlanName"
       @close="isUpgradeModalOpen = false"
       @upgraded="loadRestaurantData"
     />

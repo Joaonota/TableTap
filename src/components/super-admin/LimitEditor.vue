@@ -6,6 +6,8 @@ import { Infinity as InfinityIcon } from 'lucide-vue-next'
 interface Props {
   modelValue: PlanLimit[]
   disabled?: boolean
+  /** Erros de validação por chave de limite. */
+  errors?: Partial<Record<LimitKey, string>>
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -47,7 +49,8 @@ const updateNumber = (key: LimitKey, value: number) => {
   if (props.disabled) return
   const current = [...props.modelValue]
   const idx = current.findIndex(l => l.resourceKey === key)
-  const safeVal = Math.max(0, isNaN(value) ? 0 : value)
+  // Valores inválidos (decimais, negativos) ficam para a validação do editor mostrar
+  const safeVal = Number.isNaN(value) ? 0 : value
 
   if (idx >= 0) {
     current[idx] = { ...current[idx], limit: safeVal }
@@ -69,8 +72,12 @@ const updateNumber = (key: LimitKey, value: number) => {
     >
       <div class="limit-card-header">
         <div>
-          <div class="limit-name">{{ entry.name }}</div>
+          <div class="limit-name">
+            {{ entry.name }}
+            <span class="scope-tag">{{ entry.scope === 'restaurant' ? 'por restaurante' : 'por empresa' }}</span>
+          </div>
           <div class="limit-desc">{{ entry.description }}</div>
+          <div v-if="!entry.enforcedOnCreate" class="limit-desc">Apenas informativo: não bloqueia a operação.</div>
         </div>
 
         <button
@@ -99,16 +106,36 @@ const updateNumber = (key: LimitKey, value: number) => {
             :value="getLimitValue(entry.key) ?? 0"
             :disabled="disabled"
             class="limit-number-input"
-            @input="updateNumber(entry.key, parseInt(($event.target as HTMLInputElement).value, 10))"
+            @input="updateNumber(entry.key, Number(($event.target as HTMLInputElement).value))"
           />
           <span class="unit-label">{{ entry.unit }}</span>
         </div>
+        <span v-if="errors?.[entry.key]" class="limit-error">{{ errors[entry.key] }}</span>
       </div>
     </div>
   </div>
 </template>
 
 <style scoped>
+.scope-tag {
+  display: inline-block;
+  margin-left: 0.35rem;
+  padding: 0.05rem 0.4rem;
+  border-radius: 999px;
+  background: var(--color-neutral-100);
+  color: var(--text-muted);
+  font-size: 0.68rem;
+  font-weight: 600;
+  vertical-align: middle;
+}
+
+.limit-error {
+  display: block;
+  margin-top: 0.35rem;
+  font-size: 0.75rem;
+  color: var(--color-danger-600);
+}
+
 .limit-editor-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));

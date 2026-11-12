@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { staffService } from '@/services'
 import { useTenantStore } from '@/stores/tenant'
 import { useToastStore } from '@/stores/toast'
@@ -9,6 +9,8 @@ import AppBadge from '@/components/ui/AppBadge.vue'
 import AppModal from '@/components/ui/AppModal.vue'
 import AppInput from '@/components/ui/AppInput.vue'
 import AppSelect from '@/components/ui/AppSelect.vue'
+import PlanLimitNotice from '@/components/plans/PlanLimitNotice.vue'
+import { usePlanLimit } from '@/composables/usePlanLimit'
 import {
   Users,
   Plus,
@@ -57,7 +59,12 @@ onMounted(() => {
   loadStaff()
 })
 
+/** Limite de utilizadores ativos do plano (empresa). */
+const staffLimit = usePlanLimit('STAFF')
+watch(() => staffList.value.map(s => s.isActive).join(), () => staffLimit.refresh())
+
 const openAddModal = () => {
+  if (!staffLimit.guard()) return
   formId.value = undefined
   formName.value = ''
   formEmail.value = ''
@@ -116,7 +123,8 @@ const handleSaveStaff = async () => {
     }
     isModalOpen.value = false
   } catch (e) {
-    toastStore.error('Erro ao guardar colaborador', (e as Error).message)
+    const message = (e as Error).message
+    toastStore.error(/limite do plano/i.test(message) ? 'Limite do plano atingido' : 'Erro ao guardar colaborador', message)
   }
 }
 
@@ -139,13 +147,15 @@ const handleDeleteStaff = async (id: string) => {
         </p>
       </div>
 
-      <AppButton variant="primary" @click="openAddModal">
+      <AppButton variant="primary" :disabled="staffLimit.isReached.value" :title="staffLimit.message.value || undefined" @click="openAddModal">
         <template #icon-left>
           <Plus :size="16" />
         </template>
         Adicionar Funcionário
       </AppButton>
     </div>
+
+    <PlanLimitNotice :evaluation="staffLimit.evaluation.value" />
 
     <!-- Staff Cards Grid -->
     <div class="staff-grid">

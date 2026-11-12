@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { TABLE_AREAS, type Table, type TableStatus } from '@/types'
 import type { TableInput } from '@/services'
 import { useTableStore } from '@/stores/table'
@@ -9,6 +9,8 @@ import { useServiceRequestStore } from '@/stores/serviceRequest'
 import { effectiveTableStatus, formatDuration, formatStartTime } from '@/domain/tableRules'
 import AppButton from '@/components/ui/AppButton.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
+import PlanLimitNotice from '@/components/plans/PlanLimitNotice.vue'
+import { usePlanLimit } from '@/composables/usePlanLimit'
 import PublicUrlField from '@/components/ui/PublicUrlField.vue'
 import QrCodeModal from '@/components/ui/QrCodeModal.vue'
 import TableGrid from '@/components/tables/TableGrid.vue'
@@ -33,6 +35,10 @@ const isFormOpen = ref(false)
 const editingTable = ref<Table | null>(null)
 const isSaving = ref(false)
 const qrTable = ref<Table | null>(null)
+
+/** Limite de mesas do plano (por restaurante). */
+const tablesLimit = usePlanLimit('TABLES')
+watch(() => tableStore.tables.length, () => tablesLimit.refresh())
 
 onMounted(async () => {
   await Promise.all([tableStore.loadTables(), serviceRequestStore.loadRequests()])
@@ -71,6 +77,7 @@ const clearFilters = () => {
 }
 
 const openCreate = () => {
+  if (!tablesLimit.guard()) return
   editingTable.value = null
   isFormOpen.value = true
 }
@@ -113,12 +120,14 @@ const saveTable = async (input: TableInput) => {
             <Rows3 :size="15" /> <span>Lista</span>
           </button>
         </div>
-        <AppButton variant="primary" @click="openCreate">
+        <AppButton variant="primary" :disabled="tablesLimit.isReached.value" :title="tablesLimit.message.value || undefined" @click="openCreate">
           <template #icon-left><Plus :size="16" /></template>
           Nova mesa
         </AppButton>
       </div>
     </header>
+
+    <PlanLimitNotice :evaluation="tablesLimit.evaluation.value" />
 
     <!-- Contadores por estado (clicáveis como filtro) -->
     <div class="status-cards">
@@ -164,7 +173,7 @@ const saveTable = async (input: TableInput) => {
       title="Ainda não há mesas"
       description="Crie as mesas do restaurante. Cada mesa recebe uma URL permanente para a etiqueta NFC e para o QR Code."
     >
-      <AppButton variant="primary" @click="openCreate">
+      <AppButton variant="primary" :disabled="tablesLimit.isReached.value" :title="tablesLimit.message.value || undefined" @click="openCreate">
         <template #icon-left><Plus :size="16" /></template>
         Criar primeira mesa
       </AppButton>

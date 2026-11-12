@@ -72,20 +72,41 @@ export type LimitKey =
   | 'STAFF'
   | 'ORDERS_PER_MONTH'
 
+/**
+ * Âmbito em que o limite é contado:
+ *  - 'tenant':     total da empresa (ex.: restaurantes, utilizadores);
+ *  - 'restaurant': por restaurante (ex.: mesas, produtos).
+ */
+export type LimitScope = 'tenant' | 'restaurant'
+
 export interface LimitCatalogEntry {
   key: LimitKey
   name: string
   description: string
   unit: string
+  scope: LimitScope
+  /**
+   * `true` quando o TapMenu impede a criação de novos recursos ao atingir o
+   * limite. Limites informativos (ex.: pedidos/mês) aparecem só no consumo.
+   */
+  enforcedOnCreate: boolean
 }
 
+/**
+ * Catálogo de limites. Para acrescentar um limite novo:
+ *  1. adicionar a chave a `LimitKey` e uma entrada aqui;
+ *  2. implementar a contagem no repositório de acesso ao plano
+ *     (`src/repositories/mock/planAccessRepository.ts`, ou na API).
+ * O editor de planos, a página de planos e "Meu Plano" usam este catálogo
+ * automaticamente.
+ */
 export const LIMIT_CATALOG: LimitCatalogEntry[] = [
-  { key: 'RESTAURANTS', name: 'Restaurantes', description: 'Restaurantes ativos que a empresa pode registar', unit: 'restaurantes' },
-  { key: 'PRODUCTS', name: 'Produtos', description: 'Produtos ativos no menu por restaurante', unit: 'produtos' },
-  { key: 'CATEGORIES', name: 'Categorias', description: 'Categorias de menu por restaurante', unit: 'categorias' },
-  { key: 'TABLES', name: 'Mesas', description: 'Mesas registadas por restaurante', unit: 'mesas' },
-  { key: 'STAFF', name: 'Colaboradores', description: 'Membros da equipa da empresa (funcionários)', unit: 'colaboradores' },
-  { key: 'ORDERS_PER_MONTH', name: 'Pedidos / Mês', description: 'Pedidos recebidos no mês corrente por restaurante', unit: 'pedidos/mês' }
+  { key: 'TABLES', name: 'Mesas', description: 'Mesas registadas em cada restaurante', unit: 'mesas', scope: 'restaurant', enforcedOnCreate: true },
+  { key: 'PRODUCTS', name: 'Produtos', description: 'Produtos no menu de cada restaurante', unit: 'produtos', scope: 'restaurant', enforcedOnCreate: true },
+  { key: 'CATEGORIES', name: 'Categorias', description: 'Categorias do menu de cada restaurante', unit: 'categorias', scope: 'restaurant', enforcedOnCreate: true },
+  { key: 'STAFF', name: 'Utilizadores', description: 'Utilizadores ativos da equipa da empresa', unit: 'utilizadores', scope: 'tenant', enforcedOnCreate: true },
+  { key: 'RESTAURANTS', name: 'Restaurantes', description: 'Restaurantes que a empresa pode registar', unit: 'restaurantes', scope: 'tenant', enforcedOnCreate: true },
+  { key: 'ORDERS_PER_MONTH', name: 'Pedidos / Mês', description: 'Pedidos recebidos no mês corrente, por restaurante (informativo)', unit: 'pedidos/mês', scope: 'restaurant', enforcedOnCreate: false }
 ]
 
 // ------------------------------------------

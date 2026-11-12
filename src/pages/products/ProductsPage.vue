@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useCatalogStore } from '@/stores/catalog'
 import { useTenantStore } from '@/stores/tenant'
 import { useToastStore } from '@/stores/toast'
@@ -9,6 +9,8 @@ import AppBadge from '@/components/ui/AppBadge.vue'
 import AppModal from '@/components/ui/AppModal.vue'
 import AppInput from '@/components/ui/AppInput.vue'
 import AppSelect from '@/components/ui/AppSelect.vue'
+import PlanLimitNotice from '@/components/plans/PlanLimitNotice.vue'
+import { usePlanLimit } from '@/composables/usePlanLimit'
 import {
   Plus,
   Search,
@@ -50,7 +52,12 @@ const categoryOptions = computed(() => {
   }))
 })
 
+/** Limite de produtos do plano (por restaurante). */
+const productsLimit = usePlanLimit('PRODUCTS')
+watch(() => catalogStore.products.length, () => productsLimit.refresh())
+
 const openAddModal = () => {
+  if (!productsLimit.guard()) return
   formId.value = undefined
   formName.value = ''
   formDescription.value = ''
@@ -85,7 +92,8 @@ const handleSaveProduct = async () => {
     toastStore.warning('Validação', 'Preencha o nome e selecione a categoria do produto.')
     return
   }
-  await catalogStore.saveProduct({
+  try {
+    await catalogStore.saveProduct({
     id: formId.value,
     name: formName.value,
     description: formDescription.value,
@@ -97,8 +105,11 @@ const handleSaveProduct = async () => {
     imageUrl: formImageUrl.value,
     isFeatured: formIsFeatured.value,
     isAvailable: formIsAvailable.value
-  })
-  isProductModalOpen.value = false
+    })
+    isProductModalOpen.value = false
+  } catch {
+    // O erro (ex.: limite do plano) já foi mostrado pela store.
+  }
 }
 
 const handleDeleteProduct = async (id: string) => {
@@ -116,13 +127,15 @@ const handleDeleteProduct = async (id: string) => {
         <p class="page-subtitle">Faça a gestão dos pratos, bebidas, preços e disponibilidade do menu digital</p>
       </div>
 
-      <AppButton variant="primary" @click="openAddModal">
+      <AppButton variant="primary" :disabled="productsLimit.isReached.value" :title="productsLimit.message.value || undefined" @click="openAddModal">
         <template #icon-left>
           <Plus :size="16" />
         </template>
         Adicionar Produto
       </AppButton>
     </div>
+
+    <PlanLimitNotice :evaluation="productsLimit.evaluation.value" />
 
     <!-- Filters Bar -->
     <div class="filters-card">

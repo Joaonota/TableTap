@@ -1442,15 +1442,15 @@ export const initialPlans: Plan[] = [
       { resourceKey: 'RESTAURANTS', limit: 1 },
       { resourceKey: 'PRODUCTS', limit: 30 },
       { resourceKey: 'CATEGORIES', limit: 10 },
-      { resourceKey: 'TABLES', limit: 15 },
+      { resourceKey: 'TABLES', limit: 3 },
       { resourceKey: 'STAFF', limit: 5 },
       { resourceKey: 'ORDERS_PER_MONTH', limit: 300 }
     ]
   },
   {
     id: 'plan-pro',
-    name: 'Pro',
-    slug: 'pro',
+    name: 'Profissional',
+    slug: 'profissional',
     description: 'A escolha da maioria: pedidos digitais, KDS, NFC, pagamentos simulados e relatórios avançados.',
     price: 4490,
     currency: 'MT',
@@ -1483,9 +1483,9 @@ export const initialPlans: Plan[] = [
     ],
     limits: [
       { resourceKey: 'RESTAURANTS', limit: 3 },
-      { resourceKey: 'PRODUCTS', limit: 100 },
+      { resourceKey: 'PRODUCTS', limit: 200 },
       { resourceKey: 'CATEGORIES', limit: 25 },
-      { resourceKey: 'TABLES', limit: 50 },
+      { resourceKey: 'TABLES', limit: 20 },
       { resourceKey: 'STAFF', limit: 20 },
       { resourceKey: 'ORDERS_PER_MONTH', limit: 1500 }
     ]
@@ -1534,9 +1534,9 @@ export const initialPlans: Plan[] = [
   },
   {
     id: 'plan-enterprise',
-    name: 'Enterprise',
-    slug: 'enterprise',
-    description: 'Grupos e franquias: tudo ilimitado, incluindo personalização completa e suporte prioritário.',
+    name: 'Premium',
+    slug: 'premium',
+    description: 'Tudo ilimitado: mesas, produtos e utilizadores sem limite e todas as funcionalidades.',
     price: 9990,
     currency: 'MT',
     billingPeriod: 'monthly',
@@ -1582,7 +1582,7 @@ export const initialSubscriptions: Subscription[] = [
     tenantId: 'tenant-1',
     companyName: 'Sabores de Moçambique Lda',
     planId: 'plan-pro',
-    planName: 'Pro',
+    planName: 'Profissional',
     status: 'active',
     startDate: '2024-01-15',
     renewalDate: '2026-11-15',
@@ -1602,9 +1602,9 @@ export const initialSubscriptions: Subscription[] = [
         date: '2025-06-01T10:30:00Z',
         event: 'plan_changed',
         fromPlanName: 'Básico',
-        toPlanName: 'Pro',
+        toPlanName: 'Profissional',
         amount: 4490,
-        note: 'Upgrade para plano Pro para habilitar KDS, NFC e pedidos no menu.',
+        note: 'Upgrade para plano Profissional para habilitar KDS, NFC e pedidos no menu.',
         performedBy: 'Rui Mondlane (Admin)'
       },
       {
@@ -1623,7 +1623,7 @@ export const initialSubscriptions: Subscription[] = [
     tenantId: 'tenant-2',
     companyName: 'Ocean Food Group',
     planId: 'plan-enterprise',
-    planName: 'Enterprise',
+    planName: 'Premium',
     status: 'active',
     startDate: '2024-02-10',
     renewalDate: '2026-12-10',
@@ -1643,9 +1643,9 @@ export const initialSubscriptions: Subscription[] = [
         date: '2025-01-10T11:00:00Z',
         event: 'plan_changed',
         fromPlanName: 'Business',
-        toPlanName: 'Enterprise',
+        toPlanName: 'Premium',
         amount: 9990,
-        note: 'Migração de grupo gastronómico para plano Enterprise ilimitado.',
+        note: 'Migração de grupo gastronómico para plano Premium ilimitado.',
         performedBy: 'Super Admin'
       },
       {

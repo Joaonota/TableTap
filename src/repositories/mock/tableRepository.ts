@@ -5,6 +5,7 @@ import { generateTableSlug } from '@/domain/publicUrl'
 import { canSetManualStatus } from '@/domain/tableRules'
 import { DomainError } from '@/domain/errors'
 import { detachTagsFromTable } from './nfcTagRepository'
+import { assertWithinPlanLimit } from './planAccessRepository'
 
 const nowIso = () => new Date().toISOString()
 
@@ -57,6 +58,7 @@ export class MockTableRepository implements ITableRepository {
     const restaurant = db.restaurants.find(r => r.id === restaurantId)
     if (!restaurant) throw new DomainError('restaurant_not_found', 'Restaurante não encontrado.')
     validateInput(restaurantId, input)
+    assertWithinPlanLimit(restaurant.tenantId, 'TABLES', restaurantId)
 
     const number = input.number.trim()
     const now = nowIso()

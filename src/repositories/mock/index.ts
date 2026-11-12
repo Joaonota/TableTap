@@ -1,9 +1,13 @@
 import { mockStorage } from './mockStorage'
 import { recalculateSessionTotal } from './tableSessionRepository'
+import { assertWithinPlanLimit } from './planAccessRepository'
+import { normalizePlanEntitlements } from '@/domain/planLimits'
+import { DomainError } from '@/domain/errors'
 
 export { MockTableRepository } from './tableRepository'
 export { MockTableSessionRepository } from './tableSessionRepository'
 export { MockNfcTagRepository } from './nfcTagRepository'
+export { MockPlanAccessRepository } from './planAccessRepository'
 import type {
   ICompanyRepository,
   IRestaurantRepository,
@@ -94,6 +98,7 @@ export class MockRestaurantRepository implements IRestaurantRepository {
   }
 
   async create(restaurant: Omit<Restaurant, 'id' | 'createdAt'>): Promise<Restaurant> {
+    assertWithinPlanLimit(restaurant.tenantId, 'RESTAURANTS')
     const newRest: Restaurant = {
       ...restaurant,
       id: `rest-${Date.now()}`,
@@ -142,6 +147,7 @@ export class MockCategoryRepository implements ICategoryRepository {
   }
 
   async create(category: Omit<Category, 'id'>): Promise<Category> {
+    assertWithinPlanLimit(category.tenantId, 'CATEGORIES', category.restaurantId)
     const newCat: Category = {
       ...category,
       id: `cat-${Date.now()}`
@@ -183,6 +189,7 @@ export class MockProductRepository implements IProductRepository {
   }
 
   async create(product: Omit<Product, 'id'>): Promise<Product> {
+    assertWithinPlanLimit(product.tenantId, 'PRODUCTS', product.restaurantId)
     const newProd: Product = {
       ...product,
       id: `prod-${Date.now()}`
@@ -360,6 +367,7 @@ export class MockStaffRepository implements IStaffRepository {
   }
 
   async create(staff: Omit<StaffMember, 'id'>): Promise<StaffMember> {
+    if (staff.isActive) assertWithinPlanLimit(staff.tenantId, 'STAFF')
     const newStaff: StaffMember = {
       ...staff,
       id: `staff-${Date.now()}`
@@ -373,6 +381,8 @@ export class MockStaffRepository implements IStaffRepository {
     const db = mockStorage.getDb()
     const index = db.staff.findIndex(s => s.id === id)
     if (index === -1) throw new Error(`Funcionário ${id} não encontrado`)
+    // Reativar um utilizador conta para o limite do plano
+    if (updates.isActive === true && !db.staff[index].isActive) assertWithinPlanLimit(db.staff[index].tenantId, 'STAFF')
     db.staff[index] = { ...db.staff[index], ...updates }
     mockStorage.commit()
     return { ...db.staff[index] }
@@ -406,6 +416,7 @@ export class MockPlanRepository implements IPlanRepository {
   async create(plan: Omit<Plan, 'id'>): Promise<Plan> {
     const newPlan: Plan = {
       ...plan,
+      ...normalizePlanEntitlements(plan),
       id: `plan-${Date.now()}`
     }
     mockStorage.getDb().plans.push(newPlan)
@@ -417,7 +428,8 @@ export class MockPlanRepository implements IPlanRepository {
     const db = mockStorage.getDb()
     const index = db.plans.findIndex(p => p.id === id)
     if (index === -1) throw new Error(`Plano ${id} não encontrado`)
-    db.plans[index] = { ...db.plans[index], ...updates }
+    const merged = { ...db.plans[index], ...updates }
+    db.plans[index] = { ...merged, ...normalizePlanEntitlements(merged) }
     mockStorage.commit()
     return { ...db.plans[index] }
   }
@@ -426,6 +438,10 @@ export class MockPlanRepository implements IPlanRepository {
     const db = mockStorage.getDb()
     const index = db.plans.findIndex(p => p.id === id)
     if (index === -1) return false
+    const inUse = db.subscriptions.filter(sub => sub.planId === id).length + db.companies.filter(c => c.planId === id && !db.subscriptions.some(sub => sub.tenantId === c.id)).length
+    if (inUse > 0) {
+      throw new DomainError('plan_in_use', `O plano ${db.plans[index].name} está atribuído a ${inUse} ${inUse === 1 ? 'empresa' : 'empresas'}. Mude essas empresas para outro plano ou desative-o em vez de o eliminar.`)
+    }
     db.plans.splice(index, 1)
     mockStorage.commit()
     return true

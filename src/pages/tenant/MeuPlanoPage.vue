@@ -127,7 +127,7 @@ const handleUpgrade = async (targetPlanId: string) => {
           :class="{ 'is-limit-reached': item.reached }"
         >
           <div class="usage-card-top">
-            <span class="usage-name">{{ item.name }}</span>
+            <span class="usage-name">{{ item.name }}<small v-if="item.scope === 'restaurant'" class="usage-scope"> · {{ tenantStore.currentRestaurant?.name ?? 'restaurante atual' }}</small></span>
             <div class="usage-counts font-mono">
               <strong>{{ item.current }}</strong>
               <span class="count-sep">/</span>
@@ -317,6 +317,11 @@ const handleUpgrade = async (targetPlanId: string) => {
 </template>
 
 <style scoped>
+.usage-scope {
+  font-weight: 500;
+  color: var(--text-muted);
+}
+
 .meu-plano-page {
   display: flex;
   flex-direction: column;

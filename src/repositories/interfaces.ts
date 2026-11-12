@@ -22,7 +22,8 @@ import type {
   ServiceRequestStatus,
   MenuCustomization,
   PlatformAuditLog,
-  PlatformConfig
+  PlatformConfig,
+  LimitKey
 } from '@/types'
 
 export interface ICompanyRepository {
@@ -202,6 +203,18 @@ export interface INfcTagRepository {
   activate(tagId: string, actor: string): Promise<NfcTag>
   disable(tagId: string, actor: string, reason?: string): Promise<NfcTag>
   reactivate(tagId: string, actor: string): Promise<NfcTag>
+}
+
+/**
+ * Direitos do plano de cada empresa. Hoje é calculado no mock; com backend,
+ * a API devolve o plano efetivo e o consumo, e recusa (403) criações acima
+ * do limite — a UI não precisa de mudar.
+ */
+export interface IPlanAccessRepository {
+  /** Plano efetivo da empresa (subscrição → empresa → plano por defeito). */
+  getTenantPlan(tenantId: string): Promise<Plan | null>
+  /** Consumo atual de um recurso no âmbito do limite (empresa ou restaurante). */
+  countUsage(tenantId: string, key: LimitKey, restaurantId?: string): Promise<number>
 }
 
 export interface INotificationRepository {

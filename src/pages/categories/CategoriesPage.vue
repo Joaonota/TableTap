@@ -1,9 +1,11 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, watch } from 'vue'
 import { useCatalogStore } from '@/stores/catalog'
 import { useToastStore } from '@/stores/toast'
 import type { Category } from '@/types'
 import AppButton from '@/components/ui/AppButton.vue'
+import PlanLimitNotice from '@/components/plans/PlanLimitNotice.vue'
+import { usePlanLimit } from '@/composables/usePlanLimit'
 import AppBadge from '@/components/ui/AppBadge.vue'
 import AppModal from '@/components/ui/AppModal.vue'
 import AppInput from '@/components/ui/AppInput.vue'
@@ -33,7 +35,12 @@ const getProductCountForCategory = (catId: string) => {
   return catalogStore.products.filter(p => p.categoryId === catId).length
 }
 
+/** Limite de categorias do plano (por restaurante). */
+const categoriesLimit = usePlanLimit('CATEGORIES')
+watch(() => catalogStore.categories.length, () => categoriesLimit.refresh())
+
 const openAddModal = () => {
+  if (!categoriesLimit.guard()) return
   formId.value = undefined
   formName.value = ''
   formDescription.value = ''
@@ -54,13 +61,17 @@ const handleSaveCategory = async () => {
     toastStore.warning('Insira o nome da categoria')
     return
   }
-  await catalogStore.saveCategory({
-    id: formId.value,
-    name: formName.value,
-    description: formDescription.value,
-    imageUrl: formImageUrl.value
-  })
-  isCategoryModalOpen.value = false
+  try {
+    await catalogStore.saveCategory({
+      id: formId.value,
+      name: formName.value,
+      description: formDescription.value,
+      imageUrl: formImageUrl.value
+    })
+    isCategoryModalOpen.value = false
+  } catch {
+    // O erro (ex.: limite do plano) já foi mostrado pela store.
+  }
 }
 
 const handleDeleteCategory = async (id: string) => {
@@ -83,13 +94,15 @@ const handleDeleteCategory = async (id: string) => {
         <p class="page-subtitle">Organize os grupos de produtos para facilitar a navegação do cliente no menu digital</p>
       </div>
 
-      <AppButton variant="primary" @click="openAddModal">
+      <AppButton variant="primary" :disabled="categoriesLimit.isReached.value" :title="categoriesLimit.message.value || undefined" @click="openAddModal">
         <template #icon-left>
           <Plus :size="16" />
         </template>
         Nova Categoria
       </AppButton>
     </div>
+
+    <PlanLimitNotice :evaluation="categoriesLimit.evaluation.value" />
 
     <!-- Categories Grid -->
     <div class="categories-grid">

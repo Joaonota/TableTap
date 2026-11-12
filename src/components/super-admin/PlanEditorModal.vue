@@ -7,11 +7,15 @@ import AppButton from '@/components/ui/AppButton.vue'
 import AppInput from '@/components/ui/AppInput.vue'
 import FeatureSelector from './FeatureSelector.vue'
 import LimitEditor from './LimitEditor.vue'
-import { Sliders, Zap, CheckCircle2 } from 'lucide-vue-next'
+import { Sliders, Zap, CheckCircle2, AlertCircle } from 'lucide-vue-next'
+import { normalizePlanEntitlements, validatePlanDraft, type PlanDraftErrors } from '@/domain/planLimits'
 
 interface Props {
   isOpen: boolean
   initialPlan?: Plan | null
+  /** Restantes planos (para validar nome/identificador únicos). */
+  otherPlans?: Pick<Plan, 'id' | 'slug' | 'name'>[]
+  isSaving?: boolean
 }
 
 const props = defineProps<Props>()
@@ -36,6 +40,10 @@ const formFeatures = ref<PlanFeature[]>([])
 const formLimits = ref<PlanLimit[]>([])
 
 const isEditMode = computed(() => !!props.initialPlan?.id)
+const errors = ref<PlanDraftErrors>({})
+const limitErrors = computed(() =>
+  Object.fromEntries(Object.entries(errors.value).filter(([k]) => k.startsWith('limit:')).map(([k, v]) => [k.slice(6), v as string]))
+)
 
 const resetFormWithDefaults = () => {
   formId.value = ''
@@ -64,6 +72,7 @@ watch(
   (open) => {
     if (!open) return
     activeTab.value = 'general'
+    errors.value = {}
     if (props.initialPlan) {
       formId.value = props.initialPlan.id
       formName.value = props.initialPlan.name
@@ -75,19 +84,10 @@ watch(
       formHighlighted.value = props.initialPlan.highlighted || false
       formDisplayOrder.value = props.initialPlan.displayOrder || 1
 
-      // Ensure all features are mapped
-      const existingFeatures = props.initialPlan.features || []
-      formFeatures.value = FEATURE_CATALOG.map(f => {
-        const found = existingFeatures.find(ef => ef.featureKey === f.key)
-        return { featureKey: f.key, enabled: found ? found.enabled : false }
-      })
-
-      // Ensure all limits are mapped
-      const existingLimits = props.initialPlan.limits || []
-      formLimits.value = LIMIT_CATALOG.map(l => {
-        const found = existingLimits.find(el => el.resourceKey === l.key)
-        return { resourceKey: l.key, limit: found !== undefined ? found.limit : 10 }
-      })
+      // Todas as funcionalidades e limites do catálogo (inclui limites novos)
+      const normalized = normalizePlanEntitlements(props.initialPlan)
+      formFeatures.value = normalized.features
+      formLimits.value = normalized.limits
     } else {
       resetFormWithDefaults()
     }
@@ -107,12 +107,20 @@ const generateSlugFromName = () => {
 }
 
 const handleSave = () => {
-  if (!formName.value.trim()) return
+  if (!formSlug.value.trim()) generateSlugFromName()
+  errors.value = validatePlanDraft(
+    { name: formName.value, slug: formSlug.value, price: Number(formPrice.value), limits: formLimits.value },
+    (props.otherPlans ?? []).filter(p => p.id !== formId.value)
+  )
+  if (Object.keys(errors.value).length) {
+    activeTab.value = errors.value.name || errors.value.slug || errors.value.price ? 'general' : 'limits'
+    return
+  }
 
   emit('save', {
     ...(formId.value ? { id: formId.value } : {}),
     name: formName.value.trim(),
-    slug: formSlug.value.trim() || 'plano',
+    slug: formSlug.value.trim(),
     description: formDescription.value.trim(),
     price: Number(formPrice.value) || 0,
     currency: 'MT',
@@ -173,7 +181,8 @@ const handleSave = () => {
             id="plan-name"
             v-model="formName"
             label="Nome do Plano"
-            placeholder="Ex: Pro, Business, Enterprise"
+            placeholder="Ex.: Básico, Profissional, Premium"
+            :error="errors.name"
             required
             @input="generateSlugFromName"
           />
@@ -182,7 +191,8 @@ const handleSave = () => {
             id="plan-slug"
             v-model="formSlug"
             label="Slug / Identificador URL"
-            placeholder="pro, business, enterprise"
+            placeholder="basico, profissional, premium"
+            :error="errors.slug"
             required
           />
         </div>
@@ -212,6 +222,7 @@ const handleSave = () => {
                 required
               />
             </div>
+            <span v-if="errors.price" class="field-error">{{ errors.price }}</span>
           </div>
 
           <div class="form-group">
@@ -259,7 +270,8 @@ const handleSave = () => {
 
       <!-- Tab Content: Limits -->
       <div v-show="activeTab === 'limits'" class="tab-pane">
-        <LimitEditor v-model="formLimits" />
+        <p class="limits-help">Defina um número máximo ou marque <strong>Ilimitado</strong>. Quando um restaurante atinge o limite, o TapMenu impede a criação de novos recursos.</p>
+        <LimitEditor v-model="formLimits" :errors="limitErrors" />
       </div>
 
       <!-- Footer Actions -->
@@ -267,7 +279,8 @@ const handleSave = () => {
         <AppButton variant="outline" @click="emit('close')">
           Cancelar
         </AppButton>
-        <AppButton variant="primary" @click="handleSave">
+        <span v-if="Object.keys(errors).length" class="footer-error"><AlertCircle :size="14" /> Corrija os campos assinalados.</span>
+        <AppButton variant="primary" :loading="isSaving" @click="handleSave">
           Guardar Plano
         </AppButton>
       </div>
@@ -276,6 +289,26 @@ const handleSave = () => {
 </template>
 
 <style scoped>
+.field-error {
+  font-size: 0.75rem;
+  color: var(--color-danger-600);
+}
+
+.footer-error {
+  margin-right: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.8rem;
+  color: var(--color-danger-600);
+}
+
+.limits-help {
+  margin: 0;
+  font-size: 0.8125rem;
+  color: var(--text-muted);
+}
+
 .plan-editor-container {
   display: flex;
   flex-direction: column;

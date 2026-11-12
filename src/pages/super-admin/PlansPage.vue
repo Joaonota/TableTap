@@ -2,7 +2,8 @@
 import { ref, onMounted } from 'vue'
 import { usePlansStore } from '@/stores/plans'
 import type { Plan } from '@/types'
-import { getPlanLimit } from '@/types/plan'
+import { LIMIT_CATALOG, getFeatureCatalogEntry } from '@/types/plan'
+import { formatLimit, planLimitValue } from '@/domain/planLimits'
 import PlanEditorModal from '@/components/super-admin/PlanEditorModal.vue'
 import AppButton from '@/components/ui/AppButton.vue'
 import AppBadge from '@/components/ui/AppBadge.vue'
@@ -27,18 +28,23 @@ const openEditModal = (plan: Plan) => {
   isModalOpen.value = true
 }
 
+const isSaving = ref(false)
 const handleSavePlan = async (data: Partial<Plan>) => {
-  await plansStore.savePlan(data)
-  isModalOpen.value = false
+  isSaving.value = true
+  try {
+    await plansStore.savePlan(data)
+    isModalOpen.value = false
+  } catch {
+    // Erro já apresentado pela store; o editor continua aberto.
+  } finally {
+    isSaving.value = false
+  }
 }
 
 const handleToggleActive = async (plan: Plan) => {
   await plansStore.togglePlanActive(plan.id)
 }
 
-const formatLimit = (limit: number | null): string => {
-  return limit === null ? 'Ilimitado' : limit.toString()
-}
 </script>
 
 <template>
@@ -91,29 +97,9 @@ const formatLimit = (limit: number | null): string => {
         <div class="limits-box">
           <div class="section-title">LIMITES OPERACIONAIS:</div>
           <div class="limits-list">
-            <div class="limit-item">
-              <span class="limit-label">Restaurantes:</span>
-              <strong class="limit-val">{{ formatLimit(getPlanLimit(plan, 'RESTAURANTS')) }}</strong>
-            </div>
-            <div class="limit-item">
-              <span class="limit-label">Produtos / Menu:</span>
-              <strong class="limit-val">{{ formatLimit(getPlanLimit(plan, 'PRODUCTS')) }}</strong>
-            </div>
-            <div class="limit-item">
-              <span class="limit-label">Categorias:</span>
-              <strong class="limit-val">{{ formatLimit(getPlanLimit(plan, 'CATEGORIES')) }}</strong>
-            </div>
-            <div class="limit-item">
-              <span class="limit-label">Mesas:</span>
-              <strong class="limit-val">{{ formatLimit(getPlanLimit(plan, 'TABLES')) }}</strong>
-            </div>
-            <div class="limit-item">
-              <span class="limit-label">Colaboradores:</span>
-              <strong class="limit-val">{{ formatLimit(getPlanLimit(plan, 'STAFF')) }}</strong>
-            </div>
-            <div class="limit-item">
-              <span class="limit-label">Pedidos / Mês:</span>
-              <strong class="limit-val">{{ formatLimit(getPlanLimit(plan, 'ORDERS_PER_MONTH')) }}</strong>
+            <div v-for="entry in LIMIT_CATALOG" :key="entry.key" class="limit-item">
+              <span class="limit-label">{{ entry.name }}{{ entry.scope === 'restaurant' ? ' / restaurante' : '' }}:</span>
+              <strong class="limit-val">{{ formatLimit(planLimitValue(plan, entry.key)) }}</strong>
             </div>
           </div>
         </div>
@@ -132,7 +118,7 @@ const formatLimit = (limit: number | null): string => {
               class="feat-pill"
             >
               <Check :size="12" />
-              <span>{{ feat.featureKey.replace(/_/g, ' ') }}</span>
+              <span>{{ getFeatureCatalogEntry(feat.featureKey)?.name ?? feat.featureKey }}</span>
             </span>
             <span v-if="(plan.features?.filter(f => f.enabled).length || 0) > 7" class="feat-pill more">
               +{{ (plan.features?.filter(f => f.enabled).length || 0) - 7 }} módulos
@@ -168,6 +154,8 @@ const formatLimit = (limit: number | null): string => {
     <PlanEditorModal
       :is-open="isModalOpen"
       :initial-plan="selectedPlan"
+      :other-plans="plansStore.plans"
+      :is-saving="isSaving"
       @close="isModalOpen = false"
       @save="handleSavePlan"
     />
