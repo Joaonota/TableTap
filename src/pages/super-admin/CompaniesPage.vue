@@ -363,18 +363,18 @@ const toggleCompanyStatus = async (comp: Company) => {
 .page-title {
   font-size: 1.75rem;
   font-weight: 800;
-  color: #ffffff;
+  color: #0f172a;
 }
 
 .page-subtitle {
   font-size: 0.875rem;
-  color: #94a3b8;
+  color: #64748b;
   margin-top: 0.2rem;
 }
 
 .super-card {
-  background: #1e293b;
-  border: 1px solid #334155;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
   border-radius: 12px;
   overflow: hidden;
 }
@@ -391,24 +391,24 @@ const toggleCompanyStatus = async (comp: Company) => {
 }
 
 .super-table th {
-  background: #0f172a;
-  color: #94a3b8;
+  background: #f8fafc;
+  color: #64748b;
   font-size: 0.75rem;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.05em;
   padding: 0.85rem 1rem;
-  border-bottom: 1px solid #334155;
+  border-bottom: 1px solid #e2e8f0;
 }
 
 .super-table td {
   padding: 0.85rem 1rem;
-  border-bottom: 1px solid #334155;
-  color: #cbd5e1;
+  border-bottom: 1px solid #e2e8f0;
+  color: #334155;
 }
 
 .super-table tr:hover {
-  background: rgba(255, 255, 255, 0.02);
+  background: #f8fafc;
 }
 
 .tenant-id {
@@ -427,7 +427,7 @@ const toggleCompanyStatus = async (comp: Company) => {
   display: inline-block;
   padding: 0.15rem 0.5rem;
   background: rgba(56, 189, 248, 0.12);
-  color: #38bdf8;
+  color: #0369a1;
   border-radius: 4px;
   font-size: 0.75rem;
   font-weight: 700;
@@ -436,7 +436,7 @@ const toggleCompanyStatus = async (comp: Company) => {
 
 .sub-price {
   font-size: 0.75rem;
-  color: #34d399;
+  color: #047857;
 }
 
 .manage-sub-link {
@@ -444,7 +444,7 @@ const toggleCompanyStatus = async (comp: Company) => {
   align-items: center;
   gap: 0.3rem;
   font-size: 0.6875rem;
-  color: #38bdf8;
+  color: #0369a1;
   background: transparent;
   border: none;
   cursor: pointer;
@@ -458,8 +458,8 @@ const toggleCompanyStatus = async (comp: Company) => {
 }
 
 .badge-neutral {
-  background: #334155;
-  color: #cbd5e1;
+  background: #f1f5f9;
+  color: #334155;
   padding: 0.2rem 0.5rem;
   border-radius: 4px;
   font-size: 0.75rem;
@@ -473,9 +473,9 @@ const toggleCompanyStatus = async (comp: Company) => {
 }
 
 .action-btn {
-  background: #334155;
+  background: #f1f5f9;
   border: none;
-  color: #cbd5e1;
+  color: #334155;
   padding: 0.4rem;
   border-radius: 6px;
   cursor: pointer;
@@ -485,8 +485,8 @@ const toggleCompanyStatus = async (comp: Company) => {
 }
 
 .action-btn:hover {
-  background: #475569;
-  color: #ffffff;
+  background: #e2e8f0;
+  color: #0f172a;
 }
 
 .modal-form {
@@ -547,17 +547,17 @@ const toggleCompanyStatus = async (comp: Company) => {
 .page-title {
   font-size: 1.75rem;
   font-weight: 800;
-  color: #ffffff;
+  color: #0f172a;
 }
 
 .page-subtitle {
   font-size: 0.875rem;
-  color: #94a3b8;
+  color: #64748b;
 }
 
 .super-card {
-  background: #0f172a;
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
   border-radius: var(--radius-lg);
   overflow: hidden;
 }
@@ -573,17 +573,17 @@ const toggleCompanyStatus = async (comp: Company) => {
   padding: 0.875rem 1rem;
   font-size: 0.75rem;
   color: #64748b;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-  background: #111827;
+  border-bottom: 1px solid #e2e8f0;
+  background: #f8fafc;
 }
 
 .super-table td {
   padding: 1rem;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-  color: #cbd5e1;
+  border-bottom: 1px solid #eef2f6;
+  color: #334155;
 }
 
-.text-white { color: #ffffff; }
+.text-white { color: #0f172a; }
 
 .actions-row {
   display: flex;
@@ -592,9 +592,9 @@ const toggleCompanyStatus = async (comp: Company) => {
 }
 
 .action-btn {
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  color: #94a3b8;
+  background: #f1f5f9;
+  border: 1px solid #e2e8f0;
+  color: #64748b;
   width: 28px;
   height: 28px;
   border-radius: var(--radius-sm);
@@ -605,8 +605,8 @@ const toggleCompanyStatus = async (comp: Company) => {
 }
 
 .action-btn:hover {
-  background: rgba(255, 255, 255, 0.15);
-  color: #ffffff;
+  background: #e2e8f0;
+  color: #0f172a;
 }
 
 .text-right {

@@ -178,17 +178,17 @@ const handleToggleActive = async (plan: Plan) => {
 .page-title {
   font-size: 1.75rem;
   font-weight: 800;
-  color: #ffffff;
+  color: #0f172a;
 }
 
 .page-subtitle {
   font-size: 0.875rem;
-  color: #94a3b8;
+  color: #64748b;
   margin-top: 0.2rem;
 }
 
 .loading-state {
-  color: #94a3b8;
+  color: #64748b;
   padding: 3rem 0;
   text-align: center;
 }
@@ -212,8 +212,8 @@ const handleToggleActive = async (plan: Plan) => {
 }
 
 .super-card {
-  background: #1e293b;
-  border: 1px solid #334155;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
   border-radius: 14px;
   padding: 1.25rem;
   display: flex;
@@ -251,13 +251,13 @@ const handleToggleActive = async (plan: Plan) => {
 .plan-name {
   font-size: 1.25rem;
   font-weight: 800;
-  color: #ffffff;
+  color: #0f172a;
   margin: 0;
 }
 
 .plan-desc {
   font-size: 0.7813rem;
-  color: #94a3b8;
+  color: #64748b;
   margin: 0.35rem 0 0.75rem;
   line-height: 1.35;
   min-height: 40px;
@@ -272,7 +272,7 @@ const handleToggleActive = async (plan: Plan) => {
 .price-val {
   font-size: 1.5rem;
   font-weight: 900;
-  color: #38bdf8;
+  color: #0369a1;
 }
 
 .price-cycle {
@@ -282,7 +282,7 @@ const handleToggleActive = async (plan: Plan) => {
 
 .plan-divider {
   height: 1px;
-  background: #334155;
+  background: #f1f5f9;
   margin: 1rem 0;
 }
 
@@ -304,15 +304,15 @@ const handleToggleActive = async (plan: Plan) => {
 .limit-item {
   display: flex;
   justify-content: space-between;
-  color: #cbd5e1;
+  color: #334155;
 }
 
 .limit-label {
-  color: #94a3b8;
+  color: #64748b;
 }
 
 .limit-val {
-  color: #ffffff;
+  color: #0f172a;
 }
 
 .feature-pills {
@@ -327,14 +327,14 @@ const handleToggleActive = async (plan: Plan) => {
   gap: 0.25rem;
   font-size: 0.6875rem;
   font-weight: 600;
-  color: #34d399;
+  color: #047857;
   background: rgba(16, 185, 129, 0.1);
   padding: 0.2rem 0.45rem;
   border-radius: 4px;
 }
 
 .feat-pill.more {
-  color: #94a3b8;
+  color: #64748b;
   background: rgba(148, 163, 184, 0.1);
 }
 

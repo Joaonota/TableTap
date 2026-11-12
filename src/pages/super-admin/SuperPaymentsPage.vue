@@ -25,9 +25,22 @@ const getRestaurantName = (restaurantId: string) => {
   return restaurants.value.find(r => r.id === restaurantId)?.name || 'Restaurante'
 }
 
+/** Pagamentos efetivamente recebidos (confirmados pelo operador ou pagos). */
+const isSettled = (status: string) => status === 'confirmed' || status === 'paid'
+
+const STATUS_BADGE: Record<string, { label: string; variant: 'success' | 'warning' | 'danger' | 'neutral' }> = {
+  paid: { label: 'Pago', variant: 'success' },
+  confirmed: { label: 'Confirmado', variant: 'success' },
+  pending: { label: 'Pendente', variant: 'warning' },
+  awaiting_confirmation: { label: 'A aguardar confirmação', variant: 'warning' },
+  failed: { label: 'Falhado', variant: 'danger' },
+  refunded: { label: 'Reembolsado', variant: 'neutral' }
+}
+const statusBadge = (status: string) => STATUS_BADGE[status] ?? { label: status, variant: 'neutral' as const }
+
 const totalProcessed = computed(() => {
   return payments.value
-    .filter(p => p.status === 'confirmed')
+    .filter(p => isSettled(p.status))
     .reduce((sum, p) => sum + p.amount, 0)
 })
 
@@ -43,7 +56,7 @@ const methodStats = computed(() => {
     const m = p.method as string
     if (counts[m]) {
       counts[m].count++
-      if (p.status === 'confirmed') counts[m].volume += p.amount
+      if (isSettled(p.status)) counts[m].volume += p.amount
     }
   })
 
@@ -177,8 +190,8 @@ const getMethodLabel = (method: string): string => {
                 <strong class="font-mono text-price">{{ pay.amount.toLocaleString('pt-MZ') }} MT</strong>
               </td>
               <td>
-                <AppBadge :variant="pay.status === 'confirmed' ? 'success' : pay.status === 'pending' ? 'warning' : 'danger'">
-                  {{ pay.status === 'confirmed' ? 'CONFIRMADO' : pay.status.toUpperCase() }}
+                <AppBadge :variant="statusBadge(pay.status).variant">
+                  {{ statusBadge(pay.status).label }}
                 </AppBadge>
               </td>
               <td>
@@ -216,12 +229,12 @@ const getMethodLabel = (method: string): string => {
 .page-title {
   font-size: 1.75rem;
   font-weight: 800;
-  color: #ffffff;
+  color: #0f172a;
 }
 
 .page-subtitle {
   font-size: 0.875rem;
-  color: #94a3b8;
+  color: #64748b;
   margin-top: 0.2rem;
 }
 
@@ -244,8 +257,8 @@ const getMethodLabel = (method: string): string => {
 }
 
 .method-card {
-  background: #1e293b;
-  border: 1px solid #334155;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
   border-radius: 12px;
   padding: 1.25rem;
   display: flex;
@@ -267,20 +280,20 @@ const getMethodLabel = (method: string): string => {
   border-radius: 4px;
 }
 
-.method-tag.mpesa { background: rgba(239, 68, 68, 0.15); color: #f87171; }
-.method-tag.emola { background: rgba(245, 158, 11, 0.15); color: #fbbf24; }
-.method-tag.card { background: rgba(56, 189, 248, 0.15); color: #38bdf8; }
-.method-tag.cash { background: rgba(16, 185, 129, 0.15); color: #34d399; }
+.method-tag.mpesa { background: rgba(239, 68, 68, 0.15); color: #dc2626; }
+.method-tag.emola { background: rgba(245, 158, 11, 0.15); color: #b45309; }
+.method-tag.card { background: rgba(56, 189, 248, 0.15); color: #0369a1; }
+.method-tag.cash { background: rgba(16, 185, 129, 0.15); color: #047857; }
 
-.text-mpesa { color: #f87171; }
-.text-emola { color: #fbbf24; }
-.text-card { color: #38bdf8; }
-.text-cash { color: #34d399; }
+.text-mpesa { color: #dc2626; }
+.text-emola { color: #b45309; }
+.text-card { color: #0369a1; }
+.text-cash { color: #047857; }
 
 .method-vol {
   font-size: 1.35rem;
   font-weight: 800;
-  color: #ffffff;
+  color: #0f172a;
   margin-top: 0.25rem;
 }
 
@@ -298,8 +311,8 @@ const getMethodLabel = (method: string): string => {
 .search-wrap {
   display: flex;
   align-items: center;
-  background: #1e293b;
-  border: 1px solid #334155;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
   border-radius: 8px;
   padding: 0 0.85rem;
   flex: 1;
@@ -316,24 +329,24 @@ const getMethodLabel = (method: string): string => {
   background: transparent;
   border: none;
   padding: 0.65rem 0;
-  color: #ffffff;
+  color: #0f172a;
   font-size: 0.875rem;
   outline: none;
 }
 
 .filter-select {
-  background: #1e293b;
-  border: 1px solid #334155;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
   border-radius: 8px;
   padding: 0.65rem 0.85rem;
-  color: #ffffff;
+  color: #0f172a;
   font-size: 0.875rem;
   outline: none;
 }
 
 .super-card {
-  background: #1e293b;
-  border: 1px solid #334155;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
   border-radius: 12px;
   overflow: hidden;
 }
@@ -350,34 +363,34 @@ const getMethodLabel = (method: string): string => {
 }
 
 .super-table th {
-  background: #0f172a;
-  color: #94a3b8;
+  background: #f8fafc;
+  color: #64748b;
   font-size: 0.75rem;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.05em;
   padding: 0.85rem 1rem;
-  border-bottom: 1px solid #334155;
+  border-bottom: 1px solid #e2e8f0;
 }
 
 .super-table td {
   padding: 0.85rem 1rem;
-  border-bottom: 1px solid #334155;
-  color: #cbd5e1;
+  border-bottom: 1px solid #e2e8f0;
+  color: #334155;
 }
 
 .super-table tr:hover {
-  background: rgba(255, 255, 255, 0.02);
+  background: #f8fafc;
 }
 
 .method-pill {
   font-size: 0.75rem;
   font-weight: 600;
-  color: #cbd5e1;
+  color: #334155;
 }
 
 .text-price {
-  color: #34d399;
+  color: #047857;
 }
 </style>
 

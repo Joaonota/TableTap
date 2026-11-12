@@ -177,12 +177,12 @@ const exportPlatformCsv = () => {
 .page-title {
   font-size: 1.75rem;
   font-weight: 800;
-  color: #ffffff;
+  color: #0f172a;
 }
 
 .page-subtitle {
   font-size: 0.875rem;
-  color: #94a3b8;
+  color: #64748b;
   margin-top: 0.2rem;
 }
 
@@ -199,8 +199,8 @@ const exportPlatformCsv = () => {
 }
 
 .kpi-card {
-  background: #1e293b;
-  border: 1px solid #334155;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
   border-radius: 12px;
   padding: 1.25rem;
   display: flex;
@@ -218,9 +218,9 @@ const exportPlatformCsv = () => {
   flex-shrink: 0;
 }
 
-.kpi-icon-wrap.mrr { background: rgba(16, 185, 129, 0.15); color: #34d399; }
-.kpi-icon-wrap.arpu { background: rgba(56, 189, 248, 0.15); color: #38bdf8; }
-.kpi-icon-wrap.rate { background: rgba(168, 85, 247, 0.15); color: #c084fc; }
+.kpi-icon-wrap.mrr { background: rgba(16, 185, 129, 0.15); color: #047857; }
+.kpi-icon-wrap.arpu { background: rgba(56, 189, 248, 0.15); color: #0369a1; }
+.kpi-icon-wrap.rate { background: rgba(168, 85, 247, 0.15); color: #7e22ce; }
 
 .kpi-info {
   display: flex;
@@ -230,14 +230,14 @@ const exportPlatformCsv = () => {
 .kpi-label {
   font-size: 0.75rem;
   font-weight: 600;
-  color: #94a3b8;
+  color: #64748b;
   text-transform: uppercase;
 }
 
 .kpi-val {
   font-size: 1.35rem;
   font-weight: 800;
-  color: #ffffff;
+  color: #0f172a;
   margin: 0.15rem 0;
 }
 
@@ -259,8 +259,8 @@ const exportPlatformCsv = () => {
 }
 
 .super-card {
-  background: #1e293b;
-  border: 1px solid #334155;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
   border-radius: 12px;
   padding: 1.25rem;
 }
@@ -268,13 +268,13 @@ const exportPlatformCsv = () => {
 .report-card-title {
   font-size: 1.05rem;
   font-weight: 700;
-  color: #ffffff;
+  color: #0f172a;
   margin: 0;
 }
 
 .report-card-desc {
   font-size: 0.7813rem;
-  color: #94a3b8;
+  color: #64748b;
   margin: 0.25rem 0 1.25rem;
 }
 
@@ -285,19 +285,19 @@ const exportPlatformCsv = () => {
 
 .report-summary-table td {
   padding: 0.75rem 0;
-  border-bottom: 1px solid #334155;
+  border-bottom: 1px solid #e2e8f0;
   font-size: 0.8438rem;
-  color: #cbd5e1;
+  color: #334155;
 }
 
 .report-summary-table tr:last-child td {
   border-bottom: none;
 }
 
-.text-white { color: #ffffff; }
-.text-yellow { color: #fbbf24; }
-.text-green { color: #34d399; }
-.text-primary { color: #38bdf8; }
+.text-white { color: #0f172a; }
+.text-yellow { color: #b45309; }
+.text-green { color: #047857; }
+.text-primary { color: #0369a1; }
 .font-bold { font-weight: 700; text-align: right; }
 
 .revenue-tier-list {
@@ -310,13 +310,13 @@ const exportPlatformCsv = () => {
   display: flex;
   justify-content: space-between;
   font-size: 0.8125rem;
-  color: #ffffff;
+  color: #0f172a;
   margin-bottom: 0.35rem;
 }
 
 .tier-bar {
   height: 8px;
-  background: #0f172a;
+  background: #f8fafc;
   border-radius: 4px;
   overflow: hidden;
 }

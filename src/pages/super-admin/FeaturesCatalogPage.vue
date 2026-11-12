@@ -117,18 +117,18 @@ const isFeatureActiveInPlan = (plan: Plan, featureKey: string): boolean => {
 .page-title {
   font-size: 1.75rem;
   font-weight: 800;
-  color: #ffffff;
+  color: #0f172a;
 }
 
 .page-subtitle {
   font-size: 0.875rem;
-  color: #94a3b8;
+  color: #64748b;
   margin-top: 0.2rem;
 }
 
 .super-card {
-  background: #1e293b;
-  border: 1px solid #334155;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
   border-radius: 12px;
   overflow: hidden;
 }
@@ -143,15 +143,15 @@ const isFeatureActiveInPlan = (plan: Plan, featureKey: string): boolean => {
 }
 
 .matrix-table th {
-  background: #0f172a;
-  color: #94a3b8;
+  background: #f8fafc;
+  color: #64748b;
   padding: 1rem;
-  border-bottom: 1px solid #334155;
+  border-bottom: 1px solid #e2e8f0;
 }
 
 .matrix-table td {
   padding: 0.85rem 1rem;
-  border-bottom: 1px solid #334155;
+  border-bottom: 1px solid #e2e8f0;
 }
 
 .feat-col {
@@ -178,29 +178,29 @@ const isFeatureActiveInPlan = (plan: Plan, featureKey: string): boolean => {
 .plan-name {
   font-size: 0.9375rem;
   font-weight: 800;
-  color: #ffffff;
+  color: #0f172a;
 }
 
 .plan-price {
   font-size: 0.75rem;
-  color: #38bdf8;
+  color: #0369a1;
   font-weight: 700;
 }
 
 .module-section-row td {
-  background: #0f172a;
+  background: #f8fafc;
   padding: 0.65rem 1rem;
   font-size: 0.75rem;
   font-weight: 800;
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  color: #34d399;
-  border-top: 1px solid #334155;
-  border-bottom: 1px solid #334155;
+  color: #047857;
+  border-top: 1px solid #e2e8f0;
+  border-bottom: 1px solid #e2e8f0;
 }
 
 .feature-row:hover {
-  background: rgba(255, 255, 255, 0.02);
+  background: #f8fafc;
 }
 
 .feat-info {
@@ -210,12 +210,12 @@ const isFeatureActiveInPlan = (plan: Plan, featureKey: string): boolean => {
 
 .feat-name {
   font-size: 0.875rem;
-  color: #ffffff;
+  color: #0f172a;
 }
 
 .feat-desc {
   font-size: 0.75rem;
-  color: #94a3b8;
+  color: #64748b;
   margin-top: 0.15rem;
 }
 
@@ -225,7 +225,7 @@ const isFeatureActiveInPlan = (plan: Plan, featureKey: string): boolean => {
   gap: 0.3rem;
   font-size: 0.75rem;
   font-weight: 700;
-  color: #34d399;
+  color: #047857;
   background: rgba(16, 185, 129, 0.12);
   padding: 0.25rem 0.6rem;
   border-radius: 6px;

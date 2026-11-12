@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { subscriptionStatusLabel } from '@/domain/statusLabels'
 import { ref, onMounted, computed } from 'vue'
 import { usePlatformStore } from '@/stores/platform'
 import { usePlansStore } from '@/stores/plans'
@@ -189,7 +190,7 @@ const getStatusBadgeVariant = (status: SubscriptionStatus): 'success' | 'warning
               </td>
               <td>
                 <AppBadge :variant="getStatusBadgeVariant(sub.status)">
-                  {{ sub.status.toUpperCase() }}
+                  {{ subscriptionStatusLabel(sub.status) }}
                 </AppBadge>
               </td>
               <td class="text-right">
@@ -241,12 +242,12 @@ const getStatusBadgeVariant = (status: SubscriptionStatus): 'success' | 'warning
 .page-title {
   font-size: 1.75rem;
   font-weight: 800;
-  color: #ffffff;
+  color: #0f172a;
 }
 
 .page-subtitle {
   font-size: 0.875rem;
-  color: #94a3b8;
+  color: #64748b;
   margin-top: 0.2rem;
 }
 
@@ -263,8 +264,8 @@ const getStatusBadgeVariant = (status: SubscriptionStatus): 'success' | 'warning
 }
 
 .kpi-card {
-  background: #1e293b;
-  border: 1px solid #334155;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
   border-radius: 12px;
   padding: 1.25rem;
   display: flex;
@@ -284,17 +285,17 @@ const getStatusBadgeVariant = (status: SubscriptionStatus): 'success' | 'warning
 
 .kpi-icon-wrap.mrr {
   background: rgba(13, 122, 95, 0.15);
-  color: #34d399;
+  color: #047857;
 }
 
 .kpi-icon-wrap.active-subs {
   background: rgba(56, 189, 248, 0.15);
-  color: #38bdf8;
+  color: #0369a1;
 }
 
 .kpi-icon-wrap.trial {
   background: rgba(245, 158, 11, 0.15);
-  color: #fbbf24;
+  color: #b45309;
 }
 
 .kpi-info {
@@ -305,14 +306,14 @@ const getStatusBadgeVariant = (status: SubscriptionStatus): 'success' | 'warning
 .kpi-label {
   font-size: 0.75rem;
   font-weight: 600;
-  color: #94a3b8;
+  color: #64748b;
   text-transform: uppercase;
 }
 
 .kpi-val {
   font-size: 1.35rem;
   font-weight: 800;
-  color: #ffffff;
+  color: #0f172a;
   margin: 0.15rem 0;
 }
 
@@ -330,8 +331,8 @@ const getStatusBadgeVariant = (status: SubscriptionStatus): 'success' | 'warning
 .search-wrap {
   display: flex;
   align-items: center;
-  background: #1e293b;
-  border: 1px solid #334155;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
   border-radius: 8px;
   padding: 0 0.85rem;
   flex: 1;
@@ -348,7 +349,7 @@ const getStatusBadgeVariant = (status: SubscriptionStatus): 'success' | 'warning
   background: transparent;
   border: none;
   padding: 0.65rem 0;
-  color: #ffffff;
+  color: #0f172a;
   font-size: 0.875rem;
   outline: none;
 }
@@ -357,22 +358,22 @@ const getStatusBadgeVariant = (status: SubscriptionStatus): 'success' | 'warning
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  color: #94a3b8;
+  color: #64748b;
 }
 
 .filter-select {
-  background: #1e293b;
-  border: 1px solid #334155;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
   border-radius: 8px;
   padding: 0.65rem 0.85rem;
-  color: #ffffff;
+  color: #0f172a;
   font-size: 0.875rem;
   outline: none;
 }
 
 .super-card {
-  background: #1e293b;
-  border: 1px solid #334155;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
   border-radius: 12px;
   overflow: hidden;
 }
@@ -389,24 +390,24 @@ const getStatusBadgeVariant = (status: SubscriptionStatus): 'success' | 'warning
 }
 
 .super-table th {
-  background: #0f172a;
-  color: #94a3b8;
+  background: #f8fafc;
+  color: #64748b;
   font-size: 0.75rem;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.05em;
   padding: 0.85rem 1rem;
-  border-bottom: 1px solid #334155;
+  border-bottom: 1px solid #e2e8f0;
 }
 
 .super-table td {
   padding: 0.85rem 1rem;
-  border-bottom: 1px solid #334155;
-  color: #cbd5e1;
+  border-bottom: 1px solid #e2e8f0;
+  color: #334155;
 }
 
 .super-table tr:hover {
-  background: rgba(255, 255, 255, 0.02);
+  background: #f8fafc;
 }
 
 .company-cell {
@@ -423,18 +424,18 @@ const getStatusBadgeVariant = (status: SubscriptionStatus): 'success' | 'warning
   display: inline-block;
   padding: 0.2rem 0.6rem;
   background: rgba(56, 189, 248, 0.12);
-  color: #38bdf8;
+  color: #0369a1;
   border-radius: 6px;
   font-size: 0.8125rem;
   font-weight: 600;
 }
 
 .text-price {
-  color: #34d399;
+  color: #047857;
 }
 
 .text-success {
-  color: #34d399;
+  color: #047857;
 }
 
 .text-muted {

@@ -161,12 +161,12 @@ const handleSaveConfig = async () => {
 .page-title {
   font-size: 1.75rem;
   font-weight: 800;
-  color: #ffffff;
+  color: #0f172a;
 }
 
 .page-subtitle {
   font-size: 0.875rem;
-  color: #94a3b8;
+  color: #64748b;
   margin-top: 0.2rem;
 }
 
@@ -183,8 +183,8 @@ const handleSaveConfig = async () => {
 }
 
 .super-card {
-  background: #1e293b;
-  border: 1px solid #334155;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
   border-radius: 12px;
   padding: 1.5rem;
 }
@@ -192,13 +192,13 @@ const handleSaveConfig = async () => {
 .card-title {
   font-size: 1.05rem;
   font-weight: 700;
-  color: #ffffff;
+  color: #0f172a;
   margin: 0;
 }
 
 .card-subtitle {
   font-size: 0.7813rem;
-  color: #94a3b8;
+  color: #64748b;
   margin: 0.25rem 0 1.25rem;
 }
 
@@ -217,16 +217,16 @@ const handleSaveConfig = async () => {
 .form-label {
   font-size: 0.8125rem;
   font-weight: 600;
-  color: #cbd5e1;
+  color: #334155;
 }
 
 .form-select {
   width: 100%;
   padding: 0.65rem 0.75rem;
   border-radius: 8px;
-  border: 1px solid #475569;
-  background: #0f172a;
-  color: #ffffff;
+  border: 1px solid #cbd5e1;
+  background: #f8fafc;
+  color: #0f172a;
   font-size: 0.875rem;
   outline: none;
 }
@@ -259,12 +259,12 @@ const handleSaveConfig = async () => {
 .toggle-row strong {
   display: block;
   font-size: 0.875rem;
-  color: #ffffff;
+  color: #0f172a;
 }
 
 .toggle-row p {
   font-size: 0.75rem;
-  color: #94a3b8;
+  color: #64748b;
   margin: 0.15rem 0 0;
 }
 
@@ -276,7 +276,7 @@ const handleSaveConfig = async () => {
 }
 
 .text-warning {
-  color: #fbbf24;
+  color: #b45309;
 }
 </style>
 

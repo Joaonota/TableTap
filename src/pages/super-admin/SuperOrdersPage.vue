@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { orderStatusLabel } from '@/domain/statusLabels'
 import { ref, onMounted, computed } from 'vue'
 import { mockStorage } from '@/repositories/mock/mockStorage'
 import { restaurantService, tenantService } from '@/services'
@@ -171,7 +172,7 @@ const getOrderStatusBadge = (status: OrderStatus): 'neutral' | 'primary' | 'warn
           <tbody>
             <tr v-for="ord in filteredOrders" :key="ord.id">
               <td>
-                <strong class="order-code font-mono text-white">#{{ ord.orderCode }}</strong>
+                <strong class="order-code font-mono text-white">{{ ord.orderCode.startsWith('#') ? ord.orderCode : `#${ord.orderCode}` }}</strong>
               </td>
               <td>
                 <div class="rest-tenant-cell">
@@ -195,7 +196,7 @@ const getOrderStatusBadge = (status: OrderStatus): 'neutral' | 'primary' | 'warn
               </td>
               <td>
                 <AppBadge :variant="getOrderStatusBadge(ord.status)">
-                  {{ ord.status.toUpperCase() }}
+                  {{ orderStatusLabel(ord.status) }}
                 </AppBadge>
               </td>
               <td>
@@ -233,12 +234,12 @@ const getOrderStatusBadge = (status: OrderStatus): 'neutral' | 'primary' | 'warn
 .page-title {
   font-size: 1.75rem;
   font-weight: 800;
-  color: #ffffff;
+  color: #0f172a;
 }
 
 .page-subtitle {
   font-size: 0.875rem;
-  color: #94a3b8;
+  color: #64748b;
   margin-top: 0.2rem;
 }
 
@@ -255,8 +256,8 @@ const getOrderStatusBadge = (status: OrderStatus): 'neutral' | 'primary' | 'warn
 }
 
 .kpi-card {
-  background: #1e293b;
-  border: 1px solid #334155;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
   border-radius: 12px;
   padding: 1.25rem;
   display: flex;
@@ -274,9 +275,9 @@ const getOrderStatusBadge = (status: OrderStatus): 'neutral' | 'primary' | 'warn
   flex-shrink: 0;
 }
 
-.kpi-icon-wrap.orders { background: rgba(56, 189, 248, 0.15); color: #38bdf8; }
-.kpi-icon-wrap.rev { background: rgba(16, 185, 129, 0.15); color: #34d399; }
-.kpi-icon-wrap.ticket { background: rgba(245, 158, 11, 0.15); color: #fbbf24; }
+.kpi-icon-wrap.orders { background: rgba(56, 189, 248, 0.15); color: #0369a1; }
+.kpi-icon-wrap.rev { background: rgba(16, 185, 129, 0.15); color: #047857; }
+.kpi-icon-wrap.ticket { background: rgba(245, 158, 11, 0.15); color: #b45309; }
 
 .kpi-info {
   display: flex;
@@ -286,14 +287,14 @@ const getOrderStatusBadge = (status: OrderStatus): 'neutral' | 'primary' | 'warn
 .kpi-label {
   font-size: 0.75rem;
   font-weight: 600;
-  color: #94a3b8;
+  color: #64748b;
   text-transform: uppercase;
 }
 
 .kpi-val {
   font-size: 1.35rem;
   font-weight: 800;
-  color: #ffffff;
+  color: #0f172a;
   margin: 0.15rem 0;
 }
 
@@ -311,8 +312,8 @@ const getOrderStatusBadge = (status: OrderStatus): 'neutral' | 'primary' | 'warn
 .search-wrap {
   display: flex;
   align-items: center;
-  background: #1e293b;
-  border: 1px solid #334155;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
   border-radius: 8px;
   padding: 0 0.85rem;
   flex: 1;
@@ -329,7 +330,7 @@ const getOrderStatusBadge = (status: OrderStatus): 'neutral' | 'primary' | 'warn
   background: transparent;
   border: none;
   padding: 0.65rem 0;
-  color: #ffffff;
+  color: #0f172a;
   font-size: 0.875rem;
   outline: none;
 }
@@ -340,18 +341,18 @@ const getOrderStatusBadge = (status: OrderStatus): 'neutral' | 'primary' | 'warn
 }
 
 .filter-select {
-  background: #1e293b;
-  border: 1px solid #334155;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
   border-radius: 8px;
   padding: 0.65rem 0.85rem;
-  color: #ffffff;
+  color: #0f172a;
   font-size: 0.875rem;
   outline: none;
 }
 
 .super-card {
-  background: #1e293b;
-  border: 1px solid #334155;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
   border-radius: 12px;
   overflow: hidden;
 }
@@ -368,28 +369,29 @@ const getOrderStatusBadge = (status: OrderStatus): 'neutral' | 'primary' | 'warn
 }
 
 .super-table th {
-  background: #0f172a;
-  color: #94a3b8;
+  background: #f8fafc;
+  color: #64748b;
   font-size: 0.75rem;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.05em;
   padding: 0.85rem 1rem;
-  border-bottom: 1px solid #334155;
+  border-bottom: 1px solid #e2e8f0;
 }
 
 .super-table td {
   padding: 0.85rem 1rem;
-  border-bottom: 1px solid #334155;
-  color: #cbd5e1;
+  border-bottom: 1px solid #e2e8f0;
+  color: #334155;
 }
 
 .super-table tr:hover {
-  background: rgba(255, 255, 255, 0.02);
+  background: #f8fafc;
 }
 
 .order-code {
-  color: #38bdf8;
+  white-space: nowrap;
+  color: #0369a1;
 }
 
 .rest-tenant-cell {
@@ -398,7 +400,7 @@ const getOrderStatusBadge = (status: OrderStatus): 'neutral' | 'primary' | 'warn
 }
 
 .text-price {
-  color: #34d399;
+  color: #047857;
 }
 
 .pay-status {
@@ -409,13 +411,16 @@ const getOrderStatusBadge = (status: OrderStatus): 'neutral' | 'primary' | 'warn
 }
 
 .pay-status.paid {
-  color: #34d399;
+  color: #047857;
   background: rgba(16, 185, 129, 0.12);
 }
 
 .pay-status.pending {
-  color: #fbbf24;
+  color: #b45309;
   background: rgba(245, 158, 11, 0.12);
+}
+.super-table :deep(.app-badge) {
+  white-space: nowrap;
 }
 </style>
 

@@ -180,7 +180,7 @@ const selectAllInModule = (moduleName: string, enable: boolean) => {
 }
 
 .sep {
-  color: var(--color-border, #d1d5db);
+  color: var(--color-border, #374151);
 }
 
 .features-grid {
@@ -221,7 +221,7 @@ const selectAllInModule = (moduleName: string, enable: boolean) => {
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #ffffff;
+  color: #0f172a;
   flex-shrink: 0;
   margin-top: 1px;
   transition: all 0.15s;

@@ -145,12 +145,12 @@ const getActionColorClass = (action: string) => {
 .page-title {
   font-size: 1.75rem;
   font-weight: 800;
-  color: #ffffff;
+  color: #0f172a;
 }
 
 .page-subtitle {
   font-size: 0.875rem;
-  color: #94a3b8;
+  color: #64748b;
   margin-top: 0.2rem;
 }
 
@@ -163,8 +163,8 @@ const getActionColorClass = (action: string) => {
 .search-wrap {
   display: flex;
   align-items: center;
-  background: #1e293b;
-  border: 1px solid #334155;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
   border-radius: 8px;
   padding: 0 0.85rem;
   flex: 1;
@@ -181,7 +181,7 @@ const getActionColorClass = (action: string) => {
   background: transparent;
   border: none;
   padding: 0.65rem 0;
-  color: #ffffff;
+  color: #0f172a;
   font-size: 0.875rem;
   outline: none;
 }
@@ -190,29 +190,29 @@ const getActionColorClass = (action: string) => {
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  color: #94a3b8;
+  color: #64748b;
 }
 
 .filter-select {
-  background: #1e293b;
-  border: 1px solid #334155;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
   border-radius: 8px;
   padding: 0.65rem 0.85rem;
-  color: #ffffff;
+  color: #0f172a;
   font-size: 0.875rem;
   outline: none;
 }
 
 .super-card {
-  background: #1e293b;
-  border: 1px solid #334155;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
   border-radius: 12px;
   padding: 1.25rem;
 }
 
 .loading-state,
 .empty-state {
-  color: #94a3b8;
+  color: #64748b;
   text-align: center;
   padding: 3rem 0;
   font-size: 0.875rem;
@@ -228,8 +228,8 @@ const getActionColorClass = (action: string) => {
   display: flex;
   gap: 1rem;
   padding: 1rem;
-  background: #0f172a;
-  border: 1px solid #334155;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
   border-radius: 10px;
 }
 
@@ -244,7 +244,7 @@ const getActionColorClass = (action: string) => {
   height: 32px;
   border-radius: 8px;
   background: rgba(56, 189, 248, 0.12);
-  color: #38bdf8;
+  color: #0369a1;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -276,7 +276,7 @@ const getActionColorClass = (action: string) => {
 
 .log-resource {
   font-size: 0.8125rem;
-  color: #cbd5e1;
+  color: #334155;
   margin: 0.35rem 0 0.2rem;
   display: flex;
   align-items: center;
@@ -285,15 +285,15 @@ const getActionColorClass = (action: string) => {
 
 .tenant-pill {
   font-size: 0.6875rem;
-  color: #94a3b8;
-  background: #1e293b;
+  color: #64748b;
+  background: #ffffff;
   padding: 0.15rem 0.45rem;
   border-radius: 4px;
 }
 
 .log-details {
   font-size: 0.8125rem;
-  color: #94a3b8;
+  color: #64748b;
   margin: 0.25rem 0 0.65rem;
   line-height: 1.4;
 }
@@ -307,11 +307,11 @@ const getActionColorClass = (action: string) => {
 }
 
 .log-user strong {
-  color: #cbd5e1;
+  color: #334155;
 }
 
-.text-success { color: #34d399; }
-.text-warning { color: #fbbf24; }
-.text-danger { color: #f87171; }
-.text-primary { color: #38bdf8; }
+.text-success { color: #047857; }
+.text-warning { color: #b45309; }
+.text-danger { color: #dc2626; }
+.text-primary { color: #0369a1; }
 </style>

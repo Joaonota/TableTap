@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { subscriptionStatusLabel } from '@/domain/statusLabels'
 import { ref, onMounted, computed } from 'vue'
 import { tenantService, restaurantService, authService } from '@/services'
 import { usePlatformStore } from '@/stores/platform'
@@ -218,7 +219,7 @@ const planDistributionList = computed(() => {
             <div class="sub-right">
               <strong class="font-mono text-price">{{ sub.monthlyPrice.toLocaleString('pt-MZ') }} MT</strong>
               <AppBadge :variant="sub.status === 'active' ? 'success' : sub.status === 'trial' ? 'primary' : 'warning'">
-                {{ sub.status }}
+                {{ subscriptionStatusLabel(sub.status) }}
               </AppBadge>
             </div>
           </div>
@@ -280,13 +281,13 @@ const planDistributionList = computed(() => {
 .super-title {
   font-size: 1.75rem;
   font-weight: 800;
-  color: #ffffff;
+  color: #0f172a;
   margin: 0;
 }
 
 .super-subtitle {
   font-size: 0.875rem;
-  color: #94a3b8;
+  color: #64748b;
   margin: 0.25rem 0 0;
 }
 
@@ -299,7 +300,7 @@ const planDistributionList = computed(() => {
 .badge-status.online {
   font-size: 0.8125rem;
   font-weight: 700;
-  color: #34d399;
+  color: #047857;
   background: rgba(16, 185, 129, 0.12);
   padding: 0.35rem 0.75rem;
   border-radius: 20px;
@@ -308,7 +309,7 @@ const planDistributionList = computed(() => {
 .badge-mrr {
   font-size: 0.8125rem;
   font-weight: 700;
-  color: #38bdf8;
+  color: #0369a1;
   background: rgba(56, 189, 248, 0.12);
   padding: 0.35rem 0.75rem;
   border-radius: 20px;
@@ -333,8 +334,8 @@ const planDistributionList = computed(() => {
 }
 
 .super-metric-card {
-  background: #1e293b;
-  border: 1px solid #334155;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
   border-radius: 12px;
   padding: 1.25rem;
   display: flex;
@@ -349,7 +350,7 @@ const planDistributionList = computed(() => {
   font-size: 0.6875rem;
   font-weight: 700;
   letter-spacing: 0.05em;
-  color: #94a3b8;
+  color: #64748b;
 }
 
 .m-icon {
@@ -360,28 +361,28 @@ const planDistributionList = computed(() => {
 
 .m-icon-green {
   background: rgba(16, 185, 129, 0.12);
-  color: #34d399;
+  color: #047857;
 }
 
 .m-icon-blue {
   background: rgba(56, 189, 248, 0.12);
-  color: #38bdf8;
+  color: #0369a1;
 }
 
 .m-icon-purple {
   background: rgba(168, 85, 247, 0.12);
-  color: #c084fc;
+  color: #7e22ce;
 }
 
 .m-icon-orange {
   background: rgba(245, 158, 11, 0.12);
-  color: #fbbf24;
+  color: #b45309;
 }
 
 .m-val {
   font-size: 1.5rem;
   font-weight: 800;
-  color: #ffffff;
+  color: #0f172a;
 }
 
 .m-sub {
@@ -393,7 +394,7 @@ const planDistributionList = computed(() => {
 }
 
 .text-success {
-  color: #34d399;
+  color: #047857;
 }
 
 .analytics-row {
@@ -409,8 +410,8 @@ const planDistributionList = computed(() => {
 }
 
 .super-card {
-  background: #1e293b;
-  border: 1px solid #334155;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
   border-radius: 12px;
   padding: 1.25rem;
   display: flex;
@@ -427,13 +428,13 @@ const planDistributionList = computed(() => {
 .card-title {
   font-size: 1rem;
   font-weight: 700;
-  color: #ffffff;
+  color: #0f172a;
   margin: 0;
 }
 
 .card-subtitle {
   font-size: 0.75rem;
-  color: #94a3b8;
+  color: #64748b;
   margin: 0.2rem 0 0;
 }
 
@@ -447,7 +448,7 @@ const planDistributionList = computed(() => {
   align-items: center;
   gap: 0.35rem;
   font-size: 0.8125rem;
-  color: #38bdf8;
+  color: #0369a1;
   font-weight: 600;
   text-decoration: none;
 }
@@ -472,14 +473,14 @@ const planDistributionList = computed(() => {
 
 .bar-val {
   font-size: 0.6875rem;
-  color: #94a3b8;
+  color: #64748b;
 }
 
 .bar-track {
   flex: 1;
   width: 100%;
   max-width: 44px;
-  background: #0f172a;
+  background: #f8fafc;
   border-radius: 6px;
   display: flex;
   align-items: flex-end;
@@ -495,7 +496,7 @@ const planDistributionList = computed(() => {
 
 .bar-month {
   font-size: 0.75rem;
-  color: #94a3b8;
+  color: #64748b;
 }
 
 .distribution-list {
@@ -513,17 +514,17 @@ const planDistributionList = computed(() => {
 }
 
 .dist-name {
-  color: #ffffff;
+  color: #0f172a;
 }
 
 .dist-val {
-  color: #94a3b8;
+  color: #64748b;
   font-size: 0.75rem;
 }
 
 .dist-track {
   height: 8px;
-  background: #0f172a;
+  background: #f8fafc;
   border-radius: 4px;
   overflow: hidden;
 }
@@ -537,7 +538,7 @@ const planDistributionList = computed(() => {
 .plan-quick-action {
   margin-top: 1.25rem;
   padding-top: 1rem;
-  border-top: 1px solid #334155;
+  border-top: 1px solid #e2e8f0;
 }
 
 .super-tables-grid {
@@ -563,15 +564,15 @@ const planDistributionList = computed(() => {
   justify-content: space-between;
   align-items: center;
   padding: 0.75rem;
-  background: #0f172a;
+  background: #f8fafc;
   border-radius: 8px;
-  border: 1px solid #334155;
+  border: 1px solid #e2e8f0;
 }
 
 .sub-left strong {
   display: block;
   font-size: 0.875rem;
-  color: #ffffff;
+  color: #0f172a;
 }
 
 .sub-meta {
@@ -579,12 +580,12 @@ const planDistributionList = computed(() => {
   align-items: center;
   gap: 0.45rem;
   font-size: 0.75rem;
-  color: #94a3b8;
+  color: #64748b;
   margin-top: 0.2rem;
 }
 
 .plan-badge-mini {
-  color: #38bdf8;
+  color: #0369a1;
   font-weight: 700;
 }
 
@@ -596,7 +597,7 @@ const planDistributionList = computed(() => {
 }
 
 .text-price {
-  color: #34d399;
+  color: #047857;
 }
 
 .audit-feed {
@@ -609,13 +610,13 @@ const planDistributionList = computed(() => {
   display: flex;
   gap: 0.75rem;
   padding: 0.75rem;
-  background: #0f172a;
+  background: #f8fafc;
   border-radius: 8px;
-  border: 1px solid #334155;
+  border: 1px solid #e2e8f0;
 }
 
 .audit-icon-bullet {
-  color: #38bdf8;
+  color: #0369a1;
   margin-top: 2px;
 }
 
@@ -631,7 +632,7 @@ const planDistributionList = computed(() => {
 .audit-action {
   font-size: 0.75rem;
   font-weight: 700;
-  color: #38bdf8;
+  color: #0369a1;
 }
 
 .audit-time {
@@ -641,13 +642,13 @@ const planDistributionList = computed(() => {
 
 .audit-details {
   font-size: 0.7813rem;
-  color: #cbd5e1;
+  color: #334155;
   margin: 0.2rem 0;
   line-height: 1.35;
 }
 
 .audit-actor {
   font-size: 0.6875rem;
-  color: #94a3b8;
+  color: #64748b;
 }
 </style>

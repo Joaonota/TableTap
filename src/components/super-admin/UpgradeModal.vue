@@ -356,7 +356,7 @@ const formatLimit = (limit: number | null): string => {
   display: flex;
   align-items: center;
   gap: 0.45rem;
-  color: var(--color-text-muted, #9ca3af);
+  color: var(--color-text-muted, #6b7280);
   opacity: 0.5;
 }
 

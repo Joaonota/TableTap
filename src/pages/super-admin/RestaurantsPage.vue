@@ -110,17 +110,17 @@ const getCompanyName = (tenantId: string) => {
 .page-title {
   font-size: 1.75rem;
   font-weight: 800;
-  color: #ffffff;
+  color: #0f172a;
 }
 
 .page-subtitle {
   font-size: 0.875rem;
-  color: #94a3b8;
+  color: #64748b;
 }
 
 .super-card {
-  background: #0f172a;
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
   border-radius: var(--radius-lg);
   overflow: hidden;
 }
@@ -136,14 +136,14 @@ const getCompanyName = (tenantId: string) => {
   padding: 0.875rem 1rem;
   font-size: 0.75rem;
   color: #64748b;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-  background: #111827;
+  border-bottom: 1px solid #e2e8f0;
+  background: #f8fafc;
 }
 
 .super-table td {
   padding: 1rem;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-  color: #cbd5e1;
+  border-bottom: 1px solid #eef2f6;
+  color: #334155;
 }
 
 .rest-row {
@@ -159,14 +159,14 @@ const getCompanyName = (tenantId: string) => {
   object-fit: cover;
 }
 
-.text-white { color: #ffffff; }
+.text-white { color: #0f172a; }
 
 .menu-link {
   display: inline-flex;
   align-items: center;
   gap: 0.25rem;
   font-size: 0.75rem;
-  color: #a78bfa;
+  color: #6d28d9;
 }
 
 .menu-link:hover {

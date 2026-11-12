@@ -36,6 +36,13 @@ defineEmits<{
 </template>
 
 <style scoped>
+/* Ícone + texto passados no slot por omissão ficam alinhados e espaçados */
+.btn-text {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
 .app-btn {
   display: inline-flex;
   align-items: center;

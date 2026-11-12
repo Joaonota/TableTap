@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { subscriptionStatusLabel } from '@/domain/statusLabels'
 import { ref, watch, computed } from 'vue'
 import type { Plan, Subscription, SubscriptionStatus } from '@/types'
 import AppModal from '@/components/ui/AppModal.vue'
@@ -114,7 +115,7 @@ const handleSave = () => {
 
         <div class="status-price-box">
           <AppBadge :variant="getStatusBadgeVariant(selectedStatus)">
-            {{ selectedStatus.toUpperCase() }}
+            {{ subscriptionStatusLabel(selectedStatus) }}
           </AppBadge>
           <div class="mrr-val font-mono">
             {{ (currentPlanObj?.price || subscription.monthlyPrice || 0).toLocaleString('pt-MZ') }} MT/mês
@@ -462,7 +463,7 @@ const handleSave = () => {
 
 .empty-history {
   font-size: 0.8125rem;
-  color: var(--color-text-muted, #9ca3af);
+  color: var(--color-text-muted, #6b7280);
   text-align: center;
   padding: 1.5rem 0;
 }

@@ -45,7 +45,7 @@ const isMobileSidebarOpen = ref(false)
         <div class="super-badge-brand">
           <AppLogo :size="26" chip />
           <div>
-            <div class="brand-title">TapMenu Master SaaS</div>
+            <div class="brand-title">TapMenu <span class="role-pill">Super Admin</span></div>
             <div class="brand-sub">Consola de Gestão Global</div>
           </div>
         </div>
@@ -211,6 +211,8 @@ const isMobileSidebarOpen = ref(false)
         </div>
       </aside>
 
+      <div v-if="isMobileSidebarOpen" class="sidebar-backdrop" @click="isMobileSidebarOpen = false"></div>
+
       <!-- Main Super Admin View -->
       <main class="super-main">
         <router-view />
@@ -224,19 +226,20 @@ const isMobileSidebarOpen = ref(false)
 <style scoped>
 .super-wrapper {
   min-height: 100vh;
-  background-color: #090d16;
-  color: #f1f5f9;
+  background-color: var(--bg-page);
+  color: var(--text-main);
   display: flex;
   flex-direction: column;
 }
 
 .super-header {
   height: 64px;
-  background: #0f172a;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  background: #ffffff;
+  border-bottom: 1px solid var(--border-subtle);
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 1rem;
   padding: 0 1.5rem;
   position: sticky;
   top: 0;
@@ -247,51 +250,81 @@ const isMobileSidebarOpen = ref(false)
   display: flex;
   align-items: center;
   gap: 1rem;
+  min-width: 0;
 }
 
 .mobile-toggle {
   display: none;
   background: transparent;
   border: none;
-  color: #ffffff;
+  color: var(--text-main);
   cursor: pointer;
+  padding: 0.25rem;
+  border-radius: var(--radius-sm);
+}
+
+.mobile-toggle:hover {
+  background: var(--color-neutral-100);
 }
 
 .super-badge-brand {
   display: flex;
   align-items: center;
   gap: 0.75rem;
+  min-width: 0;
 }
 
 .brand-title {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
   font-family: var(--font-heading);
   font-size: 1.0625rem;
   font-weight: 800;
-  color: #ffffff;
+  color: var(--color-neutral-900);
   line-height: 1.1;
+  white-space: nowrap;
+}
+
+.role-pill {
+  font-family: var(--font-body);
+  font-size: 0.625rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 0.2rem 0.5rem;
+  border-radius: var(--radius-full);
+  background: #f5f3ff;
+  color: #6d28d9;
+  border: 1px solid #ddd6fe;
 }
 
 .brand-sub {
-  font-size: 0.6875rem;
-  color: #94a3b8;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  margin-top: 0.15rem;
 }
 
 .back-to-app-btn {
   display: inline-flex;
   align-items: center;
   gap: 0.5rem;
-  background: rgba(255, 255, 255, 0.08);
-  color: #ffffff;
+  background: #ffffff;
+  color: var(--color-neutral-700);
   padding: 0.45rem 0.875rem;
   border-radius: var(--radius-md);
   font-size: 0.8125rem;
   font-weight: 600;
-  border: 1px solid rgba(255, 255, 255, 0.15);
+  border: 1px solid var(--border-medium);
+  box-shadow: var(--shadow-xs);
   transition: all var(--transition-fast);
+  white-space: nowrap;
 }
 
 .back-to-app-btn:hover {
-  background: rgba(255, 255, 255, 0.15);
+  background: var(--color-neutral-50);
+  color: var(--color-neutral-900);
+  border-color: var(--color-neutral-400);
 }
 
 .super-body {
@@ -301,64 +334,84 @@ const isMobileSidebarOpen = ref(false)
 }
 
 .super-sidebar {
-  width: 250px;
-  background: #0b1120;
-  border-right: 1px solid rgba(255, 255, 255, 0.08);
+  width: 256px;
+  background: #ffffff;
+  border-right: 1px solid var(--border-subtle);
   flex-shrink: 0;
+  position: sticky;
+  top: 64px;
+  align-self: flex-start;
+  height: calc(100vh - 64px);
+  overflow-y: auto;
 }
 
 .sidebar-nav {
-  padding: 1.25rem 0.75rem;
+  padding: 1rem 0.75rem 1.5rem;
   display: flex;
   flex-direction: column;
-  gap: 0.375rem;
+  gap: 0.125rem;
 }
 
 .nav-category {
   font-size: 0.6875rem;
   font-weight: 700;
-  color: #64748b;
-  padding: 0.75rem 0.75rem 0.375rem;
-  letter-spacing: 0.05em;
+  color: var(--color-neutral-400);
+  padding: 1rem 0.75rem 0.375rem;
+  letter-spacing: 0.06em;
+}
+
+.nav-category:first-child {
+  padding-top: 0.25rem;
 }
 
 .super-nav-link {
   display: flex;
   align-items: center;
   gap: 0.75rem;
-  padding: 0.625rem 0.75rem;
+  padding: 0.55rem 0.75rem;
   border-radius: var(--radius-md);
   font-size: 0.875rem;
   font-weight: 500;
-  color: #94a3b8;
+  color: var(--color-neutral-600);
   text-decoration: none;
-  transition: all var(--transition-fast);
+  transition: background-color var(--transition-fast), color var(--transition-fast);
+}
+
+.super-nav-link :deep(svg) {
+  color: var(--color-neutral-400);
+  flex-shrink: 0;
 }
 
 .super-nav-link:hover {
-  background: rgba(255, 255, 255, 0.05);
-  color: #ffffff;
+  background: var(--color-neutral-100);
+  color: var(--color-neutral-900);
 }
 
 .super-nav-link.is-active {
-  background: linear-gradient(90deg, rgba(124, 58, 237, 0.25) 0%, rgba(79, 70, 229, 0.15) 100%);
-  color: #c4b5fd;
-  border-left: 3px solid #8b5cf6;
+  background: #f5f3ff;
+  color: #5b21b6;
   font-weight: 600;
+}
+
+.super-nav-link.is-active :deep(svg) {
+  color: #7c3aed;
 }
 
 .super-main {
   flex: 1;
   min-width: 0;
   padding: 2rem;
-  background-color: #090d16;
   max-width: 1440px;
   width: 100%;
 }
 
+.sidebar-backdrop {
+  display: none;
+}
+
 @media (max-width: 768px) {
   .mobile-toggle {
-    display: block;
+    display: inline-flex;
   }
   .super-header {
     padding: 0 1rem;
@@ -380,13 +433,21 @@ const isMobileSidebarOpen = ref(false)
     top: 64px;
     bottom: 0;
     left: 0;
+    height: auto;
     z-index: 99;
     transform: translateX(-100%);
     transition: transform 0.2s ease;
-    overflow-y: auto;
+    box-shadow: var(--shadow-xl);
   }
   .super-sidebar.is-open {
     transform: translateX(0);
+  }
+  .sidebar-backdrop {
+    display: block;
+    position: fixed;
+    inset: 64px 0 0 0;
+    background: rgba(15, 23, 42, 0.35);
+    z-index: 98;
   }
   .super-main {
     padding: 1rem;
@@ -400,9 +461,8 @@ const isMobileSidebarOpen = ref(false)
   .brand-title {
     font-size: 0.9375rem;
   }
-  .icon-wrap {
-    width: 30px;
-    height: 30px;
+  .role-pill {
+    display: none;
   }
   .super-main {
     padding: 0.875rem 0.75rem;

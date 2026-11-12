@@ -146,18 +146,18 @@ const getLayoutBadgeClass = (layout: string) => {
 .page-title {
   font-size: 1.75rem;
   font-weight: 800;
-  color: #ffffff;
+  color: #0f172a;
 }
 
 .page-subtitle {
   font-size: 0.875rem;
-  color: #94a3b8;
+  color: #64748b;
   margin-top: 0.2rem;
 }
 
 .super-card {
-  background: #1e293b;
-  border: 1px solid #334155;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
   border-radius: 12px;
   overflow: hidden;
 }
@@ -174,24 +174,24 @@ const getLayoutBadgeClass = (layout: string) => {
 }
 
 .super-table th {
-  background: #0f172a;
-  color: #94a3b8;
+  background: #f8fafc;
+  color: #64748b;
   font-size: 0.75rem;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.05em;
   padding: 0.85rem 1rem;
-  border-bottom: 1px solid #334155;
+  border-bottom: 1px solid #e2e8f0;
 }
 
 .super-table td {
   padding: 0.85rem 1rem;
-  border-bottom: 1px solid #334155;
-  color: #cbd5e1;
+  border-bottom: 1px solid #e2e8f0;
+  color: #334155;
 }
 
 .super-table tr:hover {
-  background: rgba(255, 255, 255, 0.02);
+  background: #f8fafc;
 }
 
 .rest-cell {
@@ -209,11 +209,11 @@ const getLayoutBadgeClass = (layout: string) => {
   font-weight: 700;
 }
 
-.badge-modern { background: rgba(56, 189, 248, 0.15); color: #38bdf8; }
-.badge-classic { background: rgba(148, 163, 184, 0.15); color: #cbd5e1; }
-.badge-elegant { background: rgba(244, 114, 182, 0.15); color: #f472b6; }
-.badge-compact { background: rgba(251, 146, 60, 0.15); color: #fb923c; }
-.badge-visual { background: rgba(168, 85, 247, 0.15); color: #c084fc; }
+.badge-modern { background: rgba(56, 189, 248, 0.15); color: #0369a1; }
+.badge-classic { background: rgba(148, 163, 184, 0.15); color: #334155; }
+.badge-elegant { background: rgba(244, 114, 182, 0.15); color: #be185d; }
+.badge-compact { background: rgba(251, 146, 60, 0.15); color: #c2410c; }
+.badge-visual { background: rgba(168, 85, 247, 0.15); color: #7e22ce; }
 
 .colors-preview {
   display: flex;
@@ -225,19 +225,19 @@ const getLayoutBadgeClass = (layout: string) => {
   width: 14px;
   height: 14px;
   border-radius: 50%;
-  border: 1.5px solid #334155;
+  border: 1.5px solid #e2e8f0;
   display: inline-block;
 }
 
 .color-hex {
   font-size: 0.75rem;
-  color: #94a3b8;
+  color: #64748b;
   margin-left: 0.3rem;
 }
 
 .font-tag {
   font-size: 0.75rem;
-  color: #94a3b8;
+  color: #64748b;
   text-transform: capitalize;
 }
 
