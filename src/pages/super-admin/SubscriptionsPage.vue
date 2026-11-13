@@ -53,20 +53,27 @@ const openManager = (sub: Subscription) => {
 
 const handleSaveSubscription = async (updates: Partial<Subscription>, historyNote?: string) => {
   if (!selectedSubscription.value) return
-  await platformStore.updateSubscription(selectedSubscription.value.id, updates)
-  if (historyNote) {
-    // Add history note
-    const sub = platformStore.subscriptions.find(s => s.id === selectedSubscription.value!.id)
-    if (sub && !sub.history) sub.history = []
-    sub?.history?.unshift({
-      id: `subh-${Date.now()}`,
-      date: new Date().toISOString(),
-      event: updates.status === 'suspended' ? 'suspended' : 'activated',
-      note: historyNote,
-      performedBy: 'Super Administrador'
-    })
-  }
-  isManagerOpen.value = false
+  const id = selectedSubscription.value.id
+  const updated = await platformStore.updateSubscription(id, updates)
+  if (updated && historyNote) await platformStore.addSubscriptionNote(id, historyNote)
+  if (updated) isManagerOpen.value = false
+}
+
+/** Pedidos de alteração de plano feitos pelos donos das empresas. */
+const pendingRequests = computed(() =>
+  platformStore.pendingPlanChangeRequests.map(r => ({
+    ...r,
+    companyName: platformStore.subscriptions.find(s => s.tenantId === r.tenantId)?.companyName ?? 'Empresa',
+    currentPlanName: platformStore.subscriptions.find(s => s.tenantId === r.tenantId)?.planName ?? '—',
+    requestedPlanName: plansStore.plans.find(p => p.id === r.requestedPlanId)?.name ?? 'Plano'
+  }))
+)
+
+/** Aplicar = mudar o plano da subscrição (o pedido fica aprovado automaticamente). */
+const approveRequest = async (request: { tenantId: string; requestedPlanId: string }) => {
+  const sub = platformStore.subscriptions.find(s => s.tenantId === request.tenantId)
+  if (!sub) return
+  await platformStore.updateSubscription(sub.id, { planId: request.requestedPlanId })
 }
 
 const getStatusBadgeVariant = (status: SubscriptionStatus): 'success' | 'warning' | 'danger' | 'primary' | 'neutral' => {
@@ -87,6 +94,28 @@ const getStatusBadgeVariant = (status: SubscriptionStatus): 'success' | 'warning
       <div>
         <h1 class="page-title">Subscrições & Faturamento SaaS</h1>
         <p class="page-subtitle">Acompanhamento executivo de contratos, receita recorrente (MRR), renovações e status das empresas</p>
+      </div>
+    </div>
+
+    <!-- Pedidos de alteração de plano -->
+    <div v-if="pendingRequests.length" class="requests-card">
+      <div class="requests-head">
+        <AlertCircle :size="18" />
+        <strong>{{ pendingRequests.length }} {{ pendingRequests.length === 1 ? 'pedido' : 'pedidos' }} de alteração de plano</strong>
+      </div>
+      <div v-for="req in pendingRequests" :key="req.id" class="request-row">
+        <div class="request-info">
+          <strong>{{ req.companyName }}</strong>
+          <span>{{ req.currentPlanName }} → <strong>{{ req.requestedPlanName }}</strong></span>
+          <span class="request-meta">
+            Pedido por {{ req.requestedByName || 'dono da empresa' }} em {{ new Date(req.createdAt).toLocaleDateString('pt-MZ') }}
+            <template v-if="req.note"> · "{{ req.note }}"</template>
+          </span>
+        </div>
+        <div class="request-actions">
+          <AppButton size="sm" variant="primary" :loading="platformStore.isLoading" @click="approveRequest(req)">Aplicar plano</AppButton>
+          <AppButton size="sm" variant="outline" @click="platformStore.rejectPlanChangeRequest(req.id)">Recusar</AppButton>
+        </div>
       </div>
     </div>
 
@@ -227,6 +256,52 @@ const getStatusBadgeVariant = (status: SubscriptionStatus): 'success' | 'warning
 </template>
 
 <style scoped>
+.requests-card {
+  background: var(--color-amber-50);
+  border: 1px solid var(--color-amber-200);
+  border-radius: var(--radius-lg);
+  padding: 1rem 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.requests-head {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--color-amber-900);
+}
+
+.request-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  background: #fff;
+  border: 1px solid var(--color-amber-200);
+  border-radius: var(--radius-md);
+  padding: 0.75rem 0.9rem;
+}
+
+.request-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  font-size: 0.85rem;
+}
+
+.request-meta {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.request-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
 .super-page {
   display: flex;
   flex-direction: column;

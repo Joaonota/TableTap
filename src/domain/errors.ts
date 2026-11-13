@@ -1,6 +1,6 @@
 /**
  * Erro de regra de negócio com mensagem pronta para o utilizador.
- * Os repositórios (mock hoje, API amanhã) lançam-no; a UI mostra `message`.
+ * Os repositórios lançam-no (a partir dos erros do Supabase); a UI mostra `message`.
  */
 export class DomainError extends Error {
   readonly code: string

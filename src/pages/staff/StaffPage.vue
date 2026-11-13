@@ -11,6 +11,7 @@ import AppInput from '@/components/ui/AppInput.vue'
 import AppSelect from '@/components/ui/AppSelect.vue'
 import PlanLimitNotice from '@/components/plans/PlanLimitNotice.vue'
 import { usePlanLimit } from '@/composables/usePlanLimit'
+import { initialsOf } from '@/domain/roles'
 import {
   Users,
   Plus,
@@ -34,7 +35,8 @@ const formName = ref('')
 const formEmail = ref('')
 const formPhone = ref('')
 const formRole = ref<UserRole>('waiter')
-const formHireDate = ref('2024-01-20')
+const today = () => new Date().toISOString().slice(0, 10)
+const formHireDate = ref(today())
 const formIsActive = ref(true)
 
 const roleOptions = [
@@ -119,7 +121,10 @@ const handleSaveStaff = async () => {
         isActive: formIsActive.value
       })
       staffList.value.push(created)
-      toastStore.success('Novo colaborador registado!')
+      toastStore.success(
+        'Colaborador registado',
+        `Quando ${created.name} criar conta (ou entrar) com ${created.email} e confirmar o email, fica com acesso ao restaurante.`
+      )
     }
     isModalOpen.value = false
   } catch (e) {
@@ -167,11 +172,8 @@ const handleDeleteStaff = async (id: string) => {
       >
         <div class="card-top">
           <div class="avatar-box">
-            <img
-              :src="member.avatarUrl || 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=120&q=80'"
-              :alt="member.name"
-              class="staff-img"
-            />
+            <img v-if="member.avatarUrl" :src="member.avatarUrl" :alt="member.name" class="staff-img" />
+            <span v-else class="staff-img staff-initials" aria-hidden="true">{{ initialsOf(member.name) }}</span>
             <span class="status-indicator" :class="{ active: member.isActive }"></span>
           </div>
 
@@ -269,6 +271,15 @@ const handleDeleteStaff = async (id: string) => {
 </template>
 
 <style scoped>
+.staff-initials {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--color-primary-50);
+  color: var(--color-primary-800);
+  font-weight: 700;
+}
+
 .staff-page {
   display: flex;
   flex-direction: column;

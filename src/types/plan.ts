@@ -96,7 +96,7 @@ export interface LimitCatalogEntry {
  * Catálogo de limites. Para acrescentar um limite novo:
  *  1. adicionar a chave a `LimitKey` e uma entrada aqui;
  *  2. implementar a contagem no repositório de acesso ao plano
- *     (`src/repositories/mock/planAccessRepository.ts`, ou na API).
+ *     (`private.count_usage` em supabase/migrations/20261113000300_business_rules.sql).
  * O editor de planos, a página de planos e "Meu Plano" usam este catálogo
  * automaticamente.
  */
@@ -151,7 +151,7 @@ export type SubscriptionStatus = SubscriptionStatusV2
 export interface SubscriptionHistory {
   id: string
   date: string
-  event: 'created' | 'plan_changed' | 'activated' | 'suspended' | 'renewed' | 'cancelled' | 'trial_started' | 'expired'
+  event: 'created' | 'plan_changed' | 'activated' | 'suspended' | 'renewed' | 'cancelled' | 'trial_started' | 'expired' | 'note'
   fromPlanName?: string
   toPlanName?: string
   amount?: number

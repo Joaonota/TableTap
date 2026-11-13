@@ -1,367 +1,97 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
+import { ref, computed, onMounted } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useTenantStore } from '@/stores/tenant'
 import { useToastStore } from '@/stores/toast'
+import { errorMessage } from '@/domain/errors'
+import { homePathFor } from '@/router/homePath'
+import AuthCard from '@/components/auth/AuthCard.vue'
 import AppButton from '@/components/ui/AppButton.vue'
 import AppInput from '@/components/ui/AppInput.vue'
-import AppModal from '@/components/ui/AppModal.vue'
-import AppLogo from '@/components/ui/AppLogo.vue'
-import type { User } from '@/types'
-import { ShieldCheck, UserCheck, KeyRound, ArrowRight } from 'lucide-vue-next'
+import { ArrowRight, AlertCircle, CheckCircle2 } from 'lucide-vue-next'
 
 const router = useRouter()
+const route = useRoute()
 const authStore = useAuthStore()
 const tenantStore = useTenantStore()
 const toastStore = useToastStore()
 
 const email = ref('')
-const password = ref('demo1234')
-const selectedUserId = ref('user-admin-1')
+const password = ref('')
 const isLoading = ref(false)
-const isForgotModalOpen = ref(false)
-const forgotEmail = ref('')
+const error = ref('')
+
+const justConfirmed = computed(() => route.query.confirmado === '1')
+const passwordReset = computed(() => route.query.redefinida === '1')
 
 onMounted(async () => {
-  if (authStore.availableDemoUsers.length === 0) {
-    await authStore.init()
-  }
-  const defaultUser = authStore.availableDemoUsers.find(u => u.id === selectedUserId.value)
-  if (defaultUser) {
-    email.value = defaultUser.email
-  }
+  await authStore.init()
+  // Já tem sessão: seguir para a área certa.
+  if (authStore.hasSession) await goToApp()
 })
 
-const handleSelectDemoUser = (user: User) => {
-  selectedUserId.value = user.id
-  email.value = user.email
-  password.value = 'demo1234'
+const goToApp = async () => {
+  if (authStore.needsOnboarding) return router.replace('/registo/empresa')
+  if (!authStore.currentUser) return router.replace('/403')
+  await tenantStore.loadContext()
+  const redirect = typeof route.query.redirect === 'string' && route.query.redirect.startsWith('/') ? route.query.redirect : ''
+  return router.replace(redirect || homePathFor(authStore))
 }
 
 const handleLogin = async () => {
+  error.value = ''
+  if (!email.value.trim() || !password.value) {
+    error.value = 'Indique o email e a palavra-passe.'
+    return
+  }
   isLoading.value = true
   try {
-    await authStore.switchUser(selectedUserId.value)
-    await tenantStore.loadContext()
-    toastStore.success('Sessão Iniciada com Sucesso', `Bem-vindo, ${authStore.currentUser?.name}!`)
-
-    if (authStore.isSuperAdmin) {
-      router.push('/super-admin/dashboard')
-    } else if (authStore.isKitchenStaff) {
-      router.push('/app/cozinha')
-    } else {
-      router.push('/app/dashboard')
+    await authStore.signIn(email.value, password.value)
+    if (authStore.hasSession && !authStore.currentUser && !authStore.needsOnboarding) {
+      error.value = 'A sua conta está desativada. Contacte o responsável da sua empresa.'
+      await authStore.logout()
+      return
     }
+    if (authStore.currentUser) toastStore.success('Sessão iniciada', `Bem-vindo(a), ${authStore.currentUser.name}.`)
+    await goToApp()
   } catch (e) {
-    toastStore.error('Erro ao iniciar sessão', (e as Error).message)
+    error.value = errorMessage(e)
   } finally {
     isLoading.value = false
   }
 }
-
-const handleForgotPassword = () => {
-  if (!forgotEmail.value) {
-    toastStore.warning('Insira o email para recuperação')
-    return
-  }
-  isForgotModalOpen.value = false
-  toastStore.info(
-    'Simulação de Recuperação',
-    `Em ambiente de produção, um link de reposição de senha foi enviado para ${forgotEmail.value}. Nesta demonstração utilize a senha demo1234.`
-  )
-}
 </script>
 
 <template>
-  <div class="login-page">
-    <div class="login-card">
-      <div class="login-header">
-        <router-link to="/" class="login-brand">
-          <AppLogo :size="38" />
-        </router-link>
-        <h1 class="login-title">Aceder à Plataforma</h1>
-        <p class="login-subtitle">Selecione uma conta demonstrativa para simular permissões.</p>
-      </div>
-
-      <!-- Quick Profile Selector -->
-      <div class="demo-profiles-box">
-        <div class="profiles-label">CONTAS DE DEMONSTRAÇÃO PRÉ-CONFIGURADAS:</div>
-        <div class="profiles-grid">
-          <button
-            v-for="u in authStore.availableDemoUsers"
-            :key="u.id"
-            type="button"
-            class="profile-chip"
-            :class="{ 'is-selected': selectedUserId === u.id }"
-            @click="handleSelectDemoUser(u)"
-          >
-            <div class="chip-avatar">
-              <img :src="u.avatarUrl || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=120&q=80'" alt="Avatar" />
-            </div>
-            <div class="chip-info">
-              <span class="chip-name">{{ u.name.split(' ')[0] }}</span>
-              <span class="chip-role">{{ u.role }}</span>
-            </div>
-          </button>
-        </div>
-      </div>
-
-      <form class="login-form" @submit.prevent="handleLogin">
-        <AppInput
-          v-model="email"
-          label="Email Profissional"
-          type="email"
-          required
-        />
-
-        <div class="password-wrap">
-          <AppInput
-            v-model="password"
-            label="Palavra-passe (Demonstrativa)"
-            type="password"
-            required
-          />
-          <button
-            type="button"
-            class="forgot-link"
-            @click="isForgotModalOpen = true; forgotEmail = email;"
-          >
-            Esqueceu-se da palavra-passe?
-          </button>
-        </div>
-
-        <AppButton
-          type="submit"
-          variant="primary"
-          size="lg"
-          class="submit-btn"
-          :loading="isLoading"
-        >
-          <template #icon-right>
-            <ArrowRight :size="18" />
-          </template>
-          Entrar no Sistema
-        </AppButton>
-      </form>
-
-      <div class="login-footer">
-        <span class="text-xs text-muted">
-          Ambiente 100% frontend. Nenhuma credencial pessoal ou sensível é enviada ou guardada na internet.
-        </span>
-      </div>
+  <AuthCard title="Entrar no TapMenu" subtitle="Aceda ao painel do seu restaurante.">
+    <div v-if="justConfirmed" class="auth-alert auth-alert--success" role="status">
+      <CheckCircle2 :size="16" />
+      <span>Email confirmado. Já pode iniciar sessão.</span>
+    </div>
+    <div v-if="passwordReset" class="auth-alert auth-alert--success" role="status">
+      <CheckCircle2 :size="16" />
+      <span>Palavra-passe atualizada. Inicie sessão com a nova palavra-passe.</span>
+    </div>
+    <div v-if="error" class="auth-alert auth-alert--error" role="alert">
+      <AlertCircle :size="16" />
+      <span>{{ error }}</span>
     </div>
 
-    <!-- Forgot Password Modal -->
-    <AppModal
-      :is-open="isForgotModalOpen"
-      title="Recuperação de Palavra-passe"
-      subtitle="Simulação do fluxo de envio de email"
-      @close="isForgotModalOpen = false"
-    >
-      <div class="forgot-modal-content">
-        <p class="text-sm text-muted">
-          Insira o email associado à sua conta de demonstração. Iremos simular o envio das instruções de redefinição.
-        </p>
-        <AppInput
-          v-model="forgotEmail"
-          label="Email de Registo"
-          type="email"
-          placeholder="exemplo@tapmenu.co.mz"
-        />
-      </div>
+    <form class="auth-form" novalidate @submit.prevent="handleLogin">
+      <AppInput id="login-email" v-model="email" label="Email" type="email" placeholder="nome@empresa.co.mz" required />
+      <AppInput id="login-password" v-model="password" label="Palavra-passe" type="password" required />
+      <router-link to="/recuperar-palavra-passe" class="auth-link-btn">Esqueceu-se da palavra-passe?</router-link>
+      <AppButton type="submit" variant="primary" size="lg" class="auth-submit" :loading="isLoading">
+        Entrar
+        <template #icon-right>
+          <ArrowRight :size="18" />
+        </template>
+      </AppButton>
+    </form>
 
-      <template #footer>
-        <AppButton variant="secondary" @click="isForgotModalOpen = false">Cancelar</AppButton>
-        <AppButton variant="primary" @click="handleForgotPassword">Simular Envio</AppButton>
-      </template>
-    </AppModal>
-  </div>
+    <template #footer>
+      Ainda não tem conta? <router-link to="/registo">Registe o seu restaurante</router-link>
+    </template>
+  </AuthCard>
 </template>
-
-<style scoped>
-.login-page {
-  min-height: calc(100vh - 120px);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 3rem 1.5rem;
-  background-color: var(--color-neutral-50);
-}
-
-.login-card {
-  width: 100%;
-  max-width: 520px;
-  background: #ffffff;
-  border: 1px solid var(--border-medium);
-  border-radius: var(--radius-xl);
-  padding: 2.5rem 2.25rem;
-  box-shadow: var(--shadow-lg);
-}
-
-.login-header {
-  text-align: center;
-  margin-bottom: 2rem;
-}
-
-.login-brand {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.5rem;
-  text-decoration: none;
-  margin-bottom: 1rem;
-}
-
-.login-title {
-  font-size: 1.625rem;
-  font-weight: 800;
-  color: var(--color-neutral-900);
-  margin-bottom: 0.25rem;
-}
-
-.login-subtitle {
-  font-size: 0.875rem;
-  color: var(--text-muted);
-}
-
-.demo-profiles-box {
-  background: var(--color-neutral-50);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-lg);
-  padding: 1rem;
-  margin-bottom: 1.75rem;
-}
-
-.profiles-label {
-  font-size: 0.6875rem;
-  font-weight: 700;
-  color: var(--color-neutral-500);
-  letter-spacing: 0.04em;
-  margin-bottom: 0.75rem;
-}
-
-.profiles-grid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 0.5rem;
-}
-
-.profile-chip {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0.45rem 0.625rem;
-  background: #ffffff;
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-md);
-  cursor: pointer;
-  text-align: left;
-  transition: all var(--transition-fast);
-}
-
-.profile-chip:hover {
-  border-color: var(--color-primary-300);
-  background: var(--color-primary-50);
-}
-
-.profile-chip.is-selected {
-  border-color: var(--color-primary-800);
-  background: var(--color-primary-50);
-  box-shadow: 0 0 0 1px var(--color-primary-800);
-}
-
-.chip-avatar img {
-  width: 26px;
-  height: 26px;
-  border-radius: 50%;
-  object-fit: cover;
-}
-
-.chip-info {
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-}
-
-.chip-name {
-  font-size: 0.75rem;
-  font-weight: 600;
-  color: var(--color-neutral-900);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.chip-role {
-  font-size: 0.625rem;
-  color: var(--text-muted);
-}
-
-.login-form {
-  display: flex;
-  flex-direction: column;
-  gap: 1.25rem;
-}
-
-.password-wrap {
-  display: flex;
-  flex-direction: column;
-  gap: 0.375rem;
-}
-
-.forgot-link {
-  align-self: flex-end;
-  background: transparent;
-  border: none;
-  font-size: 0.75rem;
-  font-weight: 600;
-  color: var(--color-primary-700);
-  cursor: pointer;
-}
-
-.forgot-link:hover {
-  text-decoration: underline;
-}
-
-.submit-btn {
-  width: 100%;
-  margin-top: 0.5rem;
-}
-
-.login-footer {
-  margin-top: 2rem;
-  text-align: center;
-  border-top: 1px solid var(--border-subtle);
-  padding-top: 1rem;
-}
-
-.forgot-modal-content {
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
-}
-
-@media (max-width: 560px) {
-  .login-page {
-    padding: 1.5rem 1rem;
-  }
-
-  .login-card {
-    padding: 1.75rem 1.25rem;
-  }
-
-  .login-title {
-    font-size: 1.375rem;
-  }
-}
-
-@media (max-width: 400px) {
-  .profiles-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .login-page {
-    padding: 1rem 0.75rem;
-  }
-}
-</style>

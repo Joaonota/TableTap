@@ -1,33 +1,37 @@
 /**
- * Registo único de repositórios.
+ * Registo único de repositórios — fonte de dados: Supabase.
  *
- * Hoje todos usam a implementação mock (localStorage). Para ligar a uma API,
- * criar implementações `Api*Repository` com as mesmas interfaces
- * (ver ./interfaces.ts) e trocá-las aqui — serviços, stores e páginas não
- * precisam de mudar.
+ * Serviços, stores e páginas usam apenas estas interfaces
+ * (ver ./interfaces.ts); nenhuma consulta ao Supabase é feita fora de
+ * ./supabase. Não existem dados de demonstração: sem registos na base de
+ * dados, as páginas mostram estados vazios.
  */
 import {
-  MockCompanyRepository,
-  MockRestaurantRepository,
-  MockUserRepository,
-  MockTableRepository,
-  MockTableSessionRepository,
-  MockNfcTagRepository,
-  MockPlanAccessRepository,
-  MockCategoryRepository,
-  MockProductRepository,
-  MockOrderRepository,
-  MockPaymentRepository,
-  MockServiceRequestRepository,
-  MockStaffRepository,
-  MockPlanRepository,
-  MockSubscriptionRepository,
-  MockMenuCustomizationRepository,
-  MockAuditLogRepository,
-  MockPlatformConfigRepository,
-  MockNotificationRepository
-} from './mock'
+  SupabaseAuthRepository,
+  SupabaseCompanyRepository,
+  SupabaseRestaurantRepository,
+  SupabaseUserRepository,
+  SupabaseTableRepository,
+  SupabaseTableSessionRepository,
+  SupabaseNfcTagRepository,
+  SupabasePlanAccessRepository,
+  SupabaseCategoryRepository,
+  SupabaseProductRepository,
+  SupabaseOrderRepository,
+  SupabasePaymentRepository,
+  SupabaseServiceRequestRepository,
+  SupabaseStaffRepository,
+  SupabasePlanRepository,
+  SupabaseSubscriptionRepository,
+  SupabaseMenuCustomizationRepository,
+  SupabaseAuditLogRepository,
+  SupabasePlatformConfigRepository,
+  SupabaseNotificationRepository,
+  SupabasePublicMenuRepository,
+  SupabaseMediaRepository
+} from './supabase'
 import type {
+  IAuthRepository,
   ICompanyRepository,
   IRestaurantRepository,
   IUserRepository,
@@ -46,10 +50,13 @@ import type {
   IMenuCustomizationRepository,
   IAuditLogRepository,
   IPlatformConfigRepository,
-  INotificationRepository
+  INotificationRepository,
+  IPublicMenuRepository,
+  IMediaRepository
 } from './interfaces'
 
 export interface RepositoryRegistry {
+  auth: IAuthRepository
   companies: ICompanyRepository
   restaurants: IRestaurantRepository
   users: IUserRepository
@@ -69,26 +76,31 @@ export interface RepositoryRegistry {
   auditLogs: IAuditLogRepository
   platformConfig: IPlatformConfigRepository
   notifications: INotificationRepository
+  publicMenu: IPublicMenuRepository
+  media: IMediaRepository
 }
 
 export const repositories: RepositoryRegistry = {
-  companies: new MockCompanyRepository(),
-  restaurants: new MockRestaurantRepository(),
-  users: new MockUserRepository(),
-  tables: new MockTableRepository(),
-  tableSessions: new MockTableSessionRepository(),
-  nfcTags: new MockNfcTagRepository(),
-  planAccess: new MockPlanAccessRepository(),
-  categories: new MockCategoryRepository(),
-  products: new MockProductRepository(),
-  orders: new MockOrderRepository(),
-  payments: new MockPaymentRepository(),
-  serviceRequests: new MockServiceRequestRepository(),
-  staff: new MockStaffRepository(),
-  plans: new MockPlanRepository(),
-  subscriptions: new MockSubscriptionRepository(),
-  menuCustomizations: new MockMenuCustomizationRepository(),
-  auditLogs: new MockAuditLogRepository(),
-  platformConfig: new MockPlatformConfigRepository(),
-  notifications: new MockNotificationRepository()
+  auth: new SupabaseAuthRepository(),
+  companies: new SupabaseCompanyRepository(),
+  restaurants: new SupabaseRestaurantRepository(),
+  users: new SupabaseUserRepository(),
+  tables: new SupabaseTableRepository(),
+  tableSessions: new SupabaseTableSessionRepository(),
+  nfcTags: new SupabaseNfcTagRepository(),
+  planAccess: new SupabasePlanAccessRepository(),
+  categories: new SupabaseCategoryRepository(),
+  products: new SupabaseProductRepository(),
+  orders: new SupabaseOrderRepository(),
+  payments: new SupabasePaymentRepository(),
+  serviceRequests: new SupabaseServiceRequestRepository(),
+  staff: new SupabaseStaffRepository(),
+  plans: new SupabasePlanRepository(),
+  subscriptions: new SupabaseSubscriptionRepository(),
+  menuCustomizations: new SupabaseMenuCustomizationRepository(),
+  auditLogs: new SupabaseAuditLogRepository(),
+  platformConfig: new SupabasePlatformConfigRepository(),
+  notifications: new SupabaseNotificationRepository(),
+  publicMenu: new SupabasePublicMenuRepository(),
+  media: new SupabaseMediaRepository()
 }

@@ -75,6 +75,7 @@ const getEventLabel = (event: string): string => {
     case 'cancelled': return 'Cancelada'
     case 'trial_started': return 'Início de Teste'
     case 'expired': return 'Expirada'
+    case 'note': return 'Nota'
     default: return event
   }
 }

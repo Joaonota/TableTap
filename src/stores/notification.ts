@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import type { Notification, NotificationType } from '@/types'
-import { notificationService } from '@/services'
+import type { Notification } from '@/types'
+import { notificationService, subscribeToRealtime } from '@/services'
 import { useTenantStore } from './tenant'
 import { useToastStore } from './toast'
 
@@ -29,49 +29,24 @@ export const useNotificationStore = defineStore('notification', () => {
     }
   }
 
-  const createNotification = async (payload: {
-    tenantId?: string
-    restaurantId?: string
-    type: NotificationType
-    title: string
-    message: string
-    tableId?: string
-    tableNumber?: string
-    tableSessionId?: string
-    orderId?: string
-    serviceRequestId?: string
-  }) => {
-    const tenantId = payload.tenantId || tenantStore.currentRestaurant?.tenantId || 'tenant-1'
-    const restaurantId = payload.restaurantId || tenantStore.currentRestaurant?.id || 'rest-1'
-
-    const created = await notificationService.createNotification({
-      tenantId,
-      restaurantId,
-      type: payload.type,
-      title: payload.title,
-      message: payload.message,
-      tableId: payload.tableId,
-      tableNumber: payload.tableNumber,
-      tableSessionId: payload.tableSessionId,
-      orderId: payload.orderId,
-      serviceRequestId: payload.serviceRequestId
+  /**
+   * As notificações são criadas pelo servidor (pedidos, mesas, chamadas).
+   * Em tempo real, recarrega a lista e mostra um aviso para as novas.
+   */
+  const subscribeRealtime = () => {
+    const restaurantId = tenantStore.currentRestaurant?.id
+    if (!restaurantId) return () => {}
+    return subscribeToRealtime('notifications', restaurantId, async () => {
+      if (tenantStore.currentRestaurant?.id !== restaurantId) return
+      const known = new Set(notifications.value.map(n => n.id))
+      const latest = await notificationService.getNotifications(restaurantId)
+      notifications.value = latest
+      for (const n of latest.filter(n => !known.has(n.id) && !n.readAt).slice(0, 3)) {
+        if (n.type === 'new_order' || n.type === 'additional_order') toastStore.success(n.title, n.message)
+        else if (n.type === 'bill_requested' || n.type === 'waiter_call') toastStore.warning(n.title, n.message)
+        else toastStore.info(n.title, n.message)
+      }
     })
-
-    // If it belongs to current active restaurant, prepend to reactive list
-    if (tenantStore.currentRestaurant?.id === restaurantId) {
-      notifications.value.unshift(created)
-    }
-
-    // Display a gentle toast
-    if (payload.type === 'table_occupied') {
-      toastStore.info(payload.title, payload.message)
-    } else if (payload.type === 'new_order' || payload.type === 'additional_order') {
-      toastStore.success(payload.title, payload.message)
-    } else if (payload.type === 'bill_requested' || payload.type === 'waiter_call') {
-      toastStore.warning(payload.title, payload.message)
-    }
-
-    return created
   }
 
   const markAsRead = async (id: string) => {
@@ -105,7 +80,7 @@ export const useNotificationStore = defineStore('notification', () => {
     isLoading,
     unreadCount,
     loadNotifications,
-    createNotification,
+    subscribeRealtime,
     markAsRead,
     markAllAsRead
   }

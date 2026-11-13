@@ -142,12 +142,12 @@ const handleReset = async () => {
         <Lock :size="20" />
       </div>
       <div class="lock-banner-text">
-        <strong>Funcionalidade Exclusiva dos Planos Pro, Business & Enterprise</strong>
-        <p>O seu plano atual ({{ subscriptionStore.currentPlan?.name || 'Básico' }}) utiliza o layout clássico padrão. Atualize para personalizar cores, fontes, e escolher entre 5 layouts exclusivos.</p>
+        <strong>{{ customizationPlanName ? `Disponível a partir do plano ${customizationPlanName}` : 'Não incluída no seu plano' }}</strong>
+        <p>O seu plano atual ({{ subscriptionStore.currentPlan?.name || '—' }}) utiliza o layout clássico padrão. Atualize para personalizar cores, fontes, e escolher entre 5 layouts exclusivos.</p>
       </div>
       <AppButton variant="primary" size="sm" @click="isUpgradeModalOpen = true">
         <Sparkles :size="14" />
-        <span>Fazer Upgrade</span>
+        <span>Mudar de plano</span>
       </AppButton>
     </div>
 

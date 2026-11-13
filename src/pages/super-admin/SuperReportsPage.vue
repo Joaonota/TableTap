@@ -20,6 +20,35 @@ const arpu = computed(() => {
   return activeCount > 0 ? Math.round(platformStore.mrr / activeCount) : 0
 })
 
+/** Subscrições que terminaram (canceladas ou expiradas). */
+const endedCount = computed(() => platformStore.subscriptions.filter(s => s.status === 'cancelled' || s.status === 'expired').length)
+
+/** Retenção: subscrições que continuam (ativas, em teste ou suspensas) sobre o total. */
+const retentionRate = computed(() => {
+  const total = platformStore.subscriptions.length
+  return total ? Math.round(((total - endedCount.value) / total) * 1000) / 10 : null
+})
+
+/** Tempo médio (meses) desde o início de cada subscrição ainda em curso. */
+const averageTenureMonths = computed(() => {
+  const ongoing = platformStore.subscriptions.filter(s => s.status !== 'cancelled' && s.status !== 'expired')
+  if (!ongoing.length) return null
+  const months = ongoing.map(s => (Date.now() - new Date(s.startDate).getTime()) / (1000 * 60 * 60 * 24 * 30.44))
+  return Math.round((months.reduce((a, b) => a + b, 0) / ongoing.length) * 10) / 10
+})
+
+/** Receita mensal (MRR) por plano, só subscrições ativas. */
+const revenueByPlan = computed(() => {
+  const map = new Map<string, number>()
+  for (const s of platformStore.subscriptions.filter(s => s.status === 'active')) {
+    map.set(s.planName, (map.get(s.planName) ?? 0) + s.monthlyPrice)
+  }
+  const total = [...map.values()].reduce((a, b) => a + b, 0)
+  return [...map.entries()]
+    .map(([name, amount]) => ({ name, amount, percent: total ? Math.round((amount / total) * 1000) / 10 : 0 }))
+    .sort((a, b) => b.amount - a.amount)
+})
+
 const exportPlatformCsv = () => {
   const headers = ['Tenant ID', 'Empresa', 'Plano', 'Valor Mensal (MT)', 'Estado', 'Data Inicio', 'Renovacao']
   const rows = platformStore.subscriptions.map(s => [
@@ -86,9 +115,9 @@ const exportPlatformCsv = () => {
           <BarChart3 :size="20" />
         </div>
         <div class="kpi-info">
-          <span class="kpi-label">Taxa de Renovação</span>
-          <div class="kpi-val">96.5%</div>
-          <span class="kpi-sub">Retenção de subscrições</span>
+          <span class="kpi-label">Taxa de Retenção</span>
+          <div class="kpi-val">{{ retentionRate === null ? '—' : `${retentionRate.toLocaleString('pt-MZ')}%` }}</div>
+          <span class="kpi-sub">Subscrições que não foram canceladas nem expiraram</span>
         </div>
       </div>
     </div>
@@ -97,7 +126,7 @@ const exportPlatformCsv = () => {
     <div class="reports-grid">
       <div class="super-card">
         <h3 class="report-card-title">Resumo Financeiro da Plataforma</h3>
-        <p class="report-card-desc">Indicadores calculados com base nos contratos mock e pagamentos realizados</p>
+        <p class="report-card-desc">Indicadores calculados a partir das subscrições registadas</p>
 
         <div class="metrics-table-wrap">
           <table class="report-summary-table">
@@ -111,16 +140,12 @@ const exportPlatformCsv = () => {
                 <td class="font-bold text-yellow">{{ platformStore.trialSubscriptionsCount }}</td>
               </tr>
               <tr>
-                <td>Taxa de Churn Estimada:</td>
-                <td class="font-bold text-green">1.8% / mês</td>
+                <td>Subscrições canceladas ou expiradas:</td>
+                <td class="font-bold">{{ endedCount }}</td>
               </tr>
               <tr>
-                <td>LTV Médio Estimado (Customer Lifetime Value):</td>
-                <td class="font-bold text-primary">124.000 MT</td>
-              </tr>
-              <tr>
-                <td>Período Médio de Permanência:</td>
-                <td class="font-bold text-white">18.4 meses</td>
+                <td>Permanência média (subscrições em curso):</td>
+                <td class="font-bold">{{ averageTenureMonths === null ? '—' : `${averageTenureMonths.toLocaleString('pt-MZ')} meses` }}</td>
               </tr>
             </tbody>
           </table>
@@ -129,31 +154,16 @@ const exportPlatformCsv = () => {
 
       <div class="super-card">
         <h3 class="report-card-title">Distribuição de Receita por Nível de Plano</h3>
-        <p class="report-card-desc">Contribuição relativa de cada pacote para o faturamento global</p>
+        <p class="report-card-desc">Receita mensal recorrente (MRR) das subscrições ativas, por plano</p>
 
-        <div class="revenue-tier-list">
-          <div class="tier-item">
+        <div v-if="!revenueByPlan.length" class="empty-block">Ainda não há subscrições ativas a gerar receita.</div>
+        <div v-else class="revenue-tier-list">
+          <div v-for="tier in revenueByPlan" :key="tier.name" class="tier-item">
             <div class="tier-head">
-              <strong>Plano Enterprise</strong>
-              <span class="font-mono">9.990 MT (60.6%)</span>
+              <strong>{{ tier.name }}</strong>
+              <span class="font-mono">{{ tier.amount.toLocaleString('pt-MZ') }} MT ({{ tier.percent.toLocaleString('pt-MZ') }}%)</span>
             </div>
-            <div class="tier-bar"><div class="tier-fill" style="width: 61%"></div></div>
-          </div>
-
-          <div class="tier-item">
-            <div class="tier-head">
-              <strong>Plano Pro</strong>
-              <span class="font-mono">4.490 MT (27.2%)</span>
-            </div>
-            <div class="tier-bar"><div class="tier-fill" style="width: 27%"></div></div>
-          </div>
-
-          <div class="tier-item">
-            <div class="tier-head">
-              <strong>Plano Básico</strong>
-              <span class="font-mono">1.990 MT (12.2%)</span>
-            </div>
-            <div class="tier-bar"><div class="tier-fill" style="width: 12%"></div></div>
+            <div class="tier-bar"><div class="tier-fill" :style="{ width: `${tier.percent}%` }"></div></div>
           </div>
         </div>
       </div>
@@ -162,6 +172,15 @@ const exportPlatformCsv = () => {
 </template>
 
 <style scoped>
+.empty-block {
+  padding: 2rem 1rem;
+  text-align: center;
+  font-size: 0.875rem;
+  color: var(--text-muted);
+  border: 1px dashed var(--border-subtle);
+  border-radius: var(--radius-md);
+}
+
 .super-page {
   display: flex;
   flex-direction: column;

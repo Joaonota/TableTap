@@ -135,7 +135,7 @@ const handleConfirm = () => {
 
       <div class="demo-disclaimer">
         <AlertCircle :size="15" class="disclaimer-icon" />
-        <span>Nesta fase de demonstração, o pedido de conta notifica a equipa do balcão sem transações bancárias reais.</span>
+        <span>O TapMenu não cobra pagamentos: a equipa é notificada, traz a conta à mesa e confirma o pagamento no método que escolher.</span>
       </div>
     </div>
 

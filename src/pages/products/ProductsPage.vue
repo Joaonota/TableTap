@@ -8,6 +8,8 @@ import AppButton from '@/components/ui/AppButton.vue'
 import AppBadge from '@/components/ui/AppBadge.vue'
 import AppModal from '@/components/ui/AppModal.vue'
 import AppInput from '@/components/ui/AppInput.vue'
+import ImageUploadField from '@/components/ui/ImageUploadField.vue'
+import ProductOptionsEditor, { type OptionRow } from '@/components/menu/ProductOptionsEditor.vue'
 import AppSelect from '@/components/ui/AppSelect.vue'
 import PlanLimitNotice from '@/components/plans/PlanLimitNotice.vue'
 import { usePlanLimit } from '@/composables/usePlanLimit'
@@ -38,6 +40,8 @@ const formPromoPrice = ref<number | undefined>(undefined)
 const formStation = ref<'kitchen' | 'bar'>('kitchen')
 const formPrepTime = ref(15)
 const formImageUrl = ref('')
+const formVariants = ref<OptionRow[]>([])
+const formAddons = ref<OptionRow[]>([])
 const formIsFeatured = ref(false)
 const formIsAvailable = ref(true)
 
@@ -62,11 +66,13 @@ const openAddModal = () => {
   formName.value = ''
   formDescription.value = ''
   formCategoryId.value = catalogStore.categories[0]?.id || ''
-  formPrice.value = 500
+  formPrice.value = 0
   formPromoPrice.value = undefined
   formStation.value = 'kitchen'
   formPrepTime.value = 15
-  formImageUrl.value = 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=600&q=80'
+  formImageUrl.value = ''
+  formVariants.value = []
+  formAddons.value = []
   formIsFeatured.value = false
   formIsAvailable.value = true
   isProductModalOpen.value = true
@@ -82,6 +88,8 @@ const openEditModal = (prod: Product) => {
   formStation.value = prod.station
   formPrepTime.value = prod.preparationTimeMinutes
   formImageUrl.value = prod.imageUrl
+  formVariants.value = (prod.variants ?? []).map(v => ({ id: v.id, name: v.name, amount: v.priceDelta }))
+  formAddons.value = (prod.addons ?? []).map(a => ({ id: a.id, name: a.name, amount: a.price }))
   formIsFeatured.value = prod.isFeatured
   formIsAvailable.value = prod.isAvailable
   isProductModalOpen.value = true
@@ -104,7 +112,13 @@ const handleSaveProduct = async () => {
     preparationTimeMinutes: Number(formPrepTime.value),
     imageUrl: formImageUrl.value,
     isFeatured: formIsFeatured.value,
-    isAvailable: formIsAvailable.value
+    isAvailable: formIsAvailable.value,
+    variants: formVariants.value
+      .filter(v => v.name.trim())
+      .map(v => ({ id: v.id ?? '', name: v.name.trim(), priceDelta: Number(v.amount) || 0 })),
+    addons: formAddons.value
+      .filter(a => a.name.trim())
+      .map(a => ({ id: a.id ?? '', name: a.name.trim(), price: Math.max(0, Number(a.amount) || 0) }))
     })
     isProductModalOpen.value = false
   } catch {
@@ -187,7 +201,8 @@ const handleDeleteProduct = async (id: string) => {
               :key="prod.id"
             >
               <td class="photo-cell">
-                <img :src="prod.imageUrl" :alt="prod.name" class="table-thumb" />
+                <img v-if="prod.imageUrl" :src="prod.imageUrl" :alt="prod.name" class="table-thumb" />
+                <div v-else class="table-thumb table-thumb--empty" aria-hidden="true"></div>
               </td>
 
               <td class="info-cell">
@@ -316,10 +331,29 @@ const handleDeleteProduct = async (id: string) => {
           ></textarea>
         </div>
 
-        <AppInput
+        <ImageUploadField
+          v-if="tenantStore.currentRestaurant"
           v-model="formImageUrl"
-          label="URL da Fotografia em Alta Resolução"
-          placeholder="https://images.unsplash.com/..."
+          label="Fotografia do produto"
+          kind="product"
+          :tenant-id="tenantStore.currentRestaurant.tenantId"
+          :restaurant-id="tenantStore.currentRestaurant.id"
+        />
+
+        <ProductOptionsEditor
+          v-model="formVariants"
+          title="Variantes"
+          description="Opções em que o cliente escolhe uma (ex.: Pequena, Grande). O valor é somado ao preço base."
+          amount-label="Acréscimo ao preço base"
+          add-label="Adicionar variante"
+          allow-negative
+        />
+        <ProductOptionsEditor
+          v-model="formAddons"
+          title="Adicionais"
+          description="Extras que o cliente pode juntar (ex.: Batata frita, Queijo extra)."
+          amount-label="Preço do adicional"
+          add-label="Adicionar adicional"
         />
 
         <div class="checkbox-options-row">
@@ -344,6 +378,11 @@ const handleDeleteProduct = async (id: string) => {
 </template>
 
 <style scoped>
+.table-thumb--empty {
+  background: var(--color-neutral-100);
+  border: 1px dashed var(--border-medium);
+}
+
 .products-page {
   display: flex;
   flex-direction: column;

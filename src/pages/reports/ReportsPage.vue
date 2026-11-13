@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { reportService, orderService } from '@/services'
 import { useTenantStore } from '@/stores/tenant'
 import { useToastStore } from '@/stores/toast'
@@ -22,6 +22,7 @@ const tenantStore = useTenantStore()
 const toastStore = useToastStore()
 
 const period = ref<'week' | 'month' | 'year'>('week')
+const REPORT_PERIOD_DAYS = { week: 7, month: 30, year: 365 } as const
 const metrics = ref<DashboardMetrics | null>(null)
 const salesDays = ref<{ label: string; amount: number; orderCount: number }[]>([])
 const topProducts = ref<{ name: string; quantity: number; revenue: number }[]>([])
@@ -34,7 +35,7 @@ const loadReports = async () => {
   try {
     const restId = tenantStore.currentRestaurant.id
     const [m, s, p, ords] = await Promise.all([
-      reportService.getDashboardMetrics(restId),
+      reportService.getDashboardMetrics(restId, REPORT_PERIOD_DAYS[period.value]),
       reportService.getSalesByDay(restId),
       reportService.getTopProducts(restId),
       orderService.getOrders(restId)
@@ -47,6 +48,8 @@ const loadReports = async () => {
     isLoading.value = false
   }
 }
+
+watch(() => [period.value, tenantStore.currentRestaurant?.id], () => loadReports())
 
 onMounted(() => {
   loadReports()
@@ -97,9 +100,9 @@ const exportReportsCsv = () => {
         <div class="period-select-wrap">
           <Calendar :size="15" />
           <select v-model="period" class="period-dropdown">
-            <option value="week">Esta Semana</option>
-            <option value="month">Este Mês</option>
-            <option value="year">Ano Corrente (2026)</option>
+            <option value="week">Últimos 7 dias</option>
+            <option value="month">Últimos 30 dias</option>
+            <option value="year">Últimos 12 meses</option>
           </select>
         </div>
 
@@ -115,35 +118,35 @@ const exportReportsCsv = () => {
     <!-- Metrics Cards -->
     <div v-if="metrics" class="metrics-grid">
       <MetricCard
-        title="Receita Acumulada"
-        :value="`${metrics.totalRevenue.toLocaleString('pt-MZ')} MT`"
+        title="Receita no período"
+        :value="`${metrics.periodRevenue.toLocaleString('pt-MZ')} MT`"
         variant="primary"
         :icon="DollarSign"
-        :trend="{ value: '18% vs período anterior', isPositive: true }"
+        subtitle="Pedidos não cancelados"
       />
 
       <MetricCard
         title="Volume de Pedidos"
-        :value="metrics.totalOrders"
+        :value="metrics.periodOrders"
         variant="success"
         :icon="ShoppingBag"
-        subtitle="Registados nas mesas e takeaway"
+        subtitle="Pedidos não cancelados no período"
       />
 
       <MetricCard
         title="Ticket Médio"
-        :value="`${metrics.averageTicket.toLocaleString('pt-MZ')} MT`"
+        :value="`${(metrics.periodOrders ? Math.round((metrics.periodRevenue / metrics.periodOrders) * 100) / 100 : 0).toLocaleString('pt-MZ')} MT`"
         variant="neutral"
         :icon="TrendingUp"
-        subtitle="Consumo médio por mesa"
+        subtitle="Média por pedido no período"
       />
 
       <MetricCard
         title="Taxa de Cancelamentos"
-        value="2.8%"
+        :value="`${metrics.cancellationRate.toLocaleString('pt-MZ')}%`"
         variant="warning"
         :icon="BarChart3"
-        subtitle="Dentro do padrão operacional"
+        :subtitle="`${metrics.periodCancelledOrders} pedidos cancelados no período`"
       />
     </div>
 

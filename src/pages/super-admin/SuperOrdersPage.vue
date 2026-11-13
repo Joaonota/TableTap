@@ -1,8 +1,7 @@
 <script setup lang="ts">
 import { orderStatusLabel } from '@/domain/statusLabels'
 import { ref, onMounted, computed } from 'vue'
-import { mockStorage } from '@/repositories/mock/mockStorage'
-import { restaurantService, tenantService } from '@/services'
+import { orderService, restaurantService, tenantService } from '@/services'
 import type { Order, Restaurant, Company, OrderStatus } from '@/types'
 import AppBadge from '@/components/ui/AppBadge.vue'
 import { ShoppingBag, DollarSign, Clock, CheckCircle2, Search, Filter } from 'lucide-vue-next'
@@ -18,11 +17,12 @@ const selectedTenantFilter = ref<string>('all')
 
 onMounted(async () => {
   try {
-    orders.value = mockStorage.getDb().orders || []
-    const [r, c] = await Promise.all([
+    const [o, r, c] = await Promise.all([
+      orderService.getAllOrders(),
       restaurantService.getAllRestaurants(),
       tenantService.getAllCompanies()
     ])
+    orders.value = o
     restaurants.value = r
     companies.value = c
   } finally {

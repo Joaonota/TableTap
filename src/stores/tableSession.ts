@@ -1,10 +1,9 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import type { Restaurant, SessionParticipant, Table, TableSession } from '@/types'
+import type { PaymentMethod, Restaurant, SessionParticipant, Table, TableSession } from '@/types'
 import { publicTableService, tableSessionService } from '@/services'
 import { DomainError, errorMessage } from '@/domain/errors'
 import { effectiveTableStatus } from '@/domain/tableRules'
-import { useNotificationStore } from './notification'
 import { useToastStore } from './toast'
 
 /**
@@ -19,6 +18,8 @@ interface DeviceParticipation {
   sessionId: string
   participantId: string
   name: string
+  /** Segredo devolvido pelo servidor; autoriza pedidos nesta sessão. */
+  token?: string
 }
 
 const storageKey = (tableId: string) => `tapmenu_device_participation_${tableId}`
@@ -44,7 +45,6 @@ function writeParticipation(tableId: string, value: DeviceParticipation | null) 
 export type TableAccessState = 'not_found' | 'unavailable' | 'free' | 'occupied'
 
 export const useTableSessionStore = defineStore('tableSession', () => {
-  const notificationStore = useNotificationStore()
   const toastStore = useToastStore()
 
   const restaurant = ref<Restaurant | null>(null)
@@ -68,6 +68,7 @@ export const useTableSessionStore = defineStore('tableSession', () => {
   )
 
   const participantName = computed(() => (isParticipant.value ? participation.value?.name ?? '' : ''))
+  const participantToken = computed(() => (isParticipant.value ? participation.value?.token : undefined))
 
   const applyContext = (ctx: { restaurant: Restaurant; table: Table; activeSession: TableSession | null } | null) => {
     restaurant.value = ctx?.restaurant ?? null
@@ -102,7 +103,7 @@ export const useTableSessionStore = defineStore('tableSession', () => {
 
   const rememberParticipant = (session: TableSession, participant: SessionParticipant) => {
     currentSession.value = session
-    participation.value = { sessionId: session.id, participantId: participant.id, name: participant.name }
+    participation.value = { sessionId: session.id, participantId: participant.id, name: participant.name, token: participant.token }
     writeParticipation(session.tableId, participation.value)
   }
 
@@ -120,17 +121,6 @@ export const useTableSessionStore = defineStore('tableSession', () => {
       if (!participant) throw new DomainError('participant_name_required', 'Indique o seu nome.')
       rememberParticipant(session, participant)
       table.value = { ...table.value, status: 'occupied', activeSessionId: session.id }
-
-      await notificationStore.createNotification({
-        tenantId: restaurant.value.tenantId,
-        restaurantId: restaurant.value.id,
-        type: 'table_occupied',
-        title: 'Nova mesa ocupada',
-        message: `Mesa ${table.value.number} ocupada por ${participant.name}${input.partySize ? ` (${input.partySize} pessoas)` : ''}.`,
-        tableId: table.value.id,
-        tableNumber: table.value.number,
-        tableSessionId: session.id
-      })
       toastStore.success('Sessão iniciada', `Bem-vindo(a), ${participant.name}.`)
       return session
     } catch (e) {
@@ -164,21 +154,12 @@ export const useTableSessionStore = defineStore('tableSession', () => {
     }
   }
 
-  const requestBill = async (totalAmount: number) => {
+  /** O cliente pede a conta e indica como vai pagar (a equipa confirma o recebimento). */
+  const requestBill = async (paymentMethod?: PaymentMethod, notes?: string) => {
     if (!restaurant.value || !table.value || !currentSession.value) return null
     try {
-      const updated = await tableSessionService.requestBill(currentSession.value.id)
+      const updated = await publicTableService.requestBill(currentSession.value.id, participantToken.value, paymentMethod, notes)
       currentSession.value = updated
-      await notificationStore.createNotification({
-        tenantId: restaurant.value.tenantId,
-        restaurantId: restaurant.value.id,
-        type: 'bill_requested',
-        title: 'Pedido de Conta',
-        message: `Mesa ${table.value.number} (${participantName.value || 'Cliente'}) pediu a conta — Total: ${totalAmount.toLocaleString('pt-MZ')} MT`,
-        tableId: table.value.id,
-        tableNumber: table.value.number,
-        tableSessionId: updated.id
-      })
       toastStore.success('Conta pedida', 'A equipa foi notificada e trará a conta à mesa.')
       return updated
     } catch (e) {
@@ -197,6 +178,7 @@ export const useTableSessionStore = defineStore('tableSession', () => {
     accessState,
     isParticipant,
     participantName,
+    participantToken,
     loadTable,
     refresh,
     startSession,

@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import type { Company, Restaurant } from '@/types'
 import { tenantService, restaurantService } from '@/services'
 import { useAuthStore } from './auth'
@@ -12,6 +12,8 @@ export const useTenantStore = defineStore('tenant', () => {
   const currentCompany = ref<Company | null>(null)
   const currentRestaurant = ref<Restaurant | null>(null)
   const isLoading = ref(false)
+  /** Contexto já carregado para o utilizador atual. */
+  const hasLoaded = ref(false)
 
   // Companies accessible by current user
   const availableCompanies = computed<Company[]>(() => {
@@ -42,11 +44,18 @@ export const useTenantStore = defineStore('tenant', () => {
     )
   })
 
+  /** Empresas e restaurantes visíveis (o RLS só devolve os do utilizador). */
   const loadContext = async () => {
+    if (!authStore.currentUser) return
     isLoading.value = true
     try {
-      allCompanies.value = await tenantService.getAllCompanies()
-      allRestaurants.value = await restaurantService.getAllRestaurants()
+      const [companies, restaurants] = await Promise.all([
+        tenantService.getAllCompanies(),
+        restaurantService.getAllRestaurants()
+      ])
+      allCompanies.value = companies
+      allRestaurants.value = restaurants
+      hasLoaded.value = true
 
       // Set initial company
       if (availableCompanies.value.length > 0) {
@@ -95,7 +104,21 @@ export const useTenantStore = defineStore('tenant', () => {
     }
   }
 
+  /** Outro utilizador iniciou sessão (ou terminou): limpar o contexto. */
+  watch(
+    () => authStore.currentUser?.id,
+    (id, previous) => {
+      if (id === previous) return
+      hasLoaded.value = false
+      allCompanies.value = []
+      allRestaurants.value = []
+      currentCompany.value = null
+      currentRestaurant.value = null
+    }
+  )
+
   return {
+    hasLoaded,
     allCompanies,
     allRestaurants,
     currentCompany,

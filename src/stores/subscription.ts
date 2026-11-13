@@ -2,7 +2,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import type { FeatureKey, LimitKey, Plan, Subscription } from '@/types'
-import { subscriptionService, planAccessService, type LimitCheckResult, type CanUseResult } from '@/services'
+import { subscriptionService, planAccessService, type LimitCheckResult, type CanUseResult, type PlanChangeRequest } from '@/services'
 import { LIMIT_CATALOG, type LimitScope } from '@/types/plan'
 import { useTenantStore } from './tenant'
 import { useToastStore } from './toast'
@@ -29,7 +29,7 @@ export const useSubscriptionStore = defineStore('subscription', () => {
   const isLoading = ref(false)
 
   const activeTenantId = computed(() => {
-    return tenantStore.currentCompany?.id || 'tenant-1'
+    return tenantStore.currentCompany?.id || ''
   })
 
   const isTrial = computed(() => currentSubscription.value?.status === 'trial')
@@ -59,8 +59,7 @@ export const useSubscriptionStore = defineStore('subscription', () => {
       currentPlan.value = plan
       availablePlans.value = allPlans.filter(p => p.active)
 
-      // Refresh usage metrics
-      await refreshUsageMetrics(tid)
+      await Promise.all([refreshUsageMetrics(tid), loadPendingChangeRequest()])
     } catch (e: any) {
       console.error('Erro ao carregar dados de subscrição', e)
     } finally {
@@ -107,21 +106,33 @@ export const useSubscriptionStore = defineStore('subscription', () => {
     return planAccessService.isLimitReached(activeTenantId.value, key, restaurantId)
   }
 
-  const upgradePlan = async (targetPlanId: string, performedBy?: string): Promise<boolean> => {
+  /** Pedido de alteração pendente (aplicado pela equipa TapMenu). */
+  const pendingChangeRequest = ref<PlanChangeRequest | null>(null)
+
+  const loadPendingChangeRequest = async () => {
+    if (!activeTenantId.value) return
+    try {
+      const requests = await subscriptionService.getPlanChangeRequests(activeTenantId.value)
+      pendingChangeRequest.value = requests.find(r => r.status === 'pending') ?? null
+    } catch {
+      pendingChangeRequest.value = null
+    }
+  }
+
+  /**
+   * Não há pagamento online: o dono da empresa pede a alteração e a equipa
+   * TapMenu aplica-a (Super Admin → Subscrições). Os novos limites e
+   * funcionalidades ficam ativos quando o pedido é aprovado.
+   */
+  const requestPlanChange = async (targetPlanId: string, note?: string): Promise<boolean> => {
     isLoading.value = true
     try {
-      const res = await subscriptionService.upgradePlan(
-        activeTenantId.value,
-        targetPlanId,
-        performedBy || tenantStore.currentCompany?.name || 'Administrador'
-      )
-      currentSubscription.value = res.subscription
-      currentPlan.value = res.plan
-      await refreshUsageMetrics()
-      toastStore.success('Plano Atualizado com Sucesso!', `O seu plano é agora "${res.plan.name}". Todas as novas funcionalidades foram ativadas.`)
+      pendingChangeRequest.value = await subscriptionService.requestPlanChange(targetPlanId, note)
+      const plan = availablePlans.value.find(p => p.id === targetPlanId)
+      toastStore.success('Pedido enviado', `A equipa TapMenu foi notificada do seu pedido para o plano "${plan?.name ?? ''}".`)
       return true
-    } catch (e: any) {
-      toastStore.error('Erro ao atualizar plano', e.message)
+    } catch (e) {
+      toastStore.error('Não foi possível enviar o pedido', (e as Error).message)
       return false
     } finally {
       isLoading.value = false
@@ -142,7 +153,9 @@ export const useSubscriptionStore = defineStore('subscription', () => {
     canUseFeature,
     hasFeature,
     checkResourceLimit,
-    upgradePlan
+    pendingChangeRequest,
+    loadPendingChangeRequest,
+    requestPlanChange
   }
 })
 

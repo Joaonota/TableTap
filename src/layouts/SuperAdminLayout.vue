@@ -2,7 +2,6 @@
 import { ref } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
-import DemoBanner from '@/components/ui/DemoBanner.vue'
 import AppToast from '@/components/ui/AppToast.vue'
 import AppLogo from '@/components/ui/AppLogo.vue'
 import {
@@ -33,7 +32,6 @@ const isMobileSidebarOpen = ref(false)
 
 <template>
   <div class="super-wrapper">
-    <DemoBanner />
 
     <!-- Super Admin Header -->
     <header class="super-header">

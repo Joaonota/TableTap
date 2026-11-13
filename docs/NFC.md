@@ -72,14 +72,16 @@ As regras estão em `src/domain/nfcTagRules.ts` (funções puras, com testes):
   configuração física, confirma a instalação e exporta a lista *A preparar* em CSV
   (Tag, Restaurante, Mesa, URL, Estado) para usar na aplicação externa.
 
-## Arquitetura (preparada para API)
+## Arquitetura
 
 ```
 páginas/componentes → stores (Pinia) → services (src/services) → repositories (interfaces)
-                                                                  └─ src/repositories/index.ts  ← trocar Mock* por Api*
+                                                                  └─ src/repositories/supabase
 ```
 
-As operações de domínio (`tables.setStatus`, `tableSessions.start/join/close/cancel`,
-`nfcTags.assign/markConfigured/activate/disable/reactivate`) estão nas interfaces dos repositórios.
-O mock aplica as regras como o backend deverá fazer. Uma implementação `Api*Repository` substitui o mock
-sem alterar a UI.
+As regras das etiquetas (estados, associação, reatribuição, histórico) são aplicadas pela base de
+dados em funções SQL (`nfc_register_tags`, `nfc_assign_tag`, `nfc_unassign_tag`,
+`nfc_mark_tag_configured`, `nfc_activate_tag`, `nfc_disable_tag`, `nfc_reactivate_tag`), em
+`supabase/migrations/20261113000300_business_rules.sql`. O registo de etiquetas e a configuração
+física só são aceites para a equipa TapMenu (Super Admin); associar, desassociar e desativar exigem
+o papel de gerente ou superior no restaurante. Ver `docs/SUPABASE.md`.

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useTenantStore } from '@/stores/tenant'
 import { useOrderStore } from '@/stores/order'
@@ -47,8 +47,35 @@ const metrics = ref<DashboardMetrics>({
   preparingOrders: 0,
   readyOrders: 0,
   activeServiceRequests: 0,
-  unavailableProductsCount: 0
+  unavailableProductsCount: 0,
+  periodOrders: 0,
+  periodRevenue: 0,
+  previousPeriodRevenue: 0,
+  periodCancelledOrders: 0,
+  cancelledOrders: 0,
+  cancellationRate: 0
 })
+
+const PERIOD_DAYS = { today: 1, '7days': 7, '30days': 30 } as const
+const PERIOD_TEXT = {
+  today: { title: 'Hoje', previous: 'ontem', range: 'hoje' },
+  '7days': { title: 'Últimos 7 dias', previous: 'nos 7 dias anteriores', range: 'nos últimos 7 dias' },
+  '30days': { title: 'Últimos 30 dias', previous: 'nos 30 dias anteriores', range: 'nos últimos 30 dias' }
+} as const
+const periodText = computed(() => PERIOD_TEXT[timePeriod.value])
+
+/** Variação real face ao período anterior (só quando há vendas para comparar). */
+const revenueTrend = computed(() => {
+  const { periodRevenue, previousPeriodRevenue } = metrics.value
+  if (!previousPeriodRevenue) return undefined
+  const change = ((periodRevenue - previousPeriodRevenue) / previousPeriodRevenue) * 100
+  const vs = timePeriod.value === 'today' ? 'vs ontem' : 'vs período anterior'
+  return { value: `${change >= 0 ? '+' : ''}${change.toFixed(1)}% ${vs}`, isPositive: change >= 0 }
+})
+
+const periodAverageTicket = computed(() =>
+  metrics.value.periodOrders ? Math.round((metrics.value.periodRevenue / metrics.value.periodOrders) * 100) / 100 : 0
+)
 
 const salesChartData = ref<{ label: string; amount: number; orderCount: number }[]>([])
 const topProducts = ref<{ name: string; quantity: number; revenue: number }[]>([])
@@ -60,7 +87,7 @@ const loadDashboardData = async () => {
   try {
     const restId = tenantStore.currentRestaurant.id
     const [m, sales, top] = await Promise.all([
-      reportService.getDashboardMetrics(restId),
+      reportService.getDashboardMetrics(restId, PERIOD_DAYS[timePeriod.value]),
       reportService.getSalesByDay(restId),
       reportService.getTopProducts(restId),
       subscriptionStore.fetchSubscriptionData(),
@@ -74,7 +101,7 @@ const loadDashboardData = async () => {
   }
 }
 
-watch(() => tenantStore.currentRestaurant?.id, () => {
+watch(() => [tenantStore.currentRestaurant?.id, timePeriod.value], () => {
   loadDashboardData()
 })
 
@@ -141,27 +168,28 @@ const maxSalesAmount = () => {
     <!-- Metrics Cards Grid -->
     <div class="metrics-grid">
       <MetricCard
-        title="Receita de Vendas"
-        :value="`${metrics.totalRevenue.toLocaleString('pt-MZ')} MT`"
+        :title="`Receita — ${periodText.title}`"
+        :value="`${metrics.periodRevenue.toLocaleString('pt-MZ')} MT`"
         variant="primary"
         :icon="DollarSign"
-        :trend="{ value: '14.2% vs ontem', isPositive: true }"
+        :trend="revenueTrend"
+        :subtitle="revenueTrend ? undefined : `Sem vendas ${periodText.previous} para comparar`"
       />
 
       <MetricCard
         title="Total de Pedidos"
-        :value="metrics.totalOrders"
+        :value="metrics.periodOrders"
         variant="success"
         :icon="ShoppingBag"
-        subtitle="Registados hoje no restaurante"
+        :subtitle="`Pedidos não cancelados ${periodText.range}`"
       />
 
       <MetricCard
         title="Ticket Médio"
-        :value="`${metrics.averageTicket.toLocaleString('pt-MZ')} MT`"
+        :value="`${periodAverageTicket.toLocaleString('pt-MZ')} MT`"
         variant="neutral"
         :icon="TrendingUp"
-        subtitle="Média por pedido concluído"
+        :subtitle="`Média por pedido ${periodText.range}`"
       />
 
       <MetricCard

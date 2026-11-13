@@ -9,17 +9,21 @@ import { usePlanLimit } from '@/composables/usePlanLimit'
 import AppBadge from '@/components/ui/AppBadge.vue'
 import AppModal from '@/components/ui/AppModal.vue'
 import AppInput from '@/components/ui/AppInput.vue'
+import ImageUploadField from '@/components/ui/ImageUploadField.vue'
+import { useTenantStore } from '@/stores/tenant'
 import {
   FolderTree,
   Plus,
   Edit2,
   Trash2,
   ShoppingBag,
-  ArrowUpDown
+  ArrowUpDown,
+  ImageOff
 } from 'lucide-vue-next'
 
 const catalogStore = useCatalogStore()
 const toastStore = useToastStore()
+const tenantStore = useTenantStore()
 
 const isCategoryModalOpen = ref(false)
 const formId = ref<string | undefined>(undefined)
@@ -44,7 +48,7 @@ const openAddModal = () => {
   formId.value = undefined
   formName.value = ''
   formDescription.value = ''
-  formImageUrl.value = 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=400&q=80'
+  formImageUrl.value = ''
   isCategoryModalOpen.value = true
 }
 
@@ -104,18 +108,22 @@ const handleDeleteCategory = async (id: string) => {
 
     <PlanLimitNotice :evaluation="categoriesLimit.evaluation.value" />
 
+    <div v-if="!catalogStore.isLoading && !catalogStore.categories.length" class="empty-state-card">
+      <h3>Ainda não existem categorias</h3>
+      <p>Crie a primeira categoria (ex.: Entradas, Pratos, Bebidas) para começar a montar o menu.</p>
+    </div>
+
     <!-- Categories Grid -->
-    <div class="categories-grid">
+    <div v-else class="categories-grid">
       <div
         v-for="cat in catalogStore.categories"
         :key="cat.id"
         class="category-card"
       >
-        <img
-          :src="cat.imageUrl || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=400&q=80'"
-          :alt="cat.name"
-          class="cat-cover"
-        />
+        <img v-if="cat.imageUrl" :src="cat.imageUrl" :alt="cat.name" class="cat-cover" />
+        <div v-else class="cat-cover cat-cover--empty" aria-hidden="true">
+          <ImageOff :size="22" />
+        </div>
 
         <div class="cat-content">
           <div class="cat-header-row">
@@ -164,10 +172,14 @@ const handleDeleteCategory = async (id: string) => {
           placeholder="Ex: Pratos de panela, caril de camarão e matapa..."
         />
 
-        <AppInput
+        <ImageUploadField
+          v-if="tenantStore.currentRestaurant"
           v-model="formImageUrl"
-          label="URL da Imagem de Capa"
-          placeholder="https://images.unsplash.com/..."
+          label="Imagem da categoria"
+          kind="category"
+          aspect="16 / 9"
+          :tenant-id="tenantStore.currentRestaurant.tenantId"
+          :restaurant-id="tenantStore.currentRestaurant.id"
         />
       </form>
 
@@ -180,6 +192,33 @@ const handleDeleteCategory = async (id: string) => {
 </template>
 
 <style scoped>
+.cat-cover--empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--color-neutral-100);
+  color: var(--color-neutral-400);
+}
+
+.empty-state-card {
+  padding: 2.5rem 1.5rem;
+  text-align: center;
+  background: #fff;
+  border: 1px dashed var(--border-medium);
+  border-radius: var(--radius-lg);
+}
+
+.empty-state-card h3 {
+  margin: 0 0 0.35rem;
+  font-size: 1rem;
+}
+
+.empty-state-card p {
+  margin: 0;
+  font-size: 0.875rem;
+  color: var(--text-muted);
+}
+
 .categories-page {
   display: flex;
   flex-direction: column;

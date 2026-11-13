@@ -3,8 +3,8 @@ import { FEATURE_CATALOG, LIMIT_CATALOG, type LimitCatalogEntry } from '@/types/
 
 /**
  * Regras dos planos e limites (funções puras).
- * `null` = ilimitado. Usadas pelo repositório mock (que imita o backend),
- * pelas stores e pela UI.
+ * `null` = ilimitado. Usadas pelas stores e pela UI; a base de dados aplica
+ * os mesmos limites ao criar recursos (private.assert_plan_limit).
  */
 
 export interface LimitEvaluation {

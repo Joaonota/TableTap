@@ -23,13 +23,26 @@ import type {
   MenuCustomization,
   PlatformAuditLog,
   PlatformConfig,
-  LimitKey
+  LimitKey,
+  PaymentMethod
 } from '@/types'
+
+/** Empresa registada pelo Super Admin (o dono é convidado por email). */
+export interface CreateCompanyInput {
+  name: string
+  legalName?: string
+  taxId?: string
+  phone?: string
+  email?: string
+  planId: string
+  ownerName?: string
+  ownerEmail?: string
+}
 
 export interface ICompanyRepository {
   getAll(): Promise<Company[]>
   getById(id: string): Promise<Company | null>
-  create(company: Omit<Company, 'id' | 'createdAt'>): Promise<Company>
+  create(input: CreateCompanyInput): Promise<Company>
   update(id: string, updates: Partial<Company>): Promise<Company>
 }
 
@@ -43,10 +56,42 @@ export interface IRestaurantRepository {
 }
 
 export interface IUserRepository {
+  /** Todas as contas (Super Admin). */
   getAll(): Promise<User[]>
   getById(id: string): Promise<User | null>
-  getByEmail(email: string): Promise<User | null>
   getByTenant(tenantId: string): Promise<User[]>
+}
+
+/** Conta autenticada: perfil + ligação à empresa (se existir). */
+export interface AuthAccount {
+  user: User | null
+  /** Conta válida mas ainda sem empresa (precisa de concluir o registo). */
+  needsOnboarding: boolean
+  email: string
+  fullName: string
+}
+
+export interface RegisterCompanyInput {
+  companyName: string
+  restaurantName: string
+  legalName?: string
+  taxId?: string
+  phone?: string
+  city?: string
+}
+
+export interface IAuthRepository {
+  getAccount(): Promise<AuthAccount | null>
+  signIn(email: string, password: string): Promise<void>
+  /** Devolve `needsEmailConfirmation` quando o Supabase exige confirmar o email. */
+  signUp(email: string, password: string, fullName: string, redirectTo: string): Promise<{ needsEmailConfirmation: boolean }>
+  signOut(): Promise<void>
+  sendPasswordReset(email: string, redirectTo: string): Promise<void>
+  updatePassword(password: string): Promise<void>
+  /** Liga convites de equipa pendentes ao utilizador (email confirmado). */
+  claimInvitations(): Promise<number>
+  registerCompany(input: RegisterCompanyInput): Promise<string>
+  onAuthChange(callback: (event: string) => void): () => void
 }
 
 /** Dados editáveis de uma mesa. O slug (URL) é gerado na criação e é imutável. */
@@ -87,16 +132,23 @@ export interface IProductRepository {
   delete(id: string): Promise<boolean>
 }
 
+/**
+ * Pedidos geridos pela equipa. A criação acontece no servidor
+ * (IPublicMenuRepository.placeOrder), que calcula preços e totais.
+ */
 export interface IOrderRepository {
   getByRestaurant(restaurantId: string): Promise<Order[]>
+  /** Todos os pedidos visíveis ao utilizador (Super Admin: plataforma). */
+  getAll(limit?: number): Promise<Order[]>
   getById(id: string): Promise<Order | null>
-  create(order: Omit<Order, 'id' | 'orderCode' | 'createdAt' | 'updatedAt' | 'history'>): Promise<Order>
-  updateStatus(id: string, status: OrderStatus, updatedBy: string, note?: string): Promise<Order>
+  updateStatus(id: string, status: OrderStatus, note?: string): Promise<Order>
   updatePaymentStatus(id: string, paymentStatus: PaymentStatus): Promise<Order>
 }
 
 export interface IPaymentRepository {
   getByRestaurant(restaurantId: string): Promise<Payment[]>
+  /** Todos os pagamentos visíveis ao utilizador (Super Admin: plataforma). */
+  getAll(limit?: number): Promise<Payment[]>
   getById(id: string): Promise<Payment | null>
   create(payment: Omit<Payment, 'id' | 'createdAt'>): Promise<Payment>
   updateStatus(id: string, status: PaymentStatus): Promise<Payment>
@@ -104,7 +156,6 @@ export interface IPaymentRepository {
 
 export interface IServiceRequestRepository {
   getByRestaurant(restaurantId: string): Promise<ServiceRequest[]>
-  create(req: Omit<ServiceRequest, 'id' | 'createdAt'>): Promise<ServiceRequest>
   updateStatus(id: string, status: ServiceRequestStatus, assignedToUserId?: string, assignedToName?: string): Promise<ServiceRequest>
 }
 
@@ -125,14 +176,36 @@ export interface IPlanRepository {
   delete(id: string): Promise<boolean>
 }
 
+export interface PlanChangeRequest {
+  id: string
+  tenantId: string
+  requestedPlanId: string
+  requestedByName: string
+  note?: string
+  status: 'pending' | 'approved' | 'rejected'
+  createdAt: string
+  resolvedAt?: string
+}
+
+/**
+ * Subscrições. O histórico (mudança de plano, estado, renovação) é gerado
+ * automaticamente pela base de dados.
+ */
 export interface ISubscriptionRepository {
   getAllPlans(): Promise<Plan[]>
   getAllSubscriptions(): Promise<Subscription[]>
   getByTenant(tenantId: string): Promise<Subscription | null>
   getById(id: string): Promise<Subscription | null>
-  create(sub: Omit<Subscription, 'id'>): Promise<Subscription>
-  updateSubscription(id: string, updates: Partial<Subscription>): Promise<Subscription>
+  /** Super Admin: altera plano, estado, renovação. */
+  updateSubscription(
+    id: string,
+    updates: Partial<Pick<Subscription, 'planId' | 'status' | 'renewalDate' | 'isAutoRenew' | 'startDate'>>
+  ): Promise<Subscription>
   addHistoryEvent(id: string, event: Omit<SubscriptionHistory, 'id' | 'date'>): Promise<Subscription>
+  /** Dono da empresa pede uma alteração de plano (aplicada pela equipa TapMenu). */
+  requestPlanChange(planId: string, note?: string): Promise<PlanChangeRequest>
+  getPlanChangeRequests(tenantId?: string): Promise<PlanChangeRequest[]>
+  resolvePlanChangeRequest(id: string, status: 'approved' | 'rejected'): Promise<void>
 }
 
 export interface IMenuCustomizationRepository {
@@ -168,8 +241,6 @@ export interface ITableSessionRepository {
   start(input: StartSessionInput): Promise<{ session: TableSession; participant: SessionParticipant | null }>
   /** Outro cliente/dispositivo junta-se à sessão ativa da mesa. */
   join(sessionId: string, name: string): Promise<{ session: TableSession; participant: SessionParticipant }>
-  addOrder(sessionId: string, orderId: string): Promise<TableSession>
-  requestBill(sessionId: string): Promise<TableSession>
   /** Encerra a sessão e liberta a mesa (Ocupada → Livre). */
   close(sessionId: string, actor: string): Promise<TableSession>
   /** Cancela a sessão e liberta a mesa. */
@@ -206,9 +277,8 @@ export interface INfcTagRepository {
 }
 
 /**
- * Direitos do plano de cada empresa. Hoje é calculado no mock; com backend,
- * a API devolve o plano efetivo e o consumo, e recusa (403) criações acima
- * do limite — a UI não precisa de mudar.
+ * Direitos do plano de cada empresa. A base de dados devolve o plano efetivo e o
+ * consumo, e recusa (trigger) criações acima do limite.
  */
 export interface IPlanAccessRepository {
   /** Plano efetivo da empresa (subscrição → empresa → plano por defeito). */
@@ -217,10 +287,87 @@ export interface IPlanAccessRepository {
   countUsage(tenantId: string, key: LimitKey, restaurantId?: string): Promise<number>
 }
 
+/** Notificações criadas pelo servidor (pedidos, mesas, chamadas). */
 export interface INotificationRepository {
   getByRestaurant(restaurantId: string): Promise<Notification[]>
-  create(notification: Omit<Notification, 'id' | 'createdAt'>): Promise<Notification>
   markAsRead(id: string): Promise<Notification>
   markAllAsRead(restaurantId: string): Promise<void>
 }
 
+
+// =====================================================================
+// MENU PÚBLICO (cliente sem conta, através da URL da mesa)
+// =====================================================================
+
+export interface PublicTableContext {
+  restaurant: Restaurant
+  table: Table
+  activeSession: TableSession | null
+}
+
+export interface PublicMenuContent {
+  categories: Category[]
+  products: Product[]
+  customization: MenuCustomization['theme'] | null
+}
+
+export interface PlaceOrderItemInput {
+  productId: string
+  quantity: number
+  variantId?: string
+  addonIds?: string[]
+  removedIngredients?: string[]
+  notes?: string
+}
+
+export interface PlaceOrderInput {
+  sessionId: string
+  /** Token secreto do participante (guardado no dispositivo). */
+  participantToken?: string
+  items: PlaceOrderItemInput[]
+  customerName?: string
+  customerPhone?: string
+  notes?: string
+  paymentMethod?: PaymentMethod
+}
+
+export interface CreateServiceRequestInput {
+  tableId: string
+  type: ServiceRequest['type']
+  sessionId?: string
+  participantToken?: string
+  customerName?: string
+  notes?: string
+}
+
+export interface PublicOrderView {
+  order: Order
+  restaurant: { id: string; name: string; slug: string; logoUrl: string; phone: string }
+}
+
+export interface IPublicMenuRepository {
+  /** Resolve /m/{restaurante}/{mesa} (ou o número da mesa, em URLs antigas). */
+  resolveTable(restaurantSlug: string, tableKey: string): Promise<PublicTableContext | null>
+  getMenu(restaurantId: string): Promise<PublicMenuContent>
+  placeOrder(input: PlaceOrderInput): Promise<Order>
+  getSessionOrders(sessionId: string, participantToken?: string): Promise<Order[]>
+  requestBill(sessionId: string, participantToken?: string, paymentMethod?: PaymentMethod, notes?: string): Promise<TableSession>
+  createServiceRequest(input: CreateServiceRequestInput): Promise<{ request: ServiceRequest; alreadyExisted: boolean }>
+  getOrder(orderId: string): Promise<PublicOrderView | null>
+}
+
+// =====================================================================
+// IMAGENS (Supabase Storage)
+// =====================================================================
+
+export type MediaKind = 'logo' | 'cover' | 'product' | 'category'
+
+export interface IMediaRepository {
+  /**
+   * Envia uma imagem e devolve a URL pública.
+   * Sem `restaurantId` = imagem da empresa (ex.: logótipo da empresa).
+   */
+  uploadImage(file: File, scope: { tenantId: string; restaurantId?: string; kind: MediaKind }): Promise<string>
+  /** Remove uma imagem do Storage a partir da URL pública (ignora URLs externas). */
+  removeByUrl(url: string): Promise<void>
+}

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { subscriptionStatusLabel } from '@/domain/statusLabels'
 import { ref, onMounted, computed } from 'vue'
-import { tenantService, restaurantService, authService } from '@/services'
+import { tenantService, restaurantService, userService } from '@/services'
 import { usePlatformStore } from '@/stores/platform'
 import { usePlansStore } from '@/stores/plans'
 import type { Company, Restaurant, User } from '@/types'
@@ -36,24 +36,31 @@ onMounted(async () => {
       plansStore.fetchPlans(),
       tenantService.getAllCompanies().then(c => companies.value = c),
       restaurantService.getAllRestaurants().then(r => restaurants.value = r),
-      authService.getDemoUsers().then(u => users.value = u)
+      userService.getAllUsers().then(u => users.value = u)
     ])
   } finally {
     isLoading.value = false
   }
 })
 
-// Monthly projection data for visualization
-const monthlyRevenueProjection = [
-  { month: 'Jun', value: 10470 },
-  { month: 'Jul', value: 11960 },
-  { month: 'Ago', value: 13450 },
-  { month: 'Set', value: 14940 },
-  { month: 'Out', value: 16430 },
-  { month: 'Nov (Atual)', value: 16470 }
-]
+/** Novas empresas registadas por mês (últimos 6 meses), a partir das datas reais de registo. */
+const companiesPerMonth = computed(() => {
+  const now = new Date()
+  return Array.from({ length: 6 }, (_, i) => {
+    const date = new Date(now.getFullYear(), now.getMonth() - (5 - i), 1)
+    const value = companies.value.filter(c => {
+      const created = new Date(c.createdAt)
+      return created.getFullYear() === date.getFullYear() && created.getMonth() === date.getMonth()
+    }).length
+    const label = date.toLocaleDateString('pt-MZ', { month: 'short' })
+    return { month: i === 5 ? `${label} (atual)` : label, value }
+  })
+})
 
-const maxRev = Math.max(...monthlyRevenueProjection.map(m => m.value))
+const maxCompaniesPerMonth = computed(() => Math.max(1, ...companiesPerMonth.value.map(m => m.value)))
+
+/** Cidades distintas onde há restaurantes registados. */
+const restaurantCities = computed(() => [...new Set(restaurants.value.map(r => r.address.city.trim()).filter(Boolean))])
 
 const planDistributionList = computed(() => {
   const counts = platformStore.planDistribution
@@ -88,9 +95,7 @@ const planDistributionList = computed(() => {
           <CreditCard :size="18" class="m-icon m-icon-green" />
         </div>
         <div class="m-val">{{ platformStore.mrr.toLocaleString('pt-MZ') }} MT</div>
-        <div class="m-sub text-success">
-          <TrendingUp :size="13" /> +18.4% vs mês anterior
-        </div>
+        <div class="m-sub">Subscrições ativas ({{ platformStore.trialSubscriptionsCount }} em período de teste não contam)</div>
       </div>
 
       <div class="super-metric-card">
@@ -117,7 +122,9 @@ const planDistributionList = computed(() => {
           <Store :size="18" class="m-icon m-icon-orange" />
         </div>
         <div class="m-val">{{ restaurants.length }}</div>
-        <div class="m-sub">Em 3 províncias (Maputo, Matola, Beira)</div>
+        <div class="m-sub">
+          {{ restaurantCities.length ? `Em ${restaurantCities.length} ${restaurantCities.length === 1 ? 'cidade' : 'cidades'}: ${restaurantCities.slice(0, 3).join(', ')}${restaurantCities.length > 3 ? '…' : ''}` : 'Sem cidade indicada' }}
+        </div>
       </div>
     </div>
 
@@ -127,23 +134,23 @@ const planDistributionList = computed(() => {
       <div class="super-card revenue-chart-card">
         <div class="card-header">
           <div>
-            <h2 class="card-title">Evolução de MRR (Últimos 6 Meses)</h2>
-            <p class="card-subtitle">Receita recorrente acumulada de subscrições ativas</p>
+            <h2 class="card-title">Novas empresas (últimos 6 meses)</h2>
+            <p class="card-subtitle">Empresas registadas na plataforma em cada mês</p>
           </div>
-          <span class="currency-tag">Moeda: Meticais (MT)</span>
         </div>
 
-        <div class="chart-bars">
+        <div v-if="!companies.length && !isLoading" class="empty-block">Ainda não existem empresas registadas.</div>
+        <div v-else class="chart-bars">
           <div
-            v-for="item in monthlyRevenueProjection"
+            v-for="item in companiesPerMonth"
             :key="item.month"
             class="bar-column"
           >
-            <div class="bar-val font-mono">{{ item.value.toLocaleString('pt-MZ') }}</div>
+            <div class="bar-val font-mono">{{ item.value }}</div>
             <div class="bar-track">
               <div
                 class="bar-fill"
-                :style="{ height: `${Math.round((item.value / maxRev) * 100)}%` }"
+                :style="{ height: `${Math.round((item.value / maxCompaniesPerMonth) * 100)}%` }"
               ></div>
             </div>
             <span class="bar-month">{{ item.month }}</span>
@@ -161,7 +168,8 @@ const planDistributionList = computed(() => {
           </router-link>
         </div>
 
-        <div class="distribution-list">
+        <div v-if="!planDistributionList.length" class="empty-block">Ainda não existem subscrições.</div>
+        <div v-else class="distribution-list">
           <div
             v-for="p in planDistributionList"
             :key="p.name"
@@ -203,9 +211,10 @@ const planDistributionList = computed(() => {
           </router-link>
         </div>
 
-        <div class="subscriptions-list">
+        <div v-if="!platformStore.subscriptions.length" class="empty-block">Ainda não existem subscrições.</div>
+        <div v-else class="subscriptions-list">
           <div
-            v-for="sub in platformStore.subscriptions"
+            v-for="sub in platformStore.subscriptions.slice(0, 6)"
             :key="sub.id"
             class="sub-item"
           >
@@ -233,13 +242,14 @@ const planDistributionList = computed(() => {
             <h2 class="card-title">Registo de Atividades (Auditoria)</h2>
             <p class="card-subtitle">Últimas ações e eventos críticos no sistema</p>
           </div>
-          <router-link to="/super-admin/auditoria" class="card-link">
+          <router-link to="/super-admin/atividade" class="card-link">
             <span>Ver Tudo</span>
             <ArrowRight :size="14" />
           </router-link>
         </div>
 
-        <div class="audit-feed">
+        <div v-if="!platformStore.auditLogs.length" class="empty-block">Ainda não há atividade registada.</div>
+        <div v-else class="audit-feed">
           <div
             v-for="log in platformStore.auditLogs.slice(0, 5)"
             :key="log.id"
@@ -264,6 +274,15 @@ const planDistributionList = computed(() => {
 </template>
 
 <style scoped>
+.empty-block {
+  padding: 2rem 1rem;
+  text-align: center;
+  font-size: 0.875rem;
+  color: var(--text-muted);
+  border: 1px dashed var(--border-subtle);
+  border-radius: var(--radius-md);
+}
+
 .super-dashboard {
   display: flex;
   flex-direction: column;

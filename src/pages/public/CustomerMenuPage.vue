@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { productService, categoryService, orderService } from '@/services'
+import { publicTableService } from '@/services'
 import { useCartStore, type CartCustomization } from '@/stores/cart'
 import { useTableSessionStore } from '@/stores/tableSession'
 import { useServiceRequestStore } from '@/stores/serviceRequest'
@@ -131,8 +131,12 @@ const loadSessionOrders = async () => {
     sessionOrders.value = []
     return
   }
-  const allOrders = await orderService.getOrders(restaurant.value.id)
-  sessionOrders.value = allOrders.filter(o => session.orderIds.includes(o.id) || o.tableSessionId === session.id)
+  try {
+    // Só os pedidos desta sessão, autorizados pelo token deste dispositivo.
+    sessionOrders.value = await publicTableService.getSessionOrders(session.id, tableSessionStore.participantToken)
+  } catch {
+    sessionOrders.value = []
+  }
 }
 
 const loadMenu = async () => {
@@ -146,12 +150,10 @@ const loadMenu = async () => {
     }
     cartStore.setRestaurantAndTable(restaurant.value, table.value)
 
-    const [cats, prods] = await Promise.all([
-      categoryService.getCategories(restaurant.value.id),
-      productService.getProducts(restaurant.value.id)
-    ])
-    categories.value = cats.filter(c => c.isActive)
-    products.value = prods.filter(p => p.isActive)
+    // Menu publicado: só categorias e produtos ativos.
+    const menu = await publicTableService.getMenu(restaurant.value.id)
+    categories.value = menu.categories
+    products.value = menu.products
 
     if (isSessionActive.value) {
       customerName.value = tableSessionStore.participantName
@@ -292,7 +294,8 @@ const handleConfirmOrder = async () => {
       customerPhone: customerPhone.value.trim() || undefined,
       notes: orderNotes.value.trim() || undefined,
       paymentMethod: selectedPaymentMethod.value,
-      tableSessionId: activeSession.value?.id
+      tableSessionId: activeSession.value?.id,
+      participantToken: tableSessionStore.participantToken
     })
 
     cartStore.isCartOpen = false
@@ -323,7 +326,8 @@ const handleSendServiceRequest = async () => {
       serviceType.value,
       serviceNotes.value,
       isSessionActive.value ? activeSession.value?.id : undefined,
-      tableSessionStore.participantName || customerName.value || undefined
+      tableSessionStore.participantName || customerName.value || undefined,
+      tableSessionStore.participantToken
     )
     isServiceModalOpen.value = false
     serviceNotes.value = ''
@@ -334,7 +338,7 @@ const handleSendServiceRequest = async () => {
 
 // Bill request
 const handleConfirmBill = async (payload: { paymentMethod: PaymentMethod; notes?: string; totalAmount: number }) => {
-  const updated = await tableSessionStore.requestBill(payload.totalAmount)
+  const updated = await tableSessionStore.requestBill(payload.paymentMethod, payload.notes)
   if (updated) isBillModalOpen.value = false
 }
 

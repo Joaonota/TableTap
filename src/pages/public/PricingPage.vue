@@ -47,9 +47,9 @@ onMounted(async () => {
         v-for="plan in plans"
         :key="plan.id"
         class="plan-card"
-        :class="{ 'is-featured': plan.id === 'plan-pro' || plan.highlighted }"
+        :class="{ 'is-featured': plan.highlighted }"
       >
-        <div v-if="plan.id === 'plan-pro' || plan.highlighted" class="featured-badge">
+        <div v-if="plan.highlighted" class="featured-badge">
           <Sparkles :size="13" />
           <span>MAIS POPULAR</span>
         </div>
@@ -85,13 +85,13 @@ onMounted(async () => {
         </div>
 
         <div class="plan-footer">
-          <router-link :to="`/demonstracao?plan=${plan.id}`">
+          <router-link to="/registo">
             <AppButton
-              :variant="plan.id === 'plan-pro' || plan.highlighted ? 'primary' : 'outline'"
+              :variant="plan.highlighted ? 'primary' : 'outline'"
               class="w-full"
               size="lg"
             >
-              Experimentar Neste Plano
+              Começar Agora
             </AppButton>
           </router-link>
         </div>

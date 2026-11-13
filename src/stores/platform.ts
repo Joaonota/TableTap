@@ -2,6 +2,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import type { PlatformAuditLog, PlatformConfig, Subscription } from '@/types'
+import type { PlanChangeRequest } from '@/services'
 import { subscriptionService, auditService, platformConfigService, tenantService } from '@/services'
 import { useToastStore } from './toast'
 
@@ -11,6 +12,9 @@ export const usePlatformStore = defineStore('platform', () => {
   const subscriptions = ref<Subscription[]>([])
   const auditLogs = ref<PlatformAuditLog[]>([])
   const config = ref<PlatformConfig | null>(null)
+  /** Pedidos de alteração de plano feitos pelos restaurantes. */
+  const planChangeRequests = ref<PlanChangeRequest[]>([])
+  const pendingPlanChangeRequests = computed(() => planChangeRequests.value.filter(r => r.status === 'pending'))
   const totalCompaniesCount = ref(0)
   const isLoading = ref(false)
 
@@ -41,12 +45,14 @@ export const usePlatformStore = defineStore('platform', () => {
   const fetchPlatformData = async () => {
     isLoading.value = true
     try {
-      const [subs, logs, cfg, companies] = await Promise.all([
+      const [subs, logs, cfg, companies, requests] = await Promise.all([
         subscriptionService.getAllSubscriptions(),
         auditService.getLogs(),
         platformConfigService.getConfig(),
-        tenantService.getAllCompanies()
+        tenantService.getAllCompanies(),
+        subscriptionService.getPlanChangeRequests()
       ])
+      planChangeRequests.value = requests
 
       subscriptions.value = subs
       auditLogs.value = logs
@@ -59,22 +65,18 @@ export const usePlatformStore = defineStore('platform', () => {
     }
   }
 
-  const updateSubscription = async (id: string, updates: Partial<Subscription>): Promise<Subscription | null> => {
+  /** O histórico e a auditoria da alteração são registados pela base de dados. */
+  const updateSubscription = async (
+    id: string,
+    updates: Partial<Pick<Subscription, 'planId' | 'status' | 'renewalDate' | 'isAutoRenew' | 'startDate'>>
+  ): Promise<Subscription | null> => {
     isLoading.value = true
     try {
       const updated = await subscriptionService.updateSubscription(id, updates)
       const idx = subscriptions.value.findIndex(s => s.id === id)
       if (idx !== -1) subscriptions.value[idx] = updated
+      planChangeRequests.value = await subscriptionService.getPlanChangeRequests()
 
-      // Log action
-      await auditService.log({
-        tenantId: updated.tenantId,
-        userId: 'user-super-1',
-        userName: 'Super Administrador',
-        action: 'subscription.updated',
-        resource: `Subscription: ${updated.id}`,
-        details: `Subscrição atualizada (estado: ${updated.status}, plano: ${updated.planName}).`
-      })
 
       toastStore.success('Subscrição Atualizada', `A subscrição de ${updated.companyName} foi atualizada.`)
       return updated
@@ -92,13 +94,6 @@ export const usePlatformStore = defineStore('platform', () => {
       const saved = await platformConfigService.updateConfig(updates)
       config.value = saved
 
-      await auditService.log({
-        userId: 'user-super-1',
-        userName: 'Super Administrador',
-        action: 'platform.config_updated',
-        resource: 'PlatformConfig',
-        details: 'Configurações globais do sistema foram atualizadas.'
-      })
 
       toastStore.success('Configurações Atualizadas', 'As definições globais da plataforma foram guardadas.')
       return true
@@ -110,7 +105,32 @@ export const usePlatformStore = defineStore('platform', () => {
     }
   }
 
+  /** Nota administrativa no histórico da subscrição (persistida). */
+  const addSubscriptionNote = async (id: string, note: string) => {
+    try {
+      const updated = await subscriptionService.addHistoryEvent(id, { event: 'note', note, performedBy: '' })
+      const idx = subscriptions.value.findIndex(s => s.id === id)
+      if (idx !== -1) subscriptions.value[idx] = updated
+    } catch (e) {
+      toastStore.error('Erro ao guardar a nota', (e as Error).message)
+    }
+  }
+
+  const rejectPlanChangeRequest = async (id: string) => {
+    try {
+      await subscriptionService.resolvePlanChangeRequest(id, 'rejected')
+      planChangeRequests.value = await subscriptionService.getPlanChangeRequests()
+      toastStore.info('Pedido recusado')
+    } catch (e) {
+      toastStore.error('Erro ao recusar pedido', (e as Error).message)
+    }
+  }
+
   return {
+    planChangeRequests,
+    pendingPlanChangeRequests,
+    rejectPlanChangeRequest,
+    addSubscriptionNote,
     subscriptions,
     auditLogs,
     config,

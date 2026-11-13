@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
-import DemoBanner from '@/components/ui/DemoBanner.vue'
 import AppToast from '@/components/ui/AppToast.vue'
 import AppLogo from '@/components/ui/AppLogo.vue'
 import { Menu, X, ArrowRight } from 'lucide-vue-next'
@@ -12,7 +11,6 @@ const isMenuOpen = ref(false)
 
 <template>
   <div class="public-wrapper">
-    <DemoBanner />
 
     <!-- Public Header -->
     <header class="public-header">
@@ -25,7 +23,7 @@ const isMenuOpen = ref(false)
           <router-link to="/" class="nav-item">Início</router-link>
           <router-link to="/funcionalidades" class="nav-item">Funcionalidades</router-link>
           <router-link to="/precos" class="nav-item">Preços & Planos</router-link>
-          <router-link to="/demonstracao" class="nav-item">Demonstração Interativa</router-link>
+          <router-link to="/registo" class="nav-item">Criar Conta</router-link>
         </nav>
 
         <div class="header-actions">
@@ -46,7 +44,7 @@ const isMenuOpen = ref(false)
         <router-link to="/" class="mobile-nav-item" @click="isMenuOpen = false">Início</router-link>
         <router-link to="/funcionalidades" class="mobile-nav-item" @click="isMenuOpen = false">Funcionalidades</router-link>
         <router-link to="/precos" class="mobile-nav-item" @click="isMenuOpen = false">Preços & Planos</router-link>
-        <router-link to="/demonstracao" class="mobile-nav-item" @click="isMenuOpen = false">Demonstração</router-link>
+        <router-link to="/registo" class="mobile-nav-item" @click="isMenuOpen = false">Criar Conta</router-link>
         <router-link to="/login" class="mobile-nav-item" @click="isMenuOpen = false">Iniciar Sessão</router-link>
         <router-link to="/app/dashboard" class="mobile-cta" @click="isMenuOpen = false">Aceder ao Dashboard</router-link>
       </div>
@@ -82,14 +80,14 @@ const isMenuOpen = ref(false)
           <div class="footer-links-col">
             <div class="footer-title">EMPRESA</div>
             <router-link to="/precos">Planos & Preços</router-link>
-            <router-link to="/demonstracao">Guia de Demonstração</router-link>
+            <router-link to="/registo">Criar Conta</router-link>
             <router-link to="/login">Acesso para Clientes</router-link>
             <a href="mailto:contacto@tapmenu.co.mz">contacto@tapmenu.co.mz</a>
           </div>
 
           <div class="footer-links-col">
             <div class="footer-title">PAGAMENTOS NACIONAIS</div>
-            <p class="text-sm text-muted">Compatível com simulações e integrações de:</p>
+            <p class="text-sm text-muted">Métodos de pagamento registados no TapMenu (confirmação pela equipa do restaurante):</p>
             <ul class="clean-list">
               <li>• M-Pesa Moçambique</li>
               <li>• e-Mola Movitel</li>
@@ -100,7 +98,7 @@ const isMenuOpen = ref(false)
         </div>
 
         <div class="footer-bottom">
-          <p>© 2026 TapMenu SaaS. Todos os direitos reservados. Ambiente de demonstração frontend com dados mockados.</p>
+          <p>© 2026 TapMenu SaaS. Todos os direitos reservados.</p>
         </div>
       </div>
     </footer>

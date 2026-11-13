@@ -3,7 +3,6 @@ import { ref } from 'vue'
 import { useCartStore } from '@/stores/cart'
 import { useToastStore } from '@/stores/toast'
 import AppToast from '@/components/ui/AppToast.vue'
-import DemoBanner from '@/components/ui/DemoBanner.vue'
 import { ShoppingBag, ArrowRight } from 'lucide-vue-next'
 
 const cartStore = useCartStore()
@@ -12,7 +11,6 @@ const toastStore = useToastStore()
 
 <template>
   <div class="customer-wrapper">
-    <DemoBanner />
 
     <main class="customer-main">
       <router-view />

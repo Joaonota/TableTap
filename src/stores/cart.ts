@@ -1,10 +1,8 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import type { OrderItem, OrderType, PaymentStatus, Product, ProductVariant, ProductAddon, Restaurant, Table, PaymentMethod } from '@/types'
-import { useOrderStore } from './order'
+import type { OrderItem, Product, ProductVariant, ProductAddon, Restaurant, Table, PaymentMethod } from '@/types'
 import { useToastStore } from './toast'
-import { useNotificationStore } from './notification'
-import { tableSessionService } from '@/services'
+import { publicTableService } from '@/services'
 
 export interface CartCustomization {
   selectedVariant?: ProductVariant
@@ -14,9 +12,7 @@ export interface CartCustomization {
 }
 
 export const useCartStore = defineStore('cart', () => {
-  const orderStore = useOrderStore()
   const toastStore = useToastStore()
-  const notificationStore = useNotificationStore()
 
   const items = ref<OrderItem[]>([])
   const activeRestaurant = ref<Restaurant | null>(null)
@@ -32,7 +28,7 @@ export const useCartStore = defineStore('cart', () => {
   })
 
   const taxAmount = computed(() => {
-    const rate = activeRestaurant.value?.taxRate || 16
+    const rate = activeRestaurant.value?.taxRate ?? 0
     return Math.round((subtotal.value * (rate / 100)) * 100) / 100
   })
 
@@ -118,12 +114,19 @@ export const useCartStore = defineStore('cart', () => {
     items.value = []
   }
 
+  /**
+   * Envia o pedido. O navegador só diz O QUE foi pedido (produto, quantidade,
+   * opções); preços, IVA, taxa de serviço e total são calculados pelo
+   * servidor a partir do menu atual. A notificação à equipa também é criada
+   * no servidor.
+   */
   const checkout = async (options: {
     customerName?: string
     customerPhone?: string
     notes?: string
     paymentMethod?: PaymentMethod
     tableSessionId?: string
+    participantToken?: string
   }) => {
     if (items.value.length === 0) {
       throw new Error('O carrinho está vazio!')
@@ -131,56 +134,25 @@ export const useCartStore = defineStore('cart', () => {
     if (!activeRestaurant.value) {
       throw new Error('Restaurante não identificado.')
     }
-
-    let isAdditional = false
-    if (options.tableSessionId) {
-      const sess = await tableSessionService.getSessionById(options.tableSessionId)
-      // Validar antes de criar o pedido: evita pedidos órfãos de sessões encerradas.
-      if (!sess || sess.status !== 'active') {
-        throw new Error('A sessão desta mesa já foi encerrada. Atualize a página para iniciar uma nova.')
-      }
-      isAdditional = sess.orderIds.length > 0
+    if (!options.tableSessionId) {
+      throw new Error('Inicie ou junte-se à sessão da mesa para enviar o pedido.')
     }
 
-    const orderData = {
-      tenantId: activeRestaurant.value.tenantId,
-      restaurantId: activeRestaurant.value.id,
-      tableId: activeTable.value?.id,
-      tableNumber: activeTable.value?.number || 'Balcão',
-      tableSessionId: options.tableSessionId,
-      isAdditional,
-      type: (activeTable.value ? 'dine_in' : 'takeaway') as OrderType,
-      status: 'received' as const,
-      paymentStatus: 'pending' as PaymentStatus,
-      paymentMethod: options.paymentMethod,
-      items: JSON.parse(JSON.stringify(items.value)),
-      subtotal: subtotal.value,
-      taxAmount: taxAmount.value,
-      serviceFee: serviceFee.value,
-      total: grandTotal.value,
-      customerName: options.customerName || 'Cliente Mesa',
+    const order = await publicTableService.placeOrder({
+      sessionId: options.tableSessionId,
+      participantToken: options.participantToken,
+      customerName: options.customerName,
       customerPhone: options.customerPhone,
-      notes: options.notes
-    }
-
-    const order = await orderStore.createNewOrder(orderData)
-
-    // Link order to session if present
-    if (options.tableSessionId) {
-      await tableSessionService.addOrderToSession(options.tableSessionId, order.id)
-    }
-
-    // Create counter notification
-    await notificationStore.createNotification({
-      tenantId: activeRestaurant.value.tenantId,
-      restaurantId: activeRestaurant.value.id,
-      type: isAdditional ? 'additional_order' : 'new_order',
-      title: isAdditional ? 'Pedido adicional recebido' : 'Novo pedido recebido',
-      message: `${isAdditional ? 'Pedido adicional' : 'Pedido'} ${order.orderCode} — Mesa ${order.tableNumber || 'Balcão'} (${order.customerName}) — ${order.items.length} ${order.items.length === 1 ? 'item' : 'itens'} — Total: ${order.total.toLocaleString('pt-MZ')} MT`,
-      tableId: activeTable.value?.id,
-      tableNumber: activeTable.value?.number,
-      tableSessionId: options.tableSessionId,
-      orderId: order.id
+      notes: options.notes,
+      paymentMethod: options.paymentMethod,
+      items: items.value.map(item => ({
+        productId: item.productId,
+        quantity: item.quantity,
+        variantId: item.selectedVariant?.id,
+        addonIds: item.selectedAddons?.map(a => a.id),
+        removedIngredients: item.removedIngredients,
+        notes: item.notes
+      }))
     })
 
     clearCart()

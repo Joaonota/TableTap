@@ -92,11 +92,11 @@ const handleRefundPayment = async (pay: Payment) => {
   <div class="payments-page">
     <div class="page-top-header">
       <div>
-        <h1 class="page-title">Pagamentos Demonstrativos</h1>
+        <h1 class="page-title">Pagamentos</h1>
         <p class="page-subtitle">Acompanhe transações de M-Pesa, e-Mola, Cartões POS e Dinheiro ao balcão</p>
       </div>
 
-      <div class="badge badge-warning">Simulação Financeira Segura</div>
+      <div class="badge badge-warning">Confirmação manual — sem cobrança automática</div>
     </div>
 
     <!-- Filters Bar -->

@@ -1,6 +1,16 @@
 ﻿# TapMenu
 
-Aplicação SaaS para gestão de menus digitais em restaurantes — Vue 3 + TypeScript + Vite + Pinia.
+Aplicação SaaS para gestão de menus digitais em restaurantes — Vue 3 + TypeScript + Vite + Pinia,
+com Supabase (PostgreSQL, Auth, Storage e Realtime). Sem dados de demonstração: tudo vem da base de dados.
+
+## Configurar
+
+1. `cp .env.example .env.local` e preencha `VITE_SUPABASE_URL` e `VITE_SUPABASE_PUBLISHABLE_KEY`
+   (só a chave **pública**).
+2. Aplique as migrations de `supabase/migrations/` no projeto Supabase.
+3. Siga `docs/SUPABASE.md` (autenticação, primeiro Super Admin, planos).
+
+Sem as variáveis, a aplicação mostra uma página a explicar o que falta.
 
 ## Executar
 
@@ -9,7 +19,8 @@ npm install
 npm run dev      # desenvolvimento
 npm run build    # build (vue-tsc + vite)
 npm run preview  # pré-visualizar build
-npm test         # testes (vitest)
+npm test         # testes das regras de domínio (vitest)
+npm run test:db  # testes da base de dados: RLS, isolamento e regras (PostgreSQL local)
 ```
 
 ## Mesas, sessões e etiquetas NFC
@@ -25,9 +36,17 @@ e o TapMenu gere o registo administrativo das etiquetas e o estado das mesas e d
 
 ## Arquitetura
 
-- `src/domain/`: regras de negócio puras (URL pública, estados de mesa/sessão, etiquetas).
-- `src/repositories/`: interfaces e implementação mock (localStorage). O registo único em
-  `src/repositories/index.ts` é o ponto de troca para uma API.
+```
+páginas/componentes → stores (Pinia) → services (src/services) → repositories (interfaces)
+                                                                  └─ src/repositories/supabase
+```
+
+- `supabase/migrations/`: estrutura, RLS e regras de negócio (limites, sessões, pedidos, NFC).
+- `src/lib/supabase.ts`: cliente único (chave pública).
+- `src/repositories/supabase/`: todas as consultas ao Supabase e conversão de dados (mappers).
 - `src/services/`: fachada usada pelas stores.
-- `src/stores/`: estado da UI (Pinia).
+- `src/stores/`: estado da UI (Pinia), com Realtime para pedidos, mesas, atendimento e notificações.
+- `src/domain/`: regras puras partilhadas pela UI (URL pública, estados, limites).
 - UI base em `src/components/ui/`.
+
+Detalhes: `docs/SUPABASE.md`.

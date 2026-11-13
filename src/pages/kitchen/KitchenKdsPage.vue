@@ -22,9 +22,12 @@ const stationFilter = ref<'all' | 'kitchen' | 'bar'>('all')
 
 const now = ref(Date.now())
 let interval: number
+// Pedidos novos chegam ao ecrã da cozinha em tempo real (Supabase Realtime).
+let stopRealtime: () => void = () => {}
 
 onMounted(async () => {
   await orderStore.loadOrders()
+  stopRealtime = orderStore.subscribeRealtime()
   interval = window.setInterval(() => {
     now.value = Date.now()
   }, 10000)
@@ -32,6 +35,7 @@ onMounted(async () => {
 
 onUnmounted(() => {
   clearInterval(interval)
+  stopRealtime()
 })
 
 const getElapsedTimeMinutes = (createdAt: string) => {

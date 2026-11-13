@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import type { Table, TableSession } from '@/types'
-import { tableService, tableSessionService, type TableInput } from '@/services'
+import { tableService, tableSessionService, subscribeToRealtime, type TableInput } from '@/services'
 import { countTables } from '@/domain/tableRules'
 import { buildTableUrl } from '@/domain/publicUrl'
 import { errorMessage } from '@/domain/errors'
@@ -9,7 +9,6 @@ import { useTenantStore } from './tenant'
 import { useAuthStore } from './auth'
 import { useToastStore } from './toast'
 import { useNfcTagStore } from './nfcTag'
-import { useNotificationStore } from './notification'
 
 /**
  * Mesas do restaurante atual + sessões ativas (painel do restaurante).
@@ -21,7 +20,6 @@ export const useTableStore = defineStore('table', () => {
   const authStore = useAuthStore()
   const toastStore = useToastStore()
   const nfcTagStore = useNfcTagStore()
-  const notificationStore = useNotificationStore()
 
   const tables = ref<Table[]>([])
   const activeSessions = ref<TableSession[]>([])
@@ -144,25 +142,37 @@ export const useTableStore = defineStore('table', () => {
     }
   }
 
+  /**
+   * Mesas ocupadas por clientes (URL da mesa), sessões encerradas noutro
+   * posto, etc. chegam em tempo real. Devolve a função para parar de escutar.
+   */
+  const subscribeRealtime = () => {
+    const restaurantId = tenantStore.currentRestaurant?.id
+    if (!restaurantId) return () => {}
+    const reload = async () => {
+      if (tenantStore.currentRestaurant?.id !== restaurantId) return
+      const [tbls, sessions] = await Promise.all([
+        tableService.getTables(restaurantId),
+        tableSessionService.getSessions(restaurantId)
+      ])
+      tables.value = tbls
+      activeSessions.value = sessions.filter(s => s.status === 'active')
+    }
+    const stopTables = subscribeToRealtime('dining_tables', restaurantId, reload)
+    const stopSessions = subscribeToRealtime('table_sessions', restaurantId, reload)
+    return () => {
+      stopTables()
+      stopSessions()
+    }
+  }
+
   /** Abertura de sessão pela equipa (ex.: clientes sentados pelo empregado). */
   const startSession = async (tableId: string, input: { primaryCustomerName?: string; partySize?: number; notes?: string }) => {
-    const restaurant = tenantStore.currentRestaurant
     try {
       const { session } = await tableSessionService.startSession({ tableId, ...input })
       await refreshTable(tableId)
+      // A notificação "mesa ocupada" é criada pelo servidor.
       const table = tables.value.find(t => t.id === tableId)
-      if (restaurant && table) {
-        await notificationStore.createNotification({
-          tenantId: restaurant.tenantId,
-          restaurantId: restaurant.id,
-          type: 'table_occupied',
-          title: 'Sessão iniciada',
-          message: `Mesa ${table.number} ocupada${session.primaryCustomerName ? ` por ${session.primaryCustomerName}` : ''} (aberta por ${actor()}).`,
-          tableId,
-          tableNumber: table.number,
-          tableSessionId: session.id
-        })
-      }
       toastStore.success('Sessão iniciada', `Mesa ${table?.number ?? ''} está agora ocupada.`)
       return session
     } catch (e) {
@@ -197,6 +207,7 @@ export const useTableStore = defineStore('table', () => {
   }
 
   return {
+    subscribeRealtime,
     tables,
     activeSessions,
     isLoading,

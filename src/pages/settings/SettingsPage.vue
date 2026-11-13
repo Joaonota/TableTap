@@ -2,7 +2,9 @@
 import { ref, onMounted, watch } from 'vue'
 import { useTenantStore } from '@/stores/tenant'
 import { useToastStore } from '@/stores/toast'
-import { restaurantService, tenantService, resetDatabase } from '@/services'
+import { useAuthStore } from '@/stores/auth'
+import { restaurantService, tenantService } from '@/services'
+import ImageUploadField from '@/components/ui/ImageUploadField.vue'
 import AppButton from '@/components/ui/AppButton.vue'
 import AppInput from '@/components/ui/AppInput.vue'
 import AppSelect from '@/components/ui/AppSelect.vue'
@@ -12,13 +14,13 @@ import {
   Store,
   Building2,
   DollarSign,
-  RotateCcw,
   CheckCircle2,
-  AlertTriangle
+  ImageIcon
 } from 'lucide-vue-next'
 
 const tenantStore = useTenantStore()
 const toastStore = useToastStore()
+const authStore = useAuthStore()
 
 // Restaurant form
 const restName = ref('')
@@ -31,6 +33,8 @@ const restTaxRate = ref(16)
 const restServiceFee = ref(10)
 const restOpeningHours = ref('')
 const isOrderingEnabled = ref(true)
+const restLogoUrl = ref('')
+const restCoverUrl = ref('')
 
 // Company form
 const compLegalName = ref('')
@@ -53,6 +57,8 @@ const populateForms = () => {
     restServiceFee.value = r.settings.serviceFeePercent
     restOpeningHours.value = r.openingHours
     isOrderingEnabled.value = r.settings.allowCustomerOrdering
+    restLogoUrl.value = r.logoUrl || ''
+    restCoverUrl.value = r.coverImage || ''
   }
 
   const c = tenantStore.currentCompany
@@ -83,6 +89,8 @@ const handleSaveSettings = async () => {
       phone: restPhone.value,
       email: restEmail.value,
       taxRate: Number(restTaxRate.value),
+      logoUrl: restLogoUrl.value,
+      coverImage: restCoverUrl.value,
       openingHours: restOpeningHours.value,
       address: {
         ...tenantStore.currentRestaurant.address,
@@ -96,13 +104,15 @@ const handleSaveSettings = async () => {
       }
     })
 
-    // Update Company
-    await tenantService.updateCompany(tenantStore.currentCompany.id, {
-      legalName: compLegalName.value,
-      taxId: compTaxId.value,
-      phone: compPhone.value,
-      email: compEmail.value
-    })
+    // Dados da empresa: só o dono da empresa (o RLS recusa os restantes papéis).
+    if (authStore.isCompanyOwner) {
+      await tenantService.updateCompany(tenantStore.currentCompany.id, {
+        legalName: compLegalName.value,
+        taxId: compTaxId.value,
+        phone: compPhone.value,
+        email: compEmail.value
+      })
+    }
 
     await tenantStore.loadContext()
     toastStore.success('Configurações Gravadas', 'As preferências do restaurante e dados legais foram atualizados.')
@@ -113,12 +123,6 @@ const handleSaveSettings = async () => {
   }
 }
 
-const handleReset = () => {
-  if (confirm('Deseja realmente repor todos os dados para o padrão original de demonstração?')) {
-    resetDatabase()
-    window.location.reload()
-  }
-}
 </script>
 
 <template>
@@ -249,12 +253,12 @@ const handleReset = () => {
         </div>
       </div>
 
-      <!-- Company Legal Entity -->
-      <div class="app-card">
+      <!-- Dados da empresa (só o dono) -->
+      <div v-if="authStore.isCompanyOwner" class="app-card">
         <div class="card-header">
           <div class="header-icon"><Building2 :size="18" /></div>
           <div>
-            <h2 class="card-title">Empresa / Tenant SaaS</h2>
+            <h2 class="card-title">Empresa</h2>
             <p class="card-desc">Dados fiscais da entidade jurídica registada</p>
           </div>
         </div>
@@ -284,27 +288,32 @@ const handleReset = () => {
         </div>
       </div>
 
-      <!-- Danger Zone / Reset Database -->
-      <div class="app-card danger-card">
+      <!-- Imagens (Supabase Storage) -->
+      <div v-if="tenantStore.currentRestaurant" class="app-card">
         <div class="card-header">
-          <div class="header-icon danger"><AlertTriangle :size="18" /></div>
+          <div class="header-icon"><ImageIcon :size="18" /></div>
           <div>
-            <h2 class="card-title text-danger">Repor Dados de Demonstração</h2>
-            <p class="card-desc">Restaure o estado original de fábrica com 3 empresas e catálogo completo</p>
+            <h2 class="card-title">Imagens do restaurante</h2>
+            <p class="card-desc">Logótipo e capa apresentados no menu digital. Guardadas ao clicar em "Guardar".</p>
           </div>
         </div>
-
-        <div class="danger-body">
-          <p class="text-sm text-muted">
-            Esta operação apaga quaisquer novos pedidos, produtos criados ou alterações feitas no localStorage do seu navegador e repõe a base de demonstração original de Moçambique.
-          </p>
-
-          <AppButton variant="danger" @click="handleReset">
-            <template #icon-left>
-              <RotateCcw :size="16" />
-            </template>
-            Reiniciar Toda a Base Mockada
-          </AppButton>
+        <div class="images-grid">
+          <ImageUploadField
+            v-model="restLogoUrl"
+            label="Logótipo"
+            kind="logo"
+            aspect="1 / 1"
+            :tenant-id="tenantStore.currentRestaurant.tenantId"
+            :restaurant-id="tenantStore.currentRestaurant.id"
+          />
+          <ImageUploadField
+            v-model="restCoverUrl"
+            label="Imagem de capa"
+            kind="cover"
+            aspect="16 / 9"
+            :tenant-id="tenantStore.currentRestaurant.tenantId"
+            :restaurant-id="tenantStore.currentRestaurant.id"
+          />
         </div>
       </div>
     </div>
@@ -312,6 +321,12 @@ const handleReset = () => {
 </template>
 
 <style scoped>
+.images-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1.25rem;
+}
+
 .settings-page {
   display: flex;
   flex-direction: column;

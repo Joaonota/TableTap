@@ -1,5 +1,5 @@
 // src/services/menuCustomizationService.ts
-import { mockStorage } from '@/repositories/mock/mockStorage'
+import { repositories } from '@/repositories'
 import type { MenuCustomization, MenuFontOption, MenuTheme } from '@/types'
 
 export const FONT_OPTIONS: MenuFontOption[] = [
@@ -64,27 +64,17 @@ export const menuCustomizationService = {
     return getDefaultTheme()
   },
 
+  /**
+   * Personalização guardada do restaurante. Sem registo, devolve o tema
+   * padrão do TapMenu (sem gravar — só é gravado quando o restaurante publica).
+   */
   async getCustomization(restaurantId: string, tenantId: string): Promise<MenuCustomization> {
-    const db = mockStorage.getDb()
-    if (!db.menuCustomizations) db.menuCustomizations = []
-
-    let found = db.menuCustomizations.find(mc => mc.restaurantId === restaurantId)
-    if (!found) {
-      // Create and persist default customization
-      const created: MenuCustomization = {
-        id: `mc-${restaurantId}`,
-        tenantId,
-        restaurantId,
-        theme: getDefaultTheme(),
-        updatedAt: new Date().toISOString(),
-        updatedBy: 'Sistema TapMenu'
-      }
-      db.menuCustomizations.push(created)
-      mockStorage.commit()
-      return JSON.parse(JSON.stringify(created))
+    const found = await repositories.menuCustomizations.getByRestaurant(restaurantId)
+    const defaults = getDefaultTheme()
+    if (found) {
+      return { ...found, theme: { ...defaults, ...found.theme, experience: { ...defaults.experience, ...found.theme.experience } } }
     }
-
-    return JSON.parse(JSON.stringify(found))
+    return { id: '', tenantId, restaurantId, theme: defaults, updatedAt: '', updatedBy: '' }
   },
 
   async saveCustomization(params: {
@@ -93,46 +83,12 @@ export const menuCustomizationService = {
     theme: MenuTheme
     updatedBy?: string
   }): Promise<MenuCustomization> {
-    const db = mockStorage.getDb()
-    if (!db.menuCustomizations) db.menuCustomizations = []
-    const index = db.menuCustomizations.findIndex(mc => mc.restaurantId === params.restaurantId)
-    const now = new Date().toISOString()
-    const updatedBy = params.updatedBy || 'Administrador'
-
-    let result: MenuCustomization
-    if (index >= 0) {
-      result = {
-        ...db.menuCustomizations[index],
-        theme: JSON.parse(JSON.stringify(params.theme)),
-        updatedAt: now,
-        updatedBy
-      }
-      db.menuCustomizations[index] = result
-    } else {
-      result = {
-        id: `mc-${params.restaurantId}`,
-        tenantId: params.tenantId,
-        restaurantId: params.restaurantId,
-        theme: JSON.parse(JSON.stringify(params.theme)),
-        updatedAt: now,
-        updatedBy
-      }
-      db.menuCustomizations.push(result)
-    }
-
-    mockStorage.commit()
-
-    // Add audit log entry
-    mockStorage.addAuditLog({
+    return repositories.menuCustomizations.save({
       tenantId: params.tenantId,
-      userId: 'user-admin-1',
-      userName: updatedBy,
-      action: 'menu.theme_updated',
-      resource: `Restaurant: ${params.restaurantId}`,
-      details: `Tema personalizado atualizado (layout: ${params.theme.layout}, cor: ${params.theme.primaryColor}).`
+      restaurantId: params.restaurantId,
+      theme: JSON.parse(JSON.stringify(params.theme)),
+      updatedBy: params.updatedBy || 'Administrador'
     })
-
-    return JSON.parse(JSON.stringify(result))
   },
 
   async resetToDefault(

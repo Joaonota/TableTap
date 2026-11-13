@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, watch, onMounted } from 'vue'
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useTenantStore } from '@/stores/tenant'
@@ -8,11 +8,11 @@ import { useServiceRequestStore } from '@/stores/serviceRequest'
 import { useCatalogStore } from '@/stores/catalog'
 import { useTableStore } from '@/stores/table'
 import { useNotificationStore } from '@/stores/notification'
-import DemoBanner from '@/components/ui/DemoBanner.vue'
 import AppToast from '@/components/ui/AppToast.vue'
 import NotificationDropdown from '@/components/ui/NotificationDropdown.vue'
 import AppLogo from '@/components/ui/AppLogo.vue'
 import { buildTablePath } from '@/domain/publicUrl'
+import { ROLE_LABELS, initialsOf } from '@/domain/roles'
 import {
   LayoutDashboard,
   UtensilsCrossed,
@@ -91,15 +91,30 @@ const handleLogout = async () => {
   router.push('/login')
 }
 
+/** Atualizações ao vivo (Supabase Realtime) do restaurante selecionado. */
+let stopRealtime: Array<() => void> = []
+const subscribeRealtime = () => {
+  stopRealtime.forEach(stop => stop())
+  stopRealtime = [
+    orderStore.subscribeRealtime(),
+    serviceRequestStore.subscribeRealtime(),
+    notificationStore.subscribeRealtime(),
+    tableStore.subscribeRealtime()
+  ]
+}
+onUnmounted(() => stopRealtime.forEach(stop => stop()))
+
 // Watch restaurant change to refresh data
 watch(() => tenantStore.currentRestaurant?.id, async (newId) => {
   if (newId) {
+    subscribeRealtime()
     await reloadContextData()
   }
 })
 
 onMounted(async () => {
   if (tenantStore.currentRestaurant?.id) {
+    subscribeRealtime()
     await reloadContextData()
   }
 })
@@ -107,7 +122,6 @@ onMounted(async () => {
 
 <template>
   <div class="admin-wrapper">
-    <DemoBanner />
 
     <!-- Topbar -->
     <header class="admin-topbar">
@@ -188,13 +202,15 @@ onMounted(async () => {
         <!-- Current User Display -->
         <div class="user-profile-widget">
           <img
-            :src="authStore.currentUser?.avatarUrl || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=120&q=80'"
-            alt="Avatar"
+            v-if="authStore.currentUser?.avatarUrl"
+            :src="authStore.currentUser.avatarUrl"
+            alt=""
             class="user-avatar"
           />
+          <span v-else class="user-avatar user-initials" aria-hidden="true">{{ initialsOf(authStore.currentUser?.name) }}</span>
           <div class="user-meta">
             <span class="user-name">{{ authStore.currentUser?.name }}</span>
-            <span class="user-role">{{ authStore.currentUser?.role }}</span>
+            <span class="user-role">{{ authStore.currentUser ? ROLE_LABELS[authStore.currentUser.role] : '' }}</span>
           </div>
           <button class="logout-btn" title="Terminar sessão" @click="handleLogout">
             <LogOut :size="16" />
@@ -543,6 +559,16 @@ onMounted(async () => {
   border-radius: var(--radius-full);
   object-fit: cover;
   border: 1px solid var(--border-subtle);
+}
+
+.user-initials {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--color-primary-50);
+  color: var(--color-primary-800);
+  font-size: 0.75rem;
+  font-weight: 700;
 }
 
 .user-meta {

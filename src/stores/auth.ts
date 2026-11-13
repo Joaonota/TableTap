@@ -1,30 +1,41 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import type { User, UserRole } from '@/types'
+import type { RegisterCompanyInput } from '@/services'
 import { authService } from '@/services'
+import { isSupabaseConfigured } from '@/lib/supabase'
 
+/**
+ * Sessão real (Supabase Auth). O papel e os restaurantes vêm da ligação do
+ * utilizador à empresa (staff_members); as permissões efetivas são
+ * aplicadas pelo RLS — estas verificações servem apenas para a interface.
+ */
 export const useAuthStore = defineStore('auth', () => {
   const currentUser = ref<User | null>(null)
-  const availableDemoUsers = ref<User[]>([])
+  /** Há sessão iniciada (mesmo que ainda sem empresa). */
+  const hasSession = ref(false)
+  /** Conta autenticada sem empresa: tem de concluir o registo. */
+  const needsOnboarding = ref(false)
+  const accountEmail = ref('')
+  const accountName = ref('')
   const isLoading = ref(false)
+  const isReady = ref(false)
+  let initPromise: Promise<void> | null = null
+  let unsubscribe: (() => void) | null = null
 
   const isAuthenticated = computed(() => !!currentUser.value)
   const currentRole = computed<UserRole | undefined>(() => currentUser.value?.role)
 
   const isSuperAdmin = computed(() => currentUser.value?.role === 'super_admin')
   const isCompanyOwner = computed(() => currentUser.value?.role === 'company_owner' || isSuperAdmin.value)
-  const isRestaurantAdmin = computed(() =>
-    currentUser.value?.role === 'restaurant_admin' || isCompanyOwner.value
-  )
-  const isManager = computed(() =>
-    currentUser.value?.role === 'manager' || isRestaurantAdmin.value
-  )
+  const isRestaurantAdmin = computed(() => currentUser.value?.role === 'restaurant_admin' || isCompanyOwner.value)
+  const isManager = computed(() => currentUser.value?.role === 'manager' || isRestaurantAdmin.value)
   const isKitchenStaff = computed(() => currentUser.value?.role === 'kitchen_staff')
   const isWaiter = computed(() => currentUser.value?.role === 'waiter')
 
   const canAccessRestaurant = (restaurantId: string): boolean => {
     if (!currentUser.value) return false
-    if (isSuperAdmin.value) return true
+    if (isCompanyOwner.value) return true
     return currentUser.value.assignedRestaurantIds.includes(restaurantId)
   }
 
@@ -56,36 +67,91 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
-  const init = async () => {
+  /** Recarrega a conta a partir da sessão atual. */
+  const refresh = async () => {
+    if (!isSupabaseConfigured) {
+      currentUser.value = null
+      hasSession.value = false
+      return
+    }
     isLoading.value = true
     try {
-      availableDemoUsers.value = await authService.getDemoUsers()
-      const user = await authService.getCurrentUser()
-      currentUser.value = user
+      let account = await authService.getAccount()
+      // Convite de equipa pendente para este email? Ligar agora.
+      if (account?.needsOnboarding && (await authService.claimInvitations()) > 0) {
+        account = await authService.getAccount()
+      }
+      hasSession.value = !!account
+      currentUser.value = account?.user ?? null
+      needsOnboarding.value = !!account?.needsOnboarding
+      accountEmail.value = account?.email ?? ''
+      accountName.value = account?.fullName ?? ''
     } finally {
       isLoading.value = false
     }
   }
 
-  const switchUser = async (userId: string) => {
-    isLoading.value = true
-    try {
-      const user = await authService.loginAs(userId)
-      currentUser.value = user
-    } finally {
-      isLoading.value = false
+  /** Carrega a sessão uma vez e acompanha login/logout (incl. noutros separadores). */
+  const init = () => {
+    if (!initPromise) {
+      initPromise = refresh().finally(() => {
+        isReady.value = true
+      })
+      if (isSupabaseConfigured && !unsubscribe) {
+        unsubscribe = authService.onAuthChange(event => {
+          if (event === 'SIGNED_IN' || event === 'SIGNED_OUT' || event === 'USER_UPDATED') {
+            // Fora do callback do Supabase (evita bloqueios do cliente).
+            setTimeout(() => void refresh(), 0)
+          }
+        })
+      }
     }
+    return initPromise
+  }
+
+  const signIn = async (email: string, password: string) => {
+    await authService.signIn(email, password)
+    await refresh()
+  }
+
+  const signUp = (email: string, password: string, fullName: string) =>
+    authService.signUp(email, password, fullName, `${window.location.origin}/login?confirmado=1`)
+
+  const sendPasswordReset = (email: string) =>
+    authService.sendPasswordReset(email, `${window.location.origin}/redefinir-palavra-passe`)
+
+  const updatePassword = (password: string) => authService.updatePassword(password)
+
+  const registerCompany = async (input: RegisterCompanyInput) => {
+    const companyId = await authService.registerCompany(input)
+    await refresh()
+    return companyId
   }
 
   const logout = async () => {
-    await authService.logout()
-    currentUser.value = null
+    try {
+      await authService.signOut()
+    } finally {
+      currentUser.value = null
+      hasSession.value = false
+      needsOnboarding.value = false
+      try {
+        localStorage.removeItem('tapmenu_selected_tenant_id')
+        localStorage.removeItem('tapmenu_selected_restaurant_id')
+      } catch {
+        // armazenamento local indisponível
+      }
+    }
   }
 
   return {
     currentUser,
-    availableDemoUsers,
+    hasSession,
+    needsOnboarding,
+    accountEmail,
+    accountName,
     isLoading,
+    isReady,
     isAuthenticated,
     currentRole,
     isSuperAdmin,
@@ -97,7 +163,12 @@ export const useAuthStore = defineStore('auth', () => {
     canAccessRestaurant,
     can,
     init,
-    switchUser,
+    refresh,
+    signIn,
+    signUp,
+    sendPasswordReset,
+    updatePassword,
+    registerCompany,
     logout
   }
 })

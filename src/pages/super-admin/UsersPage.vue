@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
-import { authService, tenantService } from '@/services'
+import { userService, tenantService } from '@/services'
+import { ROLE_LABELS, initialsOf } from '@/domain/roles'
 import type { User, Company } from '@/types'
 import AppBadge from '@/components/ui/AppBadge.vue'
 import { Users, Shield, Building2 } from 'lucide-vue-next'
@@ -12,7 +13,7 @@ const isLoading = ref(true)
 onMounted(async () => {
   try {
     const [u, c] = await Promise.all([
-      authService.getDemoUsers(),
+      userService.getAllUsers(),
       tenantService.getAllCompanies()
     ])
     users.value = u
@@ -51,14 +52,14 @@ const getCompanyName = (tenantId?: string) => {
           </tr>
         </thead>
         <tbody>
+          <tr v-if="!isLoading && !users.length">
+            <td colspan="6" class="empty-row">Ainda não existem utilizadores com acesso à plataforma.</td>
+          </tr>
           <tr v-for="u in users" :key="u.id">
             <td>
               <div class="user-row">
-                <img
-                  :src="u.avatarUrl || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=120&q=80'"
-                  :alt="u.name"
-                  class="user-avatar"
-                />
+                <img v-if="u.avatarUrl" :src="u.avatarUrl" alt="" class="user-avatar" />
+                <span v-else class="user-avatar user-initials" aria-hidden="true">{{ initialsOf(u.name) }}</span>
                 <strong class="text-white">{{ u.name }}</strong>
               </div>
             </td>
@@ -67,11 +68,11 @@ const getCompanyName = (tenantId?: string) => {
               <span class="badge badge-neutral">{{ getCompanyName(u.tenantId) }}</span>
             </td>
             <td>
-              <span class="role-badge">{{ u.role }}</span>
+              <span class="role-badge">{{ ROLE_LABELS[u.role] }}</span>
             </td>
             <td>
               <span class="text-xs text-muted">
-                {{ u.role === 'super_admin' ? 'Acesso Global a Todos' : `${u.assignedRestaurantIds.length} restaurantes` }}
+                {{ u.role === 'super_admin' ? 'Acesso a toda a plataforma' : u.role === 'company_owner' ? 'Todos os restaurantes da empresa' : `${u.assignedRestaurantIds.length} ${u.assignedRestaurantIds.length === 1 ? 'restaurante' : 'restaurantes'}` }}
               </span>
             </td>
             <td>
@@ -88,6 +89,22 @@ const getCompanyName = (tenantId?: string) => {
 </template>
 
 <style scoped>
+.user-initials {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--color-primary-50);
+  color: var(--color-primary-800);
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.empty-row {
+  text-align: center;
+  padding: 2rem 1rem !important;
+  color: var(--text-muted);
+}
+
 .super-page {
   display: flex;
   flex-direction: column;

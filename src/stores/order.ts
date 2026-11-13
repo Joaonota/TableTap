@@ -1,7 +1,8 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import type { Order, OrderStatus, PaymentStatus } from '@/types'
-import { orderService } from '@/services'
+import { orderService, subscribeToRealtime } from '@/services'
+import { orderStatusLabel } from '@/domain/statusLabels'
 import { useTenantStore } from './tenant'
 import { useToastStore } from './toast'
 
@@ -58,14 +59,15 @@ export const useOrderStore = defineStore('order', () => {
     )
   })
 
-  const updateOrderStatus = async (orderId: string, newStatus: OrderStatus, updatedBy: string, note?: string) => {
+  /** `_updatedBy` mantido por compatibilidade: o autor é registado pela base de dados. */
+  const updateOrderStatus = async (orderId: string, newStatus: OrderStatus, _updatedBy?: string, note?: string) => {
     try {
-      const updated = await orderService.updateOrderStatus(orderId, newStatus, updatedBy, note)
+      const updated = await orderService.updateOrderStatus(orderId, newStatus, note)
       const index = orders.value.findIndex(o => o.id === orderId)
       if (index !== -1) {
         orders.value[index] = updated
       }
-      toastStore.success(`Pedido ${updated.orderCode} atualizado`, `Estado alterado para ${newStatus.toUpperCase()}`)
+      toastStore.success(`Pedido ${updated.orderCode} atualizado`, `Estado: ${orderStatusLabel(newStatus)}`)
       return updated
     } catch (e) {
       toastStore.error('Erro ao atualizar pedido', (e as Error).message)
@@ -88,15 +90,17 @@ export const useOrderStore = defineStore('order', () => {
     }
   }
 
-  const createNewOrder = async (orderData: Omit<Order, 'id' | 'orderCode' | 'createdAt' | 'updatedAt' | 'history'>) => {
-    try {
-      const created = await orderService.createOrder(orderData)
-      orders.value.unshift(created)
-      return created
-    } catch (e) {
-      toastStore.error('Erro ao criar pedido', (e as Error).message)
-      throw e
-    }
+  /**
+   * Pedidos novos e alterações chegam em tempo real (Supabase Realtime).
+   * Devolve a função para parar de escutar.
+   */
+  const subscribeRealtime = () => {
+    const restaurantId = tenantStore.currentRestaurant?.id
+    if (!restaurantId) return () => {}
+    return subscribeToRealtime('orders', restaurantId, async () => {
+      if (tenantStore.currentRestaurant?.id !== restaurantId) return
+      orders.value = await orderService.getOrders(restaurantId)
+    })
   }
 
   return {
@@ -110,6 +114,6 @@ export const useOrderStore = defineStore('order', () => {
     loadOrders,
     updateOrderStatus,
     updatePaymentStatus,
-    createNewOrder
+    subscribeRealtime
   }
 })

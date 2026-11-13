@@ -38,7 +38,13 @@ const formLegalName = ref('')
 const formTaxId = ref('')
 const formPhone = ref('')
 const formEmail = ref('')
-const formPlanId = ref('plan-pro')
+const formPlanId = ref('')
+const formOwnerName = ref('')
+const formOwnerEmail = ref('')
+
+/** Plano sugerido: o plano por omissão da plataforma, ou o primeiro ativo. */
+const defaultPlanId = () =>
+  platformStore.config?.defaultPlanId || plansStore.plans.find(p => p.active)?.id || ''
 
 const loadData = async () => {
   isLoading.value = true
@@ -86,9 +92,11 @@ const openAddModal = () => {
   formName.value = ''
   formLegalName.value = ''
   formTaxId.value = ''
-  formPhone.value = '+258 84 '
+  formPhone.value = ''
   formEmail.value = ''
-  formPlanId.value = 'plan-pro'
+  formOwnerName.value = ''
+  formOwnerEmail.value = ''
+  formPlanId.value = defaultPlanId()
   isModalOpen.value = true
 }
 
@@ -99,7 +107,7 @@ const openEditModal = (comp: Company) => {
   formTaxId.value = comp.taxId
   formPhone.value = comp.phone
   formEmail.value = comp.email
-  formPlanId.value = comp.planId || 'plan-pro'
+  formPlanId.value = comp.planId || defaultPlanId()
   isModalOpen.value = true
 }
 
@@ -123,43 +131,26 @@ const handleSaveCompany = async () => {
       if (idx !== -1) companies.value[idx] = updated
       toastStore.success('Empresa Atualizada')
     } else {
-      const targetPlan = plansStore.plans.find(p => p.id === formPlanId.value) || plansStore.plans[0]
+      if (!formPlanId.value) {
+        toastStore.warning('Plano em falta', 'Crie um plano em "Planos Comerciais" antes de registar empresas.')
+        return
+      }
+      if (formOwnerEmail.value.trim() && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(formOwnerEmail.value.trim())) {
+        toastStore.warning('Validação', 'O email do responsável não é válido.')
+        return
+      }
+      // Empresa + subscrição (e convite ao responsável) criados de uma vez na base de dados.
       const created = await tenantService.createCompany({
         name: formName.value,
         legalName: formLegalName.value || formName.value,
-        slug: formName.value.toLowerCase().replace(/[^a-z0-9]/g, '-'),
         taxId: formTaxId.value,
         phone: formPhone.value,
         email: formEmail.value,
-        planId: targetPlan?.id || 'plan-pro',
-        subscriptionId: `sub-${Date.now()}`,
-        isActive: true
+        planId: formPlanId.value,
+        ownerName: formOwnerName.value,
+        ownerEmail: formOwnerEmail.value
       })
-
-      // Also create associated initial subscription in platform store
-      if (targetPlan) {
-        platformStore.subscriptions.push({
-          id: `sub-${Date.now()}`,
-          tenantId: created.id,
-          companyName: created.name,
-          planId: targetPlan.id,
-          planName: targetPlan.name,
-          status: 'trial',
-          startDate: new Date().toISOString(),
-          renewalDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
-          monthlyPrice: targetPlan.price,
-          isAutoRenew: false,
-          history: [
-            {
-              id: `subh-${Date.now()}`,
-              date: new Date().toISOString(),
-              event: 'trial_started',
-              toPlanName: targetPlan.name,
-              performedBy: 'Super Admin'
-            }
-          ]
-        })
-      }
+      await platformStore.fetchPlatformData()
 
       companies.value.push(created)
       toastStore.success('Nova Empresa Registada!')
@@ -214,6 +205,9 @@ const toggleCompanyStatus = async (comp: Company) => {
           </tr>
         </thead>
         <tbody>
+          <tr v-if="!isLoading && !companies.length">
+            <td colspan="8" class="empty-row">Ainda não existem empresas registadas. Use "Registar Empresa" ou aguarde registos através do site.</td>
+          </tr>
           <tr v-for="comp in companies" :key="comp.id">
             <td>
               <strong class="text-white">{{ comp.name }}</strong>
@@ -223,7 +217,7 @@ const toggleCompanyStatus = async (comp: Company) => {
             <td>{{ comp.taxId }}</td>
             <td>
               <div class="plan-sub-cell">
-                <span class="plan-pill">{{ getCompanySubscription(comp.id)?.planName || 'Básico' }}</span>
+                <span class="plan-pill">{{ getCompanySubscription(comp.id)?.planName || 'Sem plano' }}</span>
                 <span class="sub-price font-mono">{{ (getCompanySubscription(comp.id)?.monthlyPrice || 1990).toLocaleString('pt-MZ') }} MT</span>
                 <button
                   type="button"
@@ -325,6 +319,18 @@ const toggleCompanyStatus = async (comp: Company) => {
           placeholder="admin@empresa.co.mz"
         />
 
+        <template v-if="!formId">
+          <AppInput id="comp-owner-name" v-model="formOwnerName" label="Responsável (dono da empresa)" placeholder="Opcional" />
+          <AppInput
+            id="comp-owner-email"
+            v-model="formOwnerEmail"
+            type="email"
+            label="Email do responsável"
+            placeholder="Opcional"
+            hint="Ao entrar no TapMenu com este email (confirmado), a conta fica ligada à empresa como dono."
+          />
+        </template>
+
         <div class="modal-actions">
           <AppButton type="button" variant="outline" @click="isModalOpen = false">
             Cancelar
@@ -348,6 +354,12 @@ const toggleCompanyStatus = async (comp: Company) => {
 </template>
 
 <style scoped>
+.empty-row {
+  text-align: center;
+  padding: 2rem 1rem !important;
+  color: var(--text-muted);
+}
+
 .super-page {
   display: flex;
   flex-direction: column;

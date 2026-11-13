@@ -43,7 +43,8 @@ const emit = defineEmits<{
         >
           <div class="hero-image-box">
             <img
-              :src="prod.imageUrl || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=600&q=80'"
+              v-if="prod.imageUrl"
+              :src="prod.imageUrl"
               :alt="prod.name"
               class="hero-img"
               loading="lazy"

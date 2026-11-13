@@ -1,6 +1,19 @@
 import { repositories } from '@/repositories'
-import type { TableInput, StartSessionInput, RegisterNfcTagsInput } from '@/repositories/interfaces'
-import { mockStorage } from '@/repositories/mock/mockStorage'
+import type {
+  TableInput,
+  StartSessionInput,
+  RegisterNfcTagsInput,
+  AuthAccount,
+  RegisterCompanyInput,
+  CreateCompanyInput,
+  PlaceOrderInput,
+  CreateServiceRequestInput,
+  PublicTableContext,
+  PublicMenuContent,
+  PublicOrderView,
+  PlanChangeRequest,
+  MediaKind
+} from '@/repositories/interfaces'
 import { countTables } from '@/domain/tableRules'
 import type {
   User,
@@ -19,6 +32,7 @@ import type {
   ServiceRequest,
   StaffMember,
   Plan,
+  PaymentMethod,
   Subscription,
   SubscriptionHistory,
   OrderStatus,
@@ -29,10 +43,27 @@ import type {
   PlatformConfig
 } from '@/types'
 
-export type { TableInput, StartSessionInput, RegisterNfcTagsInput }
+export type {
+  TableInput,
+  StartSessionInput,
+  RegisterNfcTagsInput,
+  AuthAccount,
+  RegisterCompanyInput,
+  CreateCompanyInput,
+  PlaceOrderInput,
+  CreateServiceRequestInput,
+  PublicTableContext,
+  PublicMenuContent,
+  PublicOrderView,
+  PlanChangeRequest,
+  MediaKind
+}
 
 // Repositórios (fonte única em src/repositories/index.ts)
 const {
+  auth: authRepo,
+  publicMenu: publicMenuRepo,
+  media: mediaRepo,
   companies: companyRepo,
   restaurants: restaurantRepo,
   users: userRepo,
@@ -52,29 +83,43 @@ const {
   platformConfig: platformConfigRepo
 } = repositories
 
-// ================= AuthService =================
+// ================= Autenticação (Supabase Auth) =================
 export const authService = {
-  async getDemoUsers(): Promise<User[]> {
+  getAccount(): Promise<AuthAccount | null> {
+    return authRepo.getAccount()
+  },
+  signIn(email: string, password: string): Promise<void> {
+    return authRepo.signIn(email, password)
+  },
+  signUp(email: string, password: string, fullName: string, redirectTo: string) {
+    return authRepo.signUp(email, password, fullName, redirectTo)
+  },
+  signOut(): Promise<void> {
+    return authRepo.signOut()
+  },
+  sendPasswordReset(email: string, redirectTo: string): Promise<void> {
+    return authRepo.sendPasswordReset(email, redirectTo)
+  },
+  updatePassword(password: string): Promise<void> {
+    return authRepo.updatePassword(password)
+  },
+  claimInvitations(): Promise<number> {
+    return authRepo.claimInvitations()
+  },
+  registerCompany(input: RegisterCompanyInput): Promise<string> {
+    return authRepo.registerCompany(input)
+  },
+  onAuthChange(callback: (event: string) => void): () => void {
+    return authRepo.onAuthChange(callback)
+  }
+}
+
+export const userService = {
+  getAllUsers(): Promise<User[]> {
     return userRepo.getAll()
   },
-  async loginAs(userId: string): Promise<User> {
-    const user = await userRepo.getById(userId)
-    if (!user) throw new Error('Utilizador não encontrado')
-    localStorage.setItem('tapmenu_active_user_id', user.id)
-    return user
-  },
-  async getCurrentUser(): Promise<User | null> {
-    const savedId = localStorage.getItem('tapmenu_active_user_id')
-    if (savedId) {
-      const user = await userRepo.getById(savedId)
-      if (user) return user
-    }
-    // Default to restaurant_admin (Rui Mondlane) if not chosen
-    const defaultUser = await userRepo.getById('user-admin-1')
-    return defaultUser || null
-  },
-  async logout(): Promise<void> {
-    localStorage.removeItem('tapmenu_active_user_id')
+  getUsersByTenant(tenantId: string): Promise<User[]> {
+    return userRepo.getByTenant(tenantId)
   }
 }
 
@@ -86,7 +131,7 @@ export const tenantService = {
   async getCompanyById(id: string): Promise<Company | null> {
     return companyRepo.getById(id)
   },
-  async createCompany(data: Omit<Company, 'id' | 'createdAt'>): Promise<Company> {
+  async createCompany(data: CreateCompanyInput): Promise<Company> {
     return companyRepo.create(data)
   },
   async updateCompany(id: string, updates: Partial<Company>): Promise<Company> {
@@ -175,26 +220,42 @@ export const tableService = {
 }
 
 // ================= Acesso público (URL da etiqueta / QR Code) =================
-export interface PublicTableContext {
-  restaurant: Restaurant
-  table: Table
-  /** Sessão ativa no momento do acesso (null se a mesa estiver livre). */
-  activeSession: TableSession | null
-}
-
 export const publicTableService = {
   /**
    * Resolve a URL pública: restaurante → mesa → estado atual.
    * Aceita o slug permanente (/m/:restaurante/:mesa) e, por compatibilidade,
    * o número da mesa usado nas URLs antigas (/menu/:restaurante/:numero).
    */
-  async resolve(restaurantSlug: string, tableKey: string): Promise<PublicTableContext | null> {
-    const restaurant = await restaurantRepo.getBySlug(restaurantSlug)
-    if (!restaurant) return null
-    const table = (await tableRepo.getBySlug(restaurant.id, tableKey)) ?? (await tableRepo.getByNumber(restaurant.id, tableKey))
-    if (!table) return null
-    const activeSession = await tableSessionRepo.getActiveByTable(table.id)
-    return { restaurant, table, activeSession }
+  resolve(restaurantSlug: string, tableKey: string): Promise<PublicTableContext | null> {
+    return publicMenuRepo.resolveTable(restaurantSlug, tableKey)
+  },
+  getMenu(restaurantId: string): Promise<PublicMenuContent> {
+    return publicMenuRepo.getMenu(restaurantId)
+  },
+  placeOrder(input: PlaceOrderInput): Promise<Order> {
+    return publicMenuRepo.placeOrder(input)
+  },
+  getSessionOrders(sessionId: string, participantToken?: string): Promise<Order[]> {
+    return publicMenuRepo.getSessionOrders(sessionId, participantToken)
+  },
+  requestBill(sessionId: string, participantToken?: string, paymentMethod?: PaymentMethod, notes?: string): Promise<TableSession> {
+    return publicMenuRepo.requestBill(sessionId, participantToken, paymentMethod, notes)
+  },
+  createServiceRequest(input: CreateServiceRequestInput) {
+    return publicMenuRepo.createServiceRequest(input)
+  },
+  getOrder(orderId: string): Promise<PublicOrderView | null> {
+    return publicMenuRepo.getOrder(orderId)
+  }
+}
+
+// ================= Imagens (Supabase Storage) =================
+export const mediaService = {
+  uploadImage(file: File, scope: { tenantId: string; restaurantId?: string; kind: MediaKind }): Promise<string> {
+    return mediaRepo.uploadImage(file, scope)
+  },
+  removeByUrl(url: string): Promise<void> {
+    return mediaRepo.removeByUrl(url)
   }
 }
 
@@ -243,11 +304,11 @@ export const orderService = {
   async getOrderById(id: string): Promise<Order | null> {
     return orderRepo.getById(id)
   },
-  async createOrder(data: Omit<Order, 'id' | 'orderCode' | 'createdAt' | 'updatedAt' | 'history'>): Promise<Order> {
-    return orderRepo.create(data)
+  async getAllOrders(limit?: number): Promise<Order[]> {
+    return orderRepo.getAll(limit)
   },
-  async updateOrderStatus(id: string, status: OrderStatus, updatedBy: string, note?: string): Promise<Order> {
-    return orderRepo.updateStatus(id, status, updatedBy, note)
+  async updateOrderStatus(id: string, status: OrderStatus, note?: string): Promise<Order> {
+    return orderRepo.updateStatus(id, status, note)
   },
   async updatePaymentStatus(id: string, paymentStatus: PaymentStatus): Promise<Order> {
     return orderRepo.updatePaymentStatus(id, paymentStatus)
@@ -258,6 +319,9 @@ export const orderService = {
 export const paymentService = {
   async getPayments(restaurantId: string): Promise<Payment[]> {
     return paymentRepo.getByRestaurant(restaurantId)
+  },
+  async getAllPayments(limit?: number): Promise<Payment[]> {
+    return paymentRepo.getAll(limit)
   },
   async getPaymentById(id: string): Promise<Payment | null> {
     return paymentRepo.getById(id)
@@ -274,9 +338,6 @@ export const paymentService = {
 export const serviceRequestService = {
   async getRequests(restaurantId: string): Promise<ServiceRequest[]> {
     return serviceRequestRepo.getByRestaurant(restaurantId)
-  },
-  async createRequest(data: Omit<ServiceRequest, 'id' | 'createdAt'>): Promise<ServiceRequest> {
-    return serviceRequestRepo.create(data)
   },
   async updateStatus(id: string, status: ServiceRequestStatus, assignedToUserId?: string, assignedToName?: string): Promise<ServiceRequest> {
     return serviceRequestRepo.updateStatus(id, status, assignedToUserId, assignedToName)
@@ -337,51 +398,24 @@ export const subscriptionService = {
   async getById(id: string): Promise<Subscription | null> {
     return subscriptionRepo.getById(id)
   },
-  async createSubscription(sub: Omit<Subscription, 'id'>): Promise<Subscription> {
-    return subscriptionRepo.create(sub)
-  },
-  async updateSubscription(id: string, updates: Partial<Subscription>): Promise<Subscription> {
+  async updateSubscription(id: string, updates: Parameters<typeof subscriptionRepo.updateSubscription>[1]): Promise<Subscription> {
     return subscriptionRepo.updateSubscription(id, updates)
   },
   async addHistoryEvent(id: string, event: Omit<SubscriptionHistory, 'id' | 'date'>): Promise<Subscription> {
     return subscriptionRepo.addHistoryEvent(id, event)
   },
-  async upgradePlan(tenantId: string, targetPlanId: string, performedBy: string = 'Administrador'): Promise<{ subscription: Subscription; plan: Plan }> {
-    const sub = await subscriptionRepo.getByTenant(tenantId)
-    const plan = await planRepo.getById(targetPlanId)
-    if (!sub || !plan) throw new Error('Subscrição ou plano não encontrado')
-
-    const fromPlan = sub.planName
-    const updated = await subscriptionRepo.updateSubscription(sub.id, {
-      planId: plan.id,
-      planName: plan.name,
-      monthlyPrice: plan.price,
-      status: 'active'
-    })
-
-    await subscriptionRepo.addHistoryEvent(sub.id, {
-      event: 'plan_changed',
-      fromPlanName: fromPlan,
-      toPlanName: plan.name,
-      amount: plan.price,
-      note: `Upgrade efetuado com sucesso para ${plan.name}`,
-      performedBy
-    })
-
-    // Update company planId
-    await companyRepo.update(tenantId, { planId: plan.id })
-
-    // Add audit log
-    await auditRepo.create({
-      tenantId,
-      userId: 'user-admin-1',
-      userName: performedBy,
-      action: 'plan.upgraded',
-      resource: `Subscription: ${sub.id}`,
-      details: `Plano atualizado de ${fromPlan} para ${plan.name} (${plan.price} MT/mês).`
-    })
-
-    return { subscription: updated, plan }
+  /**
+   * O dono da empresa pede uma alteração de plano. Não há cobrança
+   * automática: a equipa TapMenu aplica a alteração no Super Admin.
+   */
+  async requestPlanChange(planId: string, note?: string): Promise<PlanChangeRequest> {
+    return subscriptionRepo.requestPlanChange(planId, note)
+  },
+  async getPlanChangeRequests(tenantId?: string): Promise<PlanChangeRequest[]> {
+    return subscriptionRepo.getPlanChangeRequests(tenantId)
+  },
+  async resolvePlanChangeRequest(id: string, status: 'approved' | 'rejected'): Promise<void> {
+    return subscriptionRepo.resolvePlanChangeRequest(id, status)
   }
 }
 
@@ -410,7 +444,11 @@ export * from './menuCustomizationService'
 
 // ================= Report & Metrics Service =================
 export const reportService = {
-  async getDashboardMetrics(restaurantId: string): Promise<DashboardMetrics> {
+  /**
+   * Indicadores reais do restaurante. `periodDays`: 1 = hoje, 7 = hoje e os
+   * 6 dias anteriores, etc. O período anterior tem a mesma duração.
+   */
+  async getDashboardMetrics(restaurantId: string, periodDays = 1): Promise<DashboardMetrics> {
     const orders = await orderRepo.getByRestaurant(restaurantId)
     const tables = await tableRepo.getByRestaurant(restaurantId)
     const requests = await serviceRequestRepo.getByRestaurant(restaurantId)
@@ -429,7 +467,29 @@ export const reportService = {
     const activeServiceRequests = requests.filter(r => r.status === 'new' || r.status === 'in_progress').length
     const unavailableProductsCount = products.filter(p => !p.isAvailable).length
 
+    const periodStart = new Date()
+    periodStart.setHours(0, 0, 0, 0)
+    periodStart.setDate(periodStart.getDate() - (periodDays - 1))
+    const previousStart = new Date(periodStart)
+    previousStart.setDate(periodStart.getDate() - periodDays)
+    const inRange = (o: Order, from: Date, to?: Date) => {
+      const t = new Date(o.createdAt).getTime()
+      return t >= from.getTime() && (!to || t < to.getTime())
+    }
+    const periodAll = orders.filter(o => inRange(o, periodStart))
+    const periodValid = periodAll.filter(o => o.status !== 'cancelled')
+    const round2 = (n: number) => Math.round(n * 100) / 100
+    const cancelledOrders = orders.length - validOrders.length
+
     return {
+      periodOrders: periodValid.length,
+      periodRevenue: round2(periodValid.reduce((sum, o) => sum + o.total, 0)),
+      previousPeriodRevenue: round2(
+        validOrders.filter(o => inRange(o, previousStart, periodStart)).reduce((sum, o) => sum + o.total, 0)
+      ),
+      periodCancelledOrders: periodAll.length - periodValid.length,
+      cancelledOrders,
+      cancellationRate: periodAll.length ? Math.round(((periodAll.length - periodValid.length) / periodAll.length) * 1000) / 10 : 0,
       totalOrders: orders.length,
       totalRevenue: Math.round(totalRevenue * 100) / 100,
       averageTicket: Math.round(averageTicket * 100) / 100,
@@ -445,29 +505,29 @@ export const reportService = {
     }
   },
 
+  /** Vendas reais dos últimos 7 dias (pedidos não cancelados), do mais antigo para hoje. */
   async getSalesByDay(restaurantId: string): Promise<{ label: string; amount: number; orderCount: number }[]> {
     const orders = await orderRepo.getByRestaurant(restaurantId)
-    // Group last 7 days
-    const days: { [key: string]: { amount: number; count: number } } = {
-      'Segunda': { amount: 8400, count: 6 },
-      'Terça': { amount: 11200, count: 9 },
-      'Quarta': { amount: 14500, count: 11 },
-      'Quinta': { amount: 18900, count: 14 },
-      'Sexta': { amount: 28400, count: 22 },
-      'Sábado': { amount: 34500, count: 26 },
-      'Hoje': { amount: 0, count: 0 }
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+    const days = Array.from({ length: 7 }, (_, i) => {
+      const date = new Date(today)
+      date.setDate(today.getDate() - (6 - i))
+      return {
+        key: date.toDateString(),
+        label: i === 6 ? 'Hoje' : date.toLocaleDateString('pt-MZ', { weekday: 'short', day: '2-digit' }),
+        amount: 0,
+        orderCount: 0
+      }
+    })
+    for (const order of orders) {
+      if (order.status === 'cancelled') continue
+      const day = days.find(d => d.key === new Date(order.createdAt).toDateString())
+      if (!day) continue
+      day.amount += order.total
+      day.orderCount++
     }
-
-    // Add today orders
-    const todayOrders = orders.filter(o => o.status !== 'cancelled')
-    const todaySum = todayOrders.reduce((sum, o) => sum + o.total, 0)
-    days['Hoje'] = { amount: Math.round(todaySum), count: todayOrders.length }
-
-    return Object.entries(days).map(([label, val]) => ({
-      label,
-      amount: val.amount,
-      orderCount: val.count
-    }))
+    return days.map(({ label, amount, orderCount }) => ({ label, amount: Math.round(amount * 100) / 100, orderCount }))
   },
 
   async getTopProducts(restaurantId: string): Promise<{ name: string; quantity: number; revenue: number }[]> {
@@ -515,12 +575,6 @@ export const tableSessionService = {
   async joinSession(sessionId: string, name: string): Promise<{ session: TableSession; participant: SessionParticipant }> {
     return tableSessionRepo.join(sessionId, name)
   },
-  async addOrderToSession(sessionId: string, orderId: string): Promise<TableSession> {
-    return tableSessionRepo.addOrder(sessionId, orderId)
-  },
-  async requestBill(sessionId: string): Promise<TableSession> {
-    return tableSessionRepo.requestBill(sessionId)
-  },
   /** Ocupada → Livre (sessão encerrada). */
   async closeSession(sessionId: string, actor: string): Promise<TableSession> {
     return tableSessionRepo.close(sessionId, actor)
@@ -536,9 +590,6 @@ export const notificationService = {
   async getNotifications(restaurantId: string): Promise<Notification[]> {
     return notificationRepo.getByRestaurant(restaurantId)
   },
-  async createNotification(notification: Omit<Notification, 'id' | 'createdAt'>): Promise<Notification> {
-    return notificationRepo.create(notification)
-  },
   async markAsRead(id: string): Promise<Notification> {
     return notificationRepo.markAsRead(id)
   },
@@ -548,7 +599,8 @@ export const notificationService = {
 }
 
 // Reset Database Utility
-export const resetDatabase = (): void => {
-  mockStorage.reset()
-}
 
+
+// ================= Tempo real (Supabase Realtime) =================
+export { subscribeToRestaurant as subscribeToRealtime } from '@/repositories/supabase/realtime'
+export type { RealtimeTable } from '@/repositories/supabase/realtime'

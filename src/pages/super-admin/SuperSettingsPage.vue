@@ -9,10 +9,10 @@ import { Settings, ShieldAlert, Save, RefreshCw } from 'lucide-vue-next'
 const platformStore = usePlatformStore()
 const plansStore = usePlansStore()
 
-const platformName = ref('TapMenu Moçambique')
-const supportEmail = ref('suporte@tapmenu.co.mz')
-const supportPhone = ref('+258 84 300 4000')
-const defaultPlanId = ref('plan-pro')
+const platformName = ref('')
+const supportEmail = ref('')
+const supportPhone = ref('')
+const defaultPlanId = ref('')
 const trialDays = ref(14)
 const allowSelfSignup = ref(true)
 const maintenanceMode = ref(false)
@@ -94,13 +94,14 @@ const handleSaveConfig = async () => {
 
       <!-- Registration & Trial Policies -->
       <div class="super-card">
-        <h2 class="card-title">Políticas de Adesão & Demonstração</h2>
+        <h2 class="card-title">Políticas de Adesão</h2>
         <p class="card-subtitle">Regras aplicadas a novos restaurantes no auto-registo</p>
 
         <div class="form-body">
           <div class="form-group">
             <label class="form-label">Plano Padrão de Boas-Vindas</label>
             <select v-model="defaultPlanId" class="form-select">
+              <option value="">— Sem plano por omissão (registo self-service bloqueado) —</option>
               <option
                 v-for="p in plansStore.plans"
                 :key="p.id"

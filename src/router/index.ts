@@ -1,6 +1,8 @@
 import { createRouter, createWebHistory, type RouteRecordRaw } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useTenantStore } from '@/stores/tenant'
+import { isSupabaseConfigured } from '@/lib/supabase'
+import { homePathFor } from './homePath'
 
 // Layouts
 import PublicLayout from '@/layouts/PublicLayout.vue'
@@ -9,62 +11,34 @@ import KitchenLayout from '@/layouts/KitchenLayout.vue'
 import CustomerMenuLayout from '@/layouts/CustomerMenuLayout.vue'
 import SuperAdminLayout from '@/layouts/SuperAdminLayout.vue'
 
-// Public Pages
-import LandingPage from '@/pages/public/LandingPage.vue'
-import FeaturesPage from '@/pages/public/FeaturesPage.vue'
-import PricingPage from '@/pages/public/PricingPage.vue'
-import DemoPage from '@/pages/public/DemoPage.vue'
-import LoginPage from '@/pages/auth/LoginPage.vue'
-import CustomerMenuPage from '@/pages/public/CustomerMenuPage.vue'
-import OrderTrackingPage from '@/pages/public/OrderTrackingPage.vue'
+declare module 'vue-router' {
+  interface RouteMeta {
+    /** Exige sessão iniciada e ligação a uma empresa (ou Super Admin). */
+    requiresAuth?: boolean
+    /** Permissão da interface (ver authStore.can). O RLS aplica a real. */
+    permission?: string
+    superAdmin?: boolean
+    /** Páginas que funcionam sem Supabase configurado. */
+    worksWithoutBackend?: boolean
+  }
+}
 
-// Admin Pages
-import DashboardPage from '@/pages/dashboard/DashboardPage.vue'
-import OrdersPage from '@/pages/orders/OrdersPage.vue'
-import KitchenKdsPage from '@/pages/kitchen/KitchenKdsPage.vue'
-import ServiceRequestsPage from '@/pages/service/ServiceRequestsPage.vue'
-import TablesPage from '@/pages/tables/TablesPage.vue'
-import ProductsPage from '@/pages/products/ProductsPage.vue'
-import CategoriesPage from '@/pages/categories/CategoriesPage.vue'
-import NfcTagsPage from '@/pages/nfc-tags/NfcTagsPage.vue'
-import PaymentsPage from '@/pages/payments/PaymentsPage.vue'
-import StaffPage from '@/pages/staff/StaffPage.vue'
-import ReportsPage from '@/pages/reports/ReportsPage.vue'
-import SettingsPage from '@/pages/settings/SettingsPage.vue'
-import MenuBuilderPage from '@/pages/menu/MenuBuilderPage.vue'
-import MeuPlanoPage from '@/pages/tenant/MeuPlanoPage.vue'
-
-// Super Admin Pages
-import SuperDashboardPage from '@/pages/super-admin/SuperDashboardPage.vue'
-import CompaniesPage from '@/pages/super-admin/CompaniesPage.vue'
-import RestaurantsPage from '@/pages/super-admin/RestaurantsPage.vue'
-import UsersPage from '@/pages/super-admin/UsersPage.vue'
-import PlansPage from '@/pages/super-admin/PlansPage.vue'
-import SubscriptionsPage from '@/pages/super-admin/SubscriptionsPage.vue'
-import ActivityLogPage from '@/pages/super-admin/ActivityLogPage.vue'
-import FeaturesCatalogPage from '@/pages/super-admin/FeaturesCatalogPage.vue'
-import SuperMenusPage from '@/pages/super-admin/SuperMenusPage.vue'
-import SuperOrdersPage from '@/pages/super-admin/SuperOrdersPage.vue'
-import SuperPaymentsPage from '@/pages/super-admin/SuperPaymentsPage.vue'
-import SuperReportsPage from '@/pages/super-admin/SuperReportsPage.vue'
-import SuperSettingsPage from '@/pages/super-admin/SuperSettingsPage.vue'
-import SuperNfcTagsPage from '@/pages/super-admin/SuperNfcTagsPage.vue'
-
-// Error Pages
-import NotFoundPage from '@/pages/errors/NotFoundPage.vue'
-import UnauthorizedPage from '@/pages/errors/UnauthorizedPage.vue'
-
+// As páginas carregam sob pedido (divide o bundle por área).
 const routes: RouteRecordRaw[] = [
-  // Public Marketing Site
+  // Site público
   {
     path: '/',
     component: PublicLayout,
     children: [
-      { path: '', name: 'home', component: LandingPage },
-      { path: 'funcionalidades', name: 'features', component: FeaturesPage },
-      { path: 'precos', name: 'pricing', component: PricingPage },
-      { path: 'demonstracao', name: 'demo', component: DemoPage },
-      { path: 'login', name: 'login', component: LoginPage }
+      { path: '', name: 'home', component: () => import('@/pages/public/LandingPage.vue'), meta: { worksWithoutBackend: true } },
+      { path: 'funcionalidades', name: 'features', component: () => import('@/pages/public/FeaturesPage.vue'), meta: { worksWithoutBackend: true } },
+      { path: 'precos', name: 'pricing', component: () => import('@/pages/public/PricingPage.vue') },
+      { path: 'login', name: 'login', component: () => import('@/pages/auth/LoginPage.vue') },
+      { path: 'registo', name: 'register', component: () => import('@/pages/auth/RegisterPage.vue') },
+      { path: 'registo/empresa', name: 'onboarding', component: () => import('@/pages/auth/OnboardingPage.vue') },
+      { path: 'recuperar-palavra-passe', name: 'forgot-password', component: () => import('@/pages/auth/ForgotPasswordPage.vue') },
+      { path: 'redefinir-palavra-passe', name: 'reset-password', component: () => import('@/pages/auth/ResetPasswordPage.vue') },
+      { path: 'demonstracao', redirect: '/registo' }
     ]
   },
 
@@ -72,92 +46,79 @@ const routes: RouteRecordRaw[] = [
   {
     path: '/m/:restaurantSlug/:tableSlug',
     component: CustomerMenuLayout,
-    children: [
-      { path: '', name: 'customer-menu', component: CustomerMenuPage }
-    ]
+    children: [{ path: '', name: 'customer-menu', component: () => import('@/pages/public/CustomerMenuPage.vue') }]
   },
   // URL antiga (/menu/:restaurante/:numero) — continua a resolver a mesa pelo número
   {
     path: '/menu/:restaurantSlug/:tableCode',
     component: CustomerMenuLayout,
-    children: [
-      { path: '', name: 'customer-menu-legacy', component: CustomerMenuPage }
-    ]
+    children: [{ path: '', name: 'customer-menu-legacy', component: () => import('@/pages/public/CustomerMenuPage.vue') }]
   },
   {
     path: '/pedido/:orderId',
     component: CustomerMenuLayout,
-    children: [
-      { path: '', name: 'order-tracking', component: OrderTrackingPage }
-    ]
+    children: [{ path: '', name: 'order-tracking', component: () => import('@/pages/public/OrderTrackingPage.vue') }]
   },
 
-  // Kitchen Display System (Dedicated Monitor Layout)
+  // Ecrã de cozinha (KDS)
   {
     path: '/app/cozinha',
     component: KitchenLayout,
-    children: [
-      { path: '', name: 'kds-screen', component: KitchenKdsPage }
-    ]
+    meta: { requiresAuth: true, permission: 'kitchen_display' },
+    children: [{ path: '', name: 'kds-screen', component: () => import('@/pages/kitchen/KitchenKdsPage.vue') }]
   },
 
-  // Restaurant Admin Workspace
+  // Painel do restaurante
   {
     path: '/app',
     component: AdminLayout,
+    meta: { requiresAuth: true },
     children: [
       { path: '', redirect: '/app/dashboard' },
-      { path: 'dashboard', name: 'admin-dashboard', component: DashboardPage },
-      { path: 'pedidos', name: 'admin-orders', component: OrdersPage },
-      { path: 'atendimento', name: 'admin-service', component: ServiceRequestsPage },
-      { path: 'mesas', name: 'admin-tables', component: TablesPage },
-      { path: 'menu/produtos', name: 'admin-products', component: ProductsPage },
-      { path: 'menu/categorias', name: 'admin-categories', component: CategoriesPage },
-      { path: 'menu/personalizacao', name: 'admin-menu-customization', component: MenuBuilderPage },
-      { path: 'meu-plano', name: 'admin-my-plan', component: MeuPlanoPage },
-      { path: 'tags-nfc', name: 'admin-nfc-tags', component: NfcTagsPage },
+      { path: 'dashboard', name: 'admin-dashboard', component: () => import('@/pages/dashboard/DashboardPage.vue') },
+      { path: 'pedidos', name: 'admin-orders', component: () => import('@/pages/orders/OrdersPage.vue'), meta: { permission: 'manage_orders' } },
+      { path: 'atendimento', name: 'admin-service', component: () => import('@/pages/service/ServiceRequestsPage.vue'), meta: { permission: 'service_requests' } },
+      { path: 'mesas', name: 'admin-tables', component: () => import('@/pages/tables/TablesPage.vue') },
+      { path: 'menu/produtos', name: 'admin-products', component: () => import('@/pages/products/ProductsPage.vue'), meta: { permission: 'manage_catalog' } },
+      { path: 'menu/categorias', name: 'admin-categories', component: () => import('@/pages/categories/CategoriesPage.vue'), meta: { permission: 'manage_catalog' } },
+      { path: 'menu/personalizacao', name: 'admin-menu-customization', component: () => import('@/pages/menu/MenuBuilderPage.vue'), meta: { permission: 'manage_catalog' } },
+      { path: 'meu-plano', name: 'admin-my-plan', component: () => import('@/pages/tenant/MeuPlanoPage.vue') },
+      { path: 'tags-nfc', name: 'admin-nfc-tags', component: () => import('@/pages/nfc-tags/NfcTagsPage.vue'), meta: { permission: 'manage_digital_access' } },
       { path: 'acesso-digital', redirect: '/app/tags-nfc' },
-      { path: 'pagamentos', name: 'admin-payments', component: PaymentsPage },
-      { path: 'funcionarios', name: 'admin-staff', component: StaffPage },
-      { path: 'relatorios', name: 'admin-reports', component: ReportsPage },
-      { path: 'configuracoes', name: 'admin-settings', component: SettingsPage }
+      { path: 'pagamentos', name: 'admin-payments', component: () => import('@/pages/payments/PaymentsPage.vue'), meta: { permission: 'manage_orders' } },
+      { path: 'funcionarios', name: 'admin-staff', component: () => import('@/pages/staff/StaffPage.vue'), meta: { permission: 'manage_staff' } },
+      { path: 'relatorios', name: 'admin-reports', component: () => import('@/pages/reports/ReportsPage.vue'), meta: { permission: 'view_reports' } },
+      { path: 'configuracoes', name: 'admin-settings', component: () => import('@/pages/settings/SettingsPage.vue'), meta: { permission: 'manage_restaurants' } }
     ]
   },
 
-  // Super Admin Workspace (Platform SaaS)
+  // Super Admin (equipa TapMenu)
   {
     path: '/super-admin',
     component: SuperAdminLayout,
+    meta: { requiresAuth: true, superAdmin: true },
     children: [
       { path: '', redirect: '/super-admin/dashboard' },
-      { path: 'dashboard', name: 'super-dashboard', component: SuperDashboardPage },
-      { path: 'empresas', name: 'super-companies', component: CompaniesPage },
-      { path: 'restaurantes', name: 'super-restaurants', component: RestaurantsPage },
-      { path: 'utilizadores', name: 'super-users', component: UsersPage },
-      { path: 'menus', name: 'super-menus', component: SuperMenusPage },
-      { path: 'pedidos', name: 'super-orders', component: SuperOrdersPage },
-      { path: 'pagamentos', name: 'super-payments', component: SuperPaymentsPage },
-      { path: 'planos', name: 'super-plans', component: PlansPage },
-      { path: 'funcionalidades', name: 'super-features', component: FeaturesCatalogPage },
-      { path: 'subscricoes', name: 'super-subscriptions', component: SubscriptionsPage },
-      { path: 'relatorios', name: 'super-reports', component: SuperReportsPage },
-      { path: 'atividade', name: 'super-activity', component: ActivityLogPage },
-      { path: 'etiquetas-nfc', name: 'super-nfc-tags', component: SuperNfcTagsPage },
-      { path: 'configuracoes', name: 'super-settings', component: SuperSettingsPage }
+      { path: 'dashboard', name: 'super-dashboard', component: () => import('@/pages/super-admin/SuperDashboardPage.vue') },
+      { path: 'empresas', name: 'super-companies', component: () => import('@/pages/super-admin/CompaniesPage.vue') },
+      { path: 'restaurantes', name: 'super-restaurants', component: () => import('@/pages/super-admin/RestaurantsPage.vue') },
+      { path: 'utilizadores', name: 'super-users', component: () => import('@/pages/super-admin/UsersPage.vue') },
+      { path: 'menus', name: 'super-menus', component: () => import('@/pages/super-admin/SuperMenusPage.vue') },
+      { path: 'pedidos', name: 'super-orders', component: () => import('@/pages/super-admin/SuperOrdersPage.vue') },
+      { path: 'pagamentos', name: 'super-payments', component: () => import('@/pages/super-admin/SuperPaymentsPage.vue') },
+      { path: 'planos', name: 'super-plans', component: () => import('@/pages/super-admin/PlansPage.vue') },
+      { path: 'funcionalidades', name: 'super-features', component: () => import('@/pages/super-admin/FeaturesCatalogPage.vue') },
+      { path: 'subscricoes', name: 'super-subscriptions', component: () => import('@/pages/super-admin/SubscriptionsPage.vue') },
+      { path: 'relatorios', name: 'super-reports', component: () => import('@/pages/super-admin/SuperReportsPage.vue') },
+      { path: 'atividade', name: 'super-activity', component: () => import('@/pages/super-admin/ActivityLogPage.vue') },
+      { path: 'etiquetas-nfc', name: 'super-nfc-tags', component: () => import('@/pages/super-admin/SuperNfcTagsPage.vue') },
+      { path: 'configuracoes', name: 'super-settings', component: () => import('@/pages/super-admin/SuperSettingsPage.vue') }
     ]
   },
 
-  // Error Pages
-  {
-    path: '/403',
-    name: 'unauthorized',
-    component: UnauthorizedPage
-  },
-  {
-    path: '/:pathMatch(.*)*',
-    name: 'not-found',
-    component: NotFoundPage
-  }
+  { path: '/configuracao-necessaria', name: 'setup-required', component: () => import('@/pages/errors/SetupRequiredPage.vue'), meta: { worksWithoutBackend: true } },
+  { path: '/403', name: 'unauthorized', component: () => import('@/pages/errors/UnauthorizedPage.vue'), meta: { worksWithoutBackend: true } },
+  { path: '/:pathMatch(.*)*', name: 'not-found', component: () => import('@/pages/errors/NotFoundPage.vue'), meta: { worksWithoutBackend: true } }
 ]
 
 export const router = createRouter({
@@ -168,21 +129,38 @@ export const router = createRouter({
   }
 })
 
-// Route Guards for demo roles
-router.beforeEach(async (to, from, next) => {
+/**
+ * Proteção de rotas (experiência). A proteção real dos dados é o RLS no
+ * Supabase: mesmo contornando estas verificações, nada é lido nem gravado
+ * sem permissão.
+ */
+router.beforeEach(async to => {
+  if (!isSupabaseConfigured) {
+    return to.meta.worksWithoutBackend ? true : { name: 'setup-required' }
+  }
+
+  // Configuração já feita: não deixar o utilizador preso no aviso.
+  if (to.name === 'setup-required') return { path: '/' }
+
+  if (!to.matched.some(r => r.meta.requiresAuth)) return true
+
   const authStore = useAuthStore()
+  await authStore.init()
 
-  // Initialize auth if not loaded
-  if (!authStore.currentUser) {
-    await authStore.init()
+  if (!authStore.hasSession) return { name: 'login', query: { redirect: to.fullPath } }
+  if (authStore.needsOnboarding) return { name: 'onboarding' }
+  if (!authStore.currentUser) return { name: 'unauthorized' }
+
+  if (to.matched.some(r => r.meta.superAdmin) && !authStore.isSuperAdmin) return { name: 'unauthorized' }
+
+  const permission = [...to.matched].reverse().find(r => r.meta.permission)?.meta.permission
+  if (permission && !authStore.can(permission)) {
+    // Ex.: cozinha a abrir o painel → ecrã da cozinha.
+    const home = homePathFor(authStore)
+    return home !== to.path ? home : { name: 'unauthorized' }
   }
 
-  // Super Admin routes protection
-  if (to.path.startsWith('/super-admin')) {
-    if (!authStore.isSuperAdmin) {
-      return next('/403')
-    }
-  }
-
-  next()
+  const tenantStore = useTenantStore()
+  if (!tenantStore.hasLoaded) await tenantStore.loadContext()
+  return true
 })

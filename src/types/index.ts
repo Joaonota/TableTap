@@ -119,6 +119,8 @@ export interface SessionParticipant {
   name: string
   joinedAt: string
   isPrimary: boolean
+  /** Só no dispositivo do próprio participante: autoriza pedidos na sessão. */
+  token?: string
 }
 
 export interface TableSession {
@@ -390,6 +392,14 @@ export interface DashboardMetrics {
   readyOrders: number
   activeServiceRequests: number
   unavailableProductsCount: number
+  /** Período pedido (ex.: hoje, últimos 7 dias) e período anterior equivalente. */
+  periodOrders: number
+  periodRevenue: number
+  previousPeriodRevenue: number
+  periodCancelledOrders: number
+  cancelledOrders: number
+  /** Percentagem de pedidos cancelados (0–100). */
+  cancellationRate: number
 }
 
 // ==========================================

@@ -17,12 +17,12 @@ import { ShieldAlert, ArrowLeft } from 'lucide-vue-next'
       <h1 class="error-code">403</h1>
       <h2 class="error-title">Acesso Não Autorizado</h2>
       <p class="error-desc">
-        O seu perfil demonstrativo atual não possui permissões para aceder a este restaurante ou módulo administrativo.
+        A sua conta não tem permissão para aceder a esta página, ou ainda não está associada a uma empresa ativa.
       </p>
 
       <div class="hint-box">
         <p class="text-xs">
-          <strong>Dica de Demonstração:</strong> Utilize o seletor de utilizadores no banner azul superior para alternar para uma conta com permissões elevadas, como <strong>Carlos Silva (Super Admin)</strong> ou <strong>Amélia Cossa (Proprietária)</strong>.
+          Se precisa deste acesso, peça ao responsável da sua empresa para rever o seu papel na página <strong>Funcionários</strong>.
         </p>
       </div>
 
@@ -31,7 +31,7 @@ import { ShieldAlert, ArrowLeft } from 'lucide-vue-next'
           <template #icon-left>
             <ArrowLeft :size="16" />
           </template>
-          Voltar ao Dashboard Autorizado
+          Voltar ao início
         </AppButton>
       </router-link>
     </div>

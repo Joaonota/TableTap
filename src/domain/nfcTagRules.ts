@@ -2,8 +2,8 @@ import type { NfcTag, NfcTagStatus } from '@/types'
 
 /**
  * Regras de negócio das etiquetas NFC (registo administrativo).
- * Funções puras — usadas pelo repositório mock (que imita o backend) e pela
- * UI para decidir que ações mostrar. Um backend real deve aplicar as mesmas.
+ * Funções puras usadas pela UI para decidir que ações mostrar. A base de dados
+ * aplica as mesmas regras (supabase/migrations, funções nfc_*).
  */
 
 export const NFC_TAG_STATUS_LABELS: Record<NfcTagStatus, string> = {

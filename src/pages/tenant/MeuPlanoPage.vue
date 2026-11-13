@@ -4,6 +4,7 @@ import { useSubscriptionStore, type ResourceUsageMetric } from '@/stores/subscri
 import { useTenantStore } from '@/stores/tenant'
 import { FEATURE_CATALOG, getPlanLimit, isPlanFeatureEnabled } from '@/types/plan'
 import type { Plan } from '@/types'
+import { useAuthStore } from '@/stores/auth'
 import UpgradeModal from '@/components/super-admin/UpgradeModal.vue'
 import AppButton from '@/components/ui/AppButton.vue'
 import AppBadge from '@/components/ui/AppBadge.vue'
@@ -23,6 +24,7 @@ import {
 const subscriptionStore = useSubscriptionStore()
 const tenantStore = useTenantStore()
 
+const authStore = useAuthStore()
 const isUpgradeModalOpen = ref(false)
 
 onMounted(async () => {
@@ -43,10 +45,16 @@ const formatLimit = (limit: number | null): string => {
   return limit === null ? 'Ilimitado' : limit.toString()
 }
 
+/** Pedido de alteração (sem pagamento online): aplicado pela equipa TapMenu. */
 const handleUpgrade = async (targetPlanId: string) => {
-  if (targetPlanId === plan.value?.id) return
-  await subscriptionStore.upgradePlan(targetPlanId)
+  if (targetPlanId === plan.value?.id || targetPlanId === subscriptionStore.pendingChangeRequest?.requestedPlanId) return
+  await subscriptionStore.requestPlanChange(targetPlanId)
 }
+
+const pendingPlanName = computed(() => {
+  const id = subscriptionStore.pendingChangeRequest?.requestedPlanId
+  return id ? subscriptionStore.availablePlans.find(p => p.id === id)?.name ?? '' : ''
+})
 </script>
 
 <template>
@@ -59,8 +67,13 @@ const handleUpgrade = async (targetPlanId: string) => {
 
       <AppButton variant="primary" @click="isUpgradeModalOpen = true">
         <Sparkles :size="16" />
-        <span>Fazer Upgrade de Plano</span>
+        <span>Mudar de plano</span>
       </AppButton>
+    </div>
+
+    <div v-if="pendingPlanName" class="pending-request" role="status">
+      Pedido de alteração para o plano <strong>{{ pendingPlanName }}</strong> enviado à equipa TapMenu.
+      O novo plano fica ativo quando o pedido for aprovado.
     </div>
 
     <!-- Current Subscription Hero Card -->
@@ -214,7 +227,7 @@ const handleUpgrade = async (targetPlanId: string) => {
     <!-- Upgrade / Plan Switch Section -->
     <div class="section-container">
       <div class="section-head">
-        <h3 class="section-title">Comparação de Planos & Upgrade</h3>
+        <h3 class="section-title">Comparação de planos</h3>
         <span class="section-subtitle">Pode mudar de plano a qualquer momento sem interrupção de serviço</span>
       </div>
 
@@ -260,12 +273,22 @@ const handleUpgrade = async (targetPlanId: string) => {
               Plano Ativo
             </AppButton>
             <AppButton
+              v-else-if="p.id === subscriptionStore.pendingChangeRequest?.requestedPlanId"
+              variant="outline"
+              disabled
+              class="w-full"
+            >
+              Pedido enviado
+            </AppButton>
+            <AppButton
               v-else
               :variant="p.highlighted ? 'primary' : 'outline'"
               class="w-full"
+              :disabled="!authStore.isCompanyOwner"
+              :title="authStore.isCompanyOwner ? '' : 'Só o dono da empresa pode pedir a alteração do plano'"
               @click="handleUpgrade(p.id)"
             >
-              <span>Subscrever {{ p.name }}</span>
+              <span>Pedir {{ p.name }}</span>
             </AppButton>
           </div>
         </div>
@@ -317,6 +340,15 @@ const handleUpgrade = async (targetPlanId: string) => {
 </template>
 
 <style scoped>
+.pending-request {
+  padding: 0.85rem 1rem;
+  border-radius: var(--radius-md);
+  background: var(--color-primary-50);
+  border: 1px solid var(--color-primary-200);
+  color: var(--color-primary-900);
+  font-size: 0.875rem;
+}
+
 .usage-scope {
   font-weight: 500;
   color: var(--text-muted);

@@ -25,9 +25,15 @@ const subscriptionStore = useSubscriptionStore()
 const plans = computed(() => subscriptionStore.availablePlans)
 const currentPlanId = computed(() => subscriptionStore.currentPlan?.id)
 
+const pendingPlanId = computed(() => subscriptionStore.pendingChangeRequest?.requestedPlanId)
+
+/**
+ * Não há pagamento online: o pedido chega à equipa TapMenu, que aplica o
+ * novo plano. Os limites e funcionalidades mudam quando for aprovado.
+ */
 const handleUpgrade = async (plan: Plan) => {
-  if (plan.id === currentPlanId.value) return
-  const ok = await subscriptionStore.upgradePlan(plan.id)
+  if (plan.id === currentPlanId.value || plan.id === pendingPlanId.value) return
+  const ok = await subscriptionStore.requestPlanChange(plan.id)
   if (ok) {
     emit('upgraded', plan.id)
     emit('close')
@@ -42,8 +48,8 @@ const formatLimit = (limit: number | null): string => {
 <template>
   <AppModal
     :is-open="isOpen"
-    title="Atualizar Plano TapMenu"
-    subtitle="Desbloqueie novas funcionalidades, aumente limites e acelere a sua operação"
+    title="Mudar de plano"
+    subtitle="Escolha o plano pretendido. A equipa TapMenu recebe o pedido e ativa o novo plano."
     max-width="960px"
     @close="emit('close')"
   >
@@ -152,12 +158,21 @@ const formatLimit = (limit: number | null): string => {
               Plano Atual
             </AppButton>
             <AppButton
+              v-else-if="plan.id === pendingPlanId"
+              variant="outline"
+              disabled
+              class="w-full"
+            >
+              Pedido enviado
+            </AppButton>
+            <AppButton
               v-else
               :variant="plan.highlighted ? 'primary' : 'outline'"
               class="w-full upgrade-btn"
+              :loading="subscriptionStore.isLoading"
               @click="handleUpgrade(plan)"
             >
-              <span>Subscrever {{ plan.name }}</span>
+              <span>Pedir {{ plan.name }}</span>
               <ArrowRight :size="15" />
             </AppButton>
           </div>

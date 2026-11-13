@@ -27,7 +27,7 @@ const faqs = ref([
   },
   {
     q: 'Como funciona a integração com M-Pesa e e-Mola?',
-    a: 'O TapMenu foi desenhado nativamente para Moçambique. Nesta fase demonstrativa, o fluxo é totalmente simulado com confirmações instantâneas. No ambiente de produção, integra-se via API direta com os serviços das operadoras Vodacom e Movitel.',
+    a: 'O TapMenu foi desenhado nativamente para Moçambique. O cliente indica no menu como vai pagar (M-Pesa, e-Mola, cartão ou numerário) e a equipa do restaurante confirma o recebimento no painel. A integração direta com as operadoras ainda não está disponível.',
     open: false
   },
   {
@@ -66,12 +66,12 @@ const toggleFaq = (index: number) => {
         </p>
 
         <div class="hero-cta-group">
-          <router-link to="/m/sabores-maputo/mesa-01">
+          <router-link to="/registo">
             <AppButton size="lg" variant="primary">
               <template #icon-left>
                 <Smartphone :size="18" />
               </template>
-              Testar Menu Digital (Mesa 01)
+              Criar Conta
             </AppButton>
           </router-link>
 
@@ -109,19 +109,19 @@ const toggleFaq = (index: number) => {
             <div class="mockup-dots">
               <span></span><span></span><span></span>
             </div>
-            <div class="mockup-url">tapmenu.co.mz/m/sabores-maputo/mesa-01</div>
+            <div class="mockup-url">tapmenu.co.mz/m/o-seu-restaurante/mesa-01</div>
           </div>
           <div class="mockup-image-wrap">
             <img
               src="https://images.unsplash.com/photo-1555396273-367ea4eb4db5?auto=format&fit=crop&w=1200&q=80"
-              alt="TapMenu Demonstração Restaurante"
+              alt="Ilustração de um restaurante com o TapMenu"
               class="mockup-img"
             />
             <div class="mockup-overlay-badge">
               <div class="badge-icon"><CheckCircle2 :size="20" /></div>
               <div>
-                <div class="badge-title">Pedido #ORD-101 Recebido</div>
-                <div class="badge-desc">Mesa 01 • Frango à Zambeziana</div>
+                <div class="badge-title">Novo pedido recebido</div>
+                <div class="badge-desc">Ilustração do menu digital</div>
               </div>
             </div>
           </div>
@@ -268,12 +268,12 @@ const toggleFaq = (index: number) => {
         <div class="final-cta-card">
           <h2 class="cta-heading">Pronto para Modernizar o Seu Estabelecimento?</h2>
           <p class="cta-text">
-            Explore agora a demonstração interativa completa com produtos, mesas, KDS e dashboard já configurados.
+            Crie a sua conta, registe o seu restaurante e configure o menu, as mesas e a equipa em poucos minutos.
           </p>
           <div class="cta-buttons">
-            <router-link to="/demonstracao">
+            <router-link to="/registo">
               <AppButton size="lg" variant="success">
-                Explorar Demonstração Completa
+                Criar Conta Gratuita
               </AppButton>
             </router-link>
             <router-link to="/precos">

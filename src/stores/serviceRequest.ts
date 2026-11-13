@@ -1,11 +1,10 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import type { Restaurant, ServiceRequest, ServiceRequestStatus, ServiceRequestType } from '@/types'
-import { serviceRequestService } from '@/services'
+import { serviceRequestService, publicTableService, subscribeToRealtime } from '@/services'
 import { useTenantStore } from './tenant'
 import { useAuthStore } from './auth'
 import { useToastStore } from './toast'
-import { useNotificationStore } from './notification'
 
 const serviceTypeLabels: Record<ServiceRequestType, string> = {
   waiter_call: 'Chamada de Garçom',
@@ -19,7 +18,6 @@ export const useServiceRequestStore = defineStore('serviceRequest', () => {
   const tenantStore = useTenantStore()
   const authStore = useAuthStore()
   const toastStore = useToastStore()
-  const notificationStore = useNotificationStore()
 
   const requests = ref<ServiceRequest[]>([])
   const isLoading = ref(false)
@@ -44,60 +42,47 @@ export const useServiceRequestStore = defineStore('serviceRequest', () => {
   const createCustomerRequest = async (
     restaurant: Pick<Restaurant, 'id' | 'tenantId'>,
     tableId: string,
-    tableNumber: string,
+    _tableNumber: string,
     type: ServiceRequestType,
     notes?: string,
     tableSessionId?: string,
-    customerName?: string
+    customerName?: string,
+    participantToken?: string
   ) => {
-    const restaurantRequests = await serviceRequestService.getRequests(restaurant.id)
-
-    // Prevent duplicate active requests of the same type on the same table
-    const existingActive = restaurantRequests.find(
-      r => r.tableId === tableId && r.type === type && (r.status === 'new' || r.status === 'in_progress')
-    )
-    if (existingActive) {
-      toastStore.info(
-        'Solicitação já registada',
-        `Já existe um pedido de "${serviceTypeLabels[type]}" em andamento para a sua mesa. A nossa equipa já está a caminho!`
-      )
-      return existingActive
-    }
-
     try {
-      const typeLabel = serviceTypeLabels[type] || 'Atendimento'
-      const created = await serviceRequestService.createRequest({
-        tenantId: restaurant.tenantId,
-        restaurantId: restaurant.id,
+      // O servidor evita duplicados e notifica a equipa.
+      const { request, alreadyExisted } = await publicTableService.createServiceRequest({
         tableId,
-        tableNumber,
-        tableSessionId,
-        customerName: customerName || 'Cliente',
         type,
-        status: 'new',
+        sessionId: tableSessionId,
+        participantToken,
+        customerName,
         notes
       })
-      if (tenantStore.currentRestaurant?.id === restaurant.id) requests.value.unshift(created)
-
-      // Create counter notification
-      await notificationStore.createNotification({
-        tenantId: restaurant.tenantId,
-        restaurantId: restaurant.id,
-        type: type === 'bill' ? 'bill_requested' : type === 'waiter_call' ? 'waiter_call' : 'service_request',
-        title: type === 'bill' ? 'Pedido de Conta' : type === 'waiter_call' ? 'Cliente solicita atendimento' : `Solicitação: ${typeLabel}`,
-        message: `Mesa ${tableNumber}${customerName ? ` (${customerName})` : ''} solicitou ${typeLabel.toLowerCase()}.${notes ? ` Nota: "${notes}"` : ''}`,
-        tableId,
-        tableNumber,
-        tableSessionId,
-        serviceRequestId: created.id
-      })
-
-      toastStore.success('Solicitação enviada', 'A nossa equipa foi notificada e já está a caminho da sua mesa!')
-      return created
+      if (alreadyExisted) {
+        toastStore.info(
+          'Solicitação já registada',
+          `Já existe um pedido de "${serviceTypeLabels[type]}" em andamento para a sua mesa. A nossa equipa já está a caminho!`
+        )
+      } else {
+        toastStore.success('Solicitação enviada', 'A nossa equipa foi notificada e já está a caminho da sua mesa!')
+      }
+      if (tenantStore.currentRestaurant?.id === restaurant.id && !alreadyExisted) requests.value.unshift(request)
+      return request
     } catch (e) {
       toastStore.error('Erro ao enviar solicitação', (e as Error).message)
       throw e
     }
+  }
+
+  /** Chamadas novas e alterações chegam em tempo real. */
+  const subscribeRealtime = () => {
+    const restaurantId = tenantStore.currentRestaurant?.id
+    if (!restaurantId) return () => {}
+    return subscribeToRealtime('service_requests', restaurantId, async () => {
+      if (tenantStore.currentRestaurant?.id !== restaurantId) return
+      requests.value = await serviceRequestService.getRequests(restaurantId)
+    })
   }
 
   const updateRequestStatus = async (requestId: string, status: ServiceRequestStatus) => {
@@ -126,6 +111,7 @@ export const useServiceRequestStore = defineStore('serviceRequest', () => {
     requests,
     isLoading,
     loadRequests,
+    subscribeRealtime,
     createCustomerRequest,
     updateRequestStatus
   }

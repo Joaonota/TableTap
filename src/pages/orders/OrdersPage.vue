@@ -455,7 +455,7 @@ const handlePrintReceipt = () => {
     <!-- Receipt Print Simulation Modal -->
     <AppModal
       :is-open="isReceiptModalOpen"
-      title="Recibo Comercial Demonstrativo"
+      title="Recibo do Pedido"
       subtitle="Formato compatível com impressora térmica 80mm"
       maxWidth="420px"
       @close="isReceiptModalOpen = false"

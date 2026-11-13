@@ -2,7 +2,6 @@
 import { ref, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useTenantStore } from '@/stores/tenant'
-import DemoBanner from '@/components/ui/DemoBanner.vue'
 import AppToast from '@/components/ui/AppToast.vue'
 import AppLogo from '@/components/ui/AppLogo.vue'
 import { ArrowLeft, Clock } from 'lucide-vue-next'
@@ -30,7 +29,6 @@ onUnmounted(() => {
 
 <template>
   <div class="kds-wrapper">
-    <DemoBanner />
 
     <!-- KDS Top Header -->
     <header class="kds-header">

@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { orderService } from '@/services'
+import { publicTableService } from '@/services'
 import type { Order, OrderStatus } from '@/types'
 import AppButton from '@/components/ui/AppButton.vue'
 import AppBadge from '@/components/ui/AppBadge.vue'
@@ -32,19 +32,31 @@ const steps: { status: OrderStatus; label: string }[] = [
   { status: 'delivered', label: 'Entregue na Mesa' }
 ]
 
-const loadOrder = async () => {
-  isLoading.value = true
+const isUuid = (v: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v)
+
+const loadOrder = async (silent = false) => {
+  if (!silent) isLoading.value = true
   try {
-    const found = await orderService.getOrderById(orderId.value)
-    order.value = found || null
+    // Leitura pública por link (o id do pedido é um UUID impossível de adivinhar).
+    order.value = isUuid(orderId.value) ? ((await publicTableService.getOrder(orderId.value))?.order ?? null) : null
+  } catch {
+    if (!silent) order.value = null
   } finally {
     isLoading.value = false
   }
 }
 
+// O cliente acompanha o estado enquanto a página está aberta.
+let timer: ReturnType<typeof setInterval> | undefined
 onMounted(() => {
   loadOrder()
+  timer = setInterval(() => {
+    if (document.visibilityState === 'visible' && order.value && !['delivered', 'cancelled'].includes(order.value.status)) {
+      void loadOrder(true)
+    }
+  }, 20000)
 })
+onUnmounted(() => clearInterval(timer))
 
 const currentStepIndex = computed(() => {
   if (!order.value) return 0
@@ -168,7 +180,7 @@ const currentStepIndex = computed(() => {
 
       <!-- Action Footer -->
       <div class="tracking-footer">
-        <AppButton variant="secondary" @click="loadOrder">
+        <AppButton variant="secondary" @click="loadOrder()">
           <template #icon-left>
             <RefreshCw :size="16" />
           </template>

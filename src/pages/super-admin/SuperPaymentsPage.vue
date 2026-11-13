@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue'
-import { mockStorage } from '@/repositories/mock/mockStorage'
-import { restaurantService } from '@/services'
+import { paymentService, restaurantService } from '@/services'
 import type { Payment, Restaurant } from '@/types'
 import AppBadge from '@/components/ui/AppBadge.vue'
 import { CreditCard, Smartphone, Banknote, DollarSign, ArrowUpRight, Search } from 'lucide-vue-next'
@@ -14,8 +13,9 @@ const selectedMethodFilter = ref('all')
 
 onMounted(async () => {
   try {
-    payments.value = mockStorage.getDb().payments || []
-    restaurants.value = await restaurantService.getAllRestaurants()
+    const [p, r] = await Promise.all([paymentService.getAllPayments(), restaurantService.getAllRestaurants()])
+    payments.value = p
+    restaurants.value = r
   } finally {
     isLoading.value = false
   }
