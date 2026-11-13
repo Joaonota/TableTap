@@ -2,7 +2,7 @@ import { createRouter, createWebHistory, type RouteRecordRaw } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useTenantStore } from '@/stores/tenant'
 import { isSupabaseConfigured } from '@/lib/supabase'
-import { homePathFor, pendingStepPath, ESTABLISHMENT_SETUP_PATH } from './homePath'
+import { homePathFor, pendingStepPath, COMPANY_SETUP_PATH } from './homePath'
 
 // Layouts
 import PublicLayout from '@/layouts/PublicLayout.vue'
@@ -63,11 +63,11 @@ const routes: RouteRecordRaw[] = [
     children: [{ path: '', name: 'order-tracking', component: () => import('@/pages/public/OrderTrackingPage.vue') }]
   },
 
-  // Primeiro acesso: assistente de configuração do estabelecimento
+  // Primeiro acesso: perfil da empresa
   {
-    path: ESTABLISHMENT_SETUP_PATH,
-    name: 'establishment-setup',
-    component: () => import('@/pages/onboarding/EstablishmentSetupPage.vue'),
+    path: COMPANY_SETUP_PATH,
+    name: 'company-setup',
+    component: () => import('@/pages/onboarding/CompanySetupPage.vue'),
     meta: { requiresAuth: true }
   },
 
@@ -90,6 +90,7 @@ const routes: RouteRecordRaw[] = [
       { path: 'pedidos', name: 'admin-orders', component: () => import('@/pages/orders/OrdersPage.vue'), meta: { permission: 'manage_orders' } },
       { path: 'atendimento', name: 'admin-service', component: () => import('@/pages/service/ServiceRequestsPage.vue'), meta: { permission: 'service_requests' } },
       { path: 'mesas', name: 'admin-tables', component: () => import('@/pages/tables/TablesPage.vue') },
+      { path: 'estabelecimentos', name: 'admin-establishments', component: () => import('@/pages/establishments/EstablishmentsPage.vue'), meta: { permission: 'manage_company' } },
       { path: 'menu/produtos', name: 'admin-products', component: () => import('@/pages/products/ProductsPage.vue'), meta: { permission: 'manage_catalog' } },
       { path: 'menu/categorias', name: 'admin-categories', component: () => import('@/pages/categories/CategoriesPage.vue'), meta: { permission: 'manage_catalog' } },
       { path: 'menu/personalizacao', name: 'admin-menu-customization', component: () => import('@/pages/menu/MenuBuilderPage.vue'), meta: { permission: 'manage_catalog' } },
@@ -112,7 +113,7 @@ const routes: RouteRecordRaw[] = [
       { path: '', redirect: '/super-admin/dashboard' },
       { path: 'dashboard', name: 'super-dashboard', component: () => import('@/pages/super-admin/SuperDashboardPage.vue') },
       { path: 'empresas', name: 'super-companies', component: () => import('@/pages/super-admin/CompaniesPage.vue') },
-      { path: 'estabelecimentos', name: 'super-establishments', component: () => import('@/pages/super-admin/EstablishmentsPage.vue') },
+      { path: 'pre-registos', name: 'super-preregistrations', component: () => import('@/pages/super-admin/PreRegistrationsPage.vue') },
       { path: 'restaurantes', name: 'super-restaurants', component: () => import('@/pages/super-admin/RestaurantsPage.vue') },
       { path: 'utilizadores', name: 'super-users', component: () => import('@/pages/super-admin/UsersPage.vue') },
       { path: 'menus', name: 'super-menus', component: () => import('@/pages/super-admin/SuperMenusPage.vue') },
@@ -161,10 +162,10 @@ router.beforeEach(async to => {
 
   if (!authStore.hasSession) return { name: 'login', query: { redirect: to.fullPath } }
 
-  // Passos obrigatórios: palavra-passe → estabelecimento → configuração inicial.
+  // Passos obrigatórios: palavra-passe → empresa associada → perfil da empresa.
   const pending = pendingStepPath(authStore)
   if (pending && pending !== to.path) return pending
-  if (!pending && to.name === 'establishment-setup') return homePathFor(authStore)
+  if (!pending && to.name === 'company-setup') return homePathFor(authStore)
 
   if (to.matched.some(r => r.meta.superAdmin) && !authStore.isSuperAdmin) return { name: 'unauthorized' }
 

@@ -101,11 +101,11 @@ export interface LimitCatalogEntry {
  * automaticamente.
  */
 export const LIMIT_CATALOG: LimitCatalogEntry[] = [
+  { key: 'RESTAURANTS', name: 'Estabelecimentos (filiais)', description: 'Estabelecimentos que a empresa pode criar', unit: 'estabelecimentos', scope: 'tenant', enforcedOnCreate: true },
   { key: 'TABLES', name: 'Mesas', description: 'Mesas registadas em cada restaurante', unit: 'mesas', scope: 'restaurant', enforcedOnCreate: true },
   { key: 'PRODUCTS', name: 'Produtos', description: 'Produtos no menu de cada restaurante', unit: 'produtos', scope: 'restaurant', enforcedOnCreate: true },
   { key: 'CATEGORIES', name: 'Categorias', description: 'Categorias do menu de cada restaurante', unit: 'categorias', scope: 'restaurant', enforcedOnCreate: true },
   { key: 'STAFF', name: 'Utilizadores', description: 'Utilizadores ativos da equipa da empresa', unit: 'utilizadores', scope: 'tenant', enforcedOnCreate: true },
-  { key: 'RESTAURANTS', name: 'Restaurantes', description: 'Restaurantes que a empresa pode registar', unit: 'restaurantes', scope: 'tenant', enforcedOnCreate: true },
   { key: 'ORDERS_PER_MONTH', name: 'Pedidos / Mês', description: 'Pedidos recebidos no mês corrente, por restaurante (informativo)', unit: 'pedidos/mês', scope: 'restaurant', enforcedOnCreate: false }
 ]
 

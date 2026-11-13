@@ -91,6 +91,11 @@ export const mapCompany = (r: Row): Company => {
     planId: sub?.plan_id ?? '',
     subscriptionId: sub?.id ?? '',
     isActive: r.is_active,
+    country: r.country ?? '',
+    province: r.province ?? '',
+    city: r.city ?? '',
+    address: r.address ?? '',
+    onboardingCompletedAt: r.onboarding_completed_at ?? null,
     createdAt: r.created_at
   }
 }
@@ -105,6 +110,10 @@ export const companyToRow = (c: Partial<Company>): Row => {
   if (c.phone !== undefined) row.phone = c.phone
   if (c.email !== undefined) row.email = c.email
   if (c.isActive !== undefined) row.is_active = c.isActive
+  if (c.country !== undefined) row.country = c.country
+  if (c.province !== undefined) row.province = c.province
+  if (c.city !== undefined) row.city = c.city
+  if (c.address !== undefined) row.address = c.address
   return row
 }
 
@@ -219,21 +228,22 @@ export const restaurantToRow = (r: Partial<Restaurant>): Row => {
 }
 
 // ------------------------------------------------ Pré-registos (Super Admin)
-export const INVITATION_SELECT = '*, companies(name), restaurants(name, onboarding_completed_at)'
+export const INVITATION_SELECT = '*, companies(name, legal_name, is_active, onboarding_completed_at, restaurants(count))'
 
 export const mapInvitation = (r: Row): EstablishmentInvitation => {
   const company = one(r.companies)
-  const restaurant = one(r.restaurants)
   return {
     id: r.id,
     tenantId: r.company_id,
-    restaurantId: opt(r.restaurant_id),
-    establishmentName: restaurant?.name ?? '',
-    companyName: company?.name ?? '',
+    commercialName: company?.name ?? '',
+    companyName: company?.legal_name || company?.name || '',
+    accountActive: company?.is_active ?? true,
+    restaurantCount: Number(one(company?.restaurants)?.count ?? 0),
     ownerName: r.owner_name,
     ownerEmail: r.owner_email,
     ownerPhone: r.owner_phone ?? '',
     country: r.country ?? '',
+    province: r.province ?? '',
     city: r.city ?? '',
     internalNotes: r.internal_notes ?? '',
     status: r.status,
@@ -241,7 +251,7 @@ export const mapInvitation = (r: Row): EstablishmentInvitation => {
     inviteCount: r.invite_count ?? 0,
     invitedAt: opt(r.invited_at),
     acceptedAt: opt(r.accepted_at),
-    onboardingCompletedAt: opt(restaurant?.onboarding_completed_at),
+    onboardingCompletedAt: opt(company?.onboarding_completed_at),
     createdAt: r.created_at
   }
 }

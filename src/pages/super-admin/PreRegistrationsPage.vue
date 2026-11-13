@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
-import { establishmentService, type InviteDelivery, type PreRegisterEstablishmentInput } from '@/services'
+import { establishmentService, type InviteDelivery, type PreRegisterCompanyInput } from '@/services'
 import { usePlansStore } from '@/stores/plans'
 import { usePlatformStore } from '@/stores/platform'
 import { useToastStore } from '@/stores/toast'
@@ -13,9 +13,9 @@ import AppInput from '@/components/ui/AppInput.vue'
 import { Plus, Mail, Link2, Edit2, Copy, Search } from 'lucide-vue-next'
 
 /**
- * Pré-registo de estabelecimentos: a equipa TapMenu cria a empresa, a
- * subscrição e o restaurante, e convida o responsável, que define a
- * palavra-passe e completa a configuração no primeiro acesso.
+ * Pré-registo de empresas clientes: a equipa TapMenu cria a empresa e a
+ * subscrição (plano) e convida o responsável, que define a palavra-passe,
+ * completa o perfil da empresa e cria os seus estabelecimentos.
  */
 const toastStore = useToastStore()
 const plansStore = usePlansStore()
@@ -49,7 +49,7 @@ const loadData = async () => {
     ])
     invitations.value = list
   } catch (e) {
-    toastStore.error('Erro ao carregar estabelecimentos', (e as Error).message)
+    toastStore.error('Erro ao carregar pré-registos', (e as Error).message)
   } finally {
     isLoading.value = false
   }
@@ -61,7 +61,7 @@ const filtered = computed(() => {
   return invitations.value.filter(i => {
     if (statusFilter.value !== 'all' && i.status !== statusFilter.value) return false
     if (!q) return true
-    return [i.establishmentName, i.companyName, i.ownerName, i.ownerEmail, i.city].some(v => v?.toLowerCase().includes(q))
+    return [i.commercialName, i.companyName, i.ownerName, i.ownerEmail, i.city].some(v => v?.toLowerCase().includes(q))
   })
 })
 
@@ -79,16 +79,18 @@ const isSaving = ref(false)
 const today = () => new Date().toISOString().slice(0, 10)
 
 const emptyForm = () => ({
-  establishmentName: '',
   companyName: '',
+  commercialName: '',
   ownerName: '',
   ownerEmail: '',
   ownerPhone: '',
   country: 'Moçambique',
+  province: '',
   city: '',
   planId: platformStore.config?.defaultPlanId || plansStore.plans.find(p => p.active)?.id || '',
   subscriptionStatus: 'trial' as SubscriptionStatus,
   startDate: today(),
+  accountActive: true,
   internalNotes: '',
   customPrice: '',
   sendInvite: true
@@ -104,8 +106,8 @@ const openCreate = () => {
 
 const handleCreate = async () => {
   const f = form.value
-  if (!f.establishmentName.trim() || !f.ownerName.trim() || !f.ownerEmail.trim() || !f.planId) {
-    toastStore.warning('Validação', 'Preencha o estabelecimento, o responsável, o email e o plano.')
+  if (!f.companyName.trim() || !f.ownerName.trim() || !f.ownerEmail.trim() || !f.planId) {
+    toastStore.warning('Validação', 'Preencha a empresa, o responsável, o email e o plano.')
     return
   }
   const price = f.customPrice.trim() === '' ? null : Number(f.customPrice)
@@ -113,16 +115,18 @@ const handleCreate = async () => {
     toastStore.warning('Validação', 'Preço ajustado inválido.')
     return
   }
-  const input: PreRegisterEstablishmentInput = {
-    establishmentName: f.establishmentName.trim(),
-    companyName: f.companyName.trim() || f.establishmentName.trim(),
+  const input: PreRegisterCompanyInput = {
+    companyName: f.companyName.trim(),
+    commercialName: f.commercialName.trim() || f.companyName.trim(),
     ownerName: f.ownerName.trim(),
     ownerEmail: f.ownerEmail.trim(),
     ownerPhone: f.ownerPhone.trim(),
     country: f.country.trim(),
+    province: f.province.trim(),
     city: f.city.trim(),
     planId: f.planId,
     subscriptionStatus: f.subscriptionStatus,
+    accountActive: f.accountActive,
     startDate: f.startDate,
     internalNotes: f.internalNotes.trim(),
     customPrice: price
@@ -132,7 +136,7 @@ const handleCreate = async () => {
     const created = await establishmentService.preregister(input)
     replaceRow(created)
     isCreateOpen.value = false
-    toastStore.success('Estabelecimento pré-registado', created.establishmentName)
+    toastStore.success('Empresa pré-registada', created.commercialName)
     if (f.sendInvite) await sendInvite(created, 'email')
   } catch (e) {
     toastStore.error('Não foi possível pré-registar', (e as Error).message)
@@ -173,7 +177,7 @@ const copyLink = async () => {
 
 // ---------------- Edição de dados internos ----------------
 const editing = ref<EstablishmentInvitation | null>(null)
-const editForm = ref({ ownerName: '', ownerPhone: '', country: '', city: '', internalNotes: '' })
+const editForm = ref({ ownerName: '', ownerPhone: '', country: '', province: '', city: '', internalNotes: '' })
 
 const openEdit = (inv: EstablishmentInvitation) => {
   editing.value = inv
@@ -181,6 +185,7 @@ const openEdit = (inv: EstablishmentInvitation) => {
     ownerName: inv.ownerName,
     ownerPhone: inv.ownerPhone,
     country: inv.country,
+    province: inv.province,
     city: inv.city,
     internalNotes: inv.internalNotes
   }
@@ -209,12 +214,12 @@ const handleEdit = async () => {
   <div class="super-page">
     <div class="page-top-header">
       <div>
-        <h1 class="page-title">Pré-registo de Estabelecimentos</h1>
-        <p class="page-subtitle">Crie o acesso de novos clientes e envie o convite ao responsável</p>
+        <h1 class="page-title">Pré-registo de Empresas</h1>
+        <p class="page-subtitle">Crie a empresa cliente, atribua o plano e envie o convite ao responsável</p>
       </div>
       <AppButton variant="primary" @click="openCreate">
         <template #icon-left><Plus :size="16" /></template>
-        Pré-registar Estabelecimento
+        Pré-registar Empresa
       </AppButton>
     </div>
 
@@ -236,11 +241,11 @@ const handleEdit = async () => {
         <table class="super-table">
           <thead>
             <tr>
-              <th>Estabelecimento</th>
+              <th>Empresa</th>
               <th>Responsável</th>
               <th>Localização</th>
               <th>Estado</th>
-              <th>Configuração</th>
+              <th>Perfil / Estabelecimentos</th>
               <th class="text-right">Ações</th>
             </tr>
           </thead>
@@ -250,20 +255,21 @@ const handleEdit = async () => {
             </tr>
             <tr v-else-if="!filtered.length">
               <td colspan="6" class="empty-row">
-                {{ invitations.length ? 'Nenhum estabelecimento corresponde à pesquisa.' : 'Ainda não há estabelecimentos pré-registados.' }}
+                {{ invitations.length ? 'Nenhuma empresa corresponde à pesquisa.' : 'Ainda não há empresas pré-registadas.' }}
               </td>
             </tr>
             <tr v-for="inv in filtered" :key="inv.id">
               <td>
-                <strong class="text-strong">{{ inv.establishmentName }}</strong>
+                <strong class="text-strong">{{ inv.commercialName }}</strong>
                 <div class="text-xs text-muted">{{ inv.companyName }}</div>
+                <span v-if="!inv.accountActive" class="text-xs danger">Conta suspensa</span>
               </td>
               <td>
                 <div>{{ inv.ownerName }}</div>
                 <div class="text-xs text-muted">{{ inv.ownerEmail }}</div>
                 <div v-if="inv.ownerPhone" class="text-xs text-muted">{{ inv.ownerPhone }}</div>
               </td>
-              <td>{{ [inv.city, inv.country].filter(Boolean).join(', ') || '—' }}</td>
+              <td>{{ [inv.city, inv.province, inv.country].filter(Boolean).join(', ') || '—' }}</td>
               <td>
                 <AppBadge :variant="STATUS_VARIANT[inv.status]">{{ STATUS_LABEL[inv.status] }}</AppBadge>
                 <div v-if="inv.invitedAt" class="text-xs text-muted">
@@ -271,8 +277,9 @@ const handleEdit = async () => {
                 </div>
               </td>
               <td>
-                <span v-if="inv.onboardingCompletedAt" class="text-xs ok">Concluída {{ formatDate(inv.onboardingCompletedAt) }}</span>
-                <span v-else class="text-xs text-muted">Por concluir</span>
+                <span v-if="inv.onboardingCompletedAt" class="text-xs ok">Perfil concluído {{ formatDate(inv.onboardingCompletedAt) }}</span>
+                <span v-else class="text-xs text-muted">Perfil por concluir</span>
+                <div class="text-xs text-muted">{{ inv.restaurantCount }} estabelecimento(s)</div>
               </td>
               <td class="text-right">
                 <div class="actions-row">
@@ -306,16 +313,17 @@ const handleEdit = async () => {
     </div>
 
     <!-- Pré-registo -->
-    <AppModal :is-open="isCreateOpen" title="Pré-registar Estabelecimento" max-width="620px" @close="isCreateOpen = false">
+    <AppModal :is-open="isCreateOpen" title="Pré-registar Empresa" max-width="620px" @close="isCreateOpen = false">
       <form class="modal-form" @submit.prevent="handleCreate">
-        <h3 class="form-section">Estabelecimento</h3>
+        <h3 class="form-section">Empresa</h3>
         <div class="form-row">
-          <AppInput id="pr-est" v-model="form.establishmentName" label="Nome do estabelecimento" required />
-          <AppInput id="pr-comp" v-model="form.companyName" label="Entidade proprietária" placeholder="Igual ao estabelecimento" />
+          <AppInput id="pr-comp" v-model="form.companyName" label="Nome da empresa" placeholder="Ex.: Sabores de Moçambique, Lda" required />
+          <AppInput id="pr-commercial" v-model="form.commercialName" label="Nome comercial" placeholder="Igual ao nome da empresa" />
         </div>
-        <div class="form-row">
-          <AppInput id="pr-city" v-model="form.city" label="Cidade" />
+        <div class="form-row form-row--3">
           <AppInput id="pr-country" v-model="form.country" label="País" />
+          <AppInput id="pr-province" v-model="form.province" label="Província / Estado" />
+          <AppInput id="pr-city" v-model="form.city" label="Cidade" />
         </div>
 
         <h3 class="form-section">Responsável</h3>
@@ -325,7 +333,7 @@ const handleEdit = async () => {
           <AppInput id="pr-phone" v-model="form.ownerPhone" label="Telefone" placeholder="+258 84 000 0000" />
         </div>
 
-        <h3 class="form-section">Subscrição</h3>
+        <h3 class="form-section">Plano e conta</h3>
         <div class="form-row">
           <div class="form-group">
             <label class="form-label" for="pr-plan">Plano</label>
@@ -336,7 +344,7 @@ const handleEdit = async () => {
             </select>
           </div>
           <div class="form-group">
-            <label class="form-label" for="pr-status">Estado</label>
+            <label class="form-label" for="pr-status">Estado da subscrição</label>
             <select id="pr-status" v-model="form.subscriptionStatus" class="form-select">
               <option v-for="s in SUB_STATUSES" :key="s.value" :value="s.value">{{ s.label }}</option>
             </select>
@@ -353,6 +361,11 @@ const handleEdit = async () => {
             hint="Opcional"
           />
         </div>
+
+        <label class="check-row">
+          <input v-model="form.accountActive" type="checkbox" />
+          <span>Conta ativa (desmarque para criar a empresa suspensa)</span>
+        </label>
 
         <div class="form-group">
           <label class="form-label" for="pr-notes">Notas internas</label>
@@ -396,13 +409,14 @@ const handleEdit = async () => {
     </AppModal>
 
     <!-- Edição -->
-    <AppModal :is-open="!!editing" title="Editar dados internos" :subtitle="editing?.establishmentName" max-width="520px" @close="editing = null">
+    <AppModal :is-open="!!editing" title="Editar dados internos" :subtitle="editing?.commercialName" max-width="520px" @close="editing = null">
       <form class="modal-form" @submit.prevent="handleEdit">
         <AppInput id="ed-owner" v-model="editForm.ownerName" label="Nome do responsável" required />
         <AppInput id="ed-phone" v-model="editForm.ownerPhone" label="Telefone" />
-        <div class="form-row">
-          <AppInput id="ed-city" v-model="editForm.city" label="Cidade" />
+        <div class="form-row form-row--3">
           <AppInput id="ed-country" v-model="editForm.country" label="País" />
+          <AppInput id="ed-province" v-model="editForm.province" label="Província / Estado" />
+          <AppInput id="ed-city" v-model="editForm.city" label="Cidade" />
         </div>
         <div class="form-group">
           <label class="form-label" for="ed-notes">Notas internas</label>
@@ -548,6 +562,12 @@ const handleEdit = async () => {
   font-weight: 600;
 }
 
+.danger {
+  color: #dc2626;
+  font-weight: 600;
+  display: block;
+}
+
 .actions-row {
   display: flex;
   justify-content: flex-end;
@@ -596,6 +616,10 @@ const handleEdit = async () => {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 1rem;
+}
+
+.form-row--3 {
+  grid-template-columns: 1fr 1fr 1fr;
 }
 
 .form-group {
@@ -661,7 +685,8 @@ const handleEdit = async () => {
     font-size: 1.375rem;
   }
 
-  .form-row {
+  .form-row,
+  .form-row--3 {
     grid-template-columns: 1fr;
   }
 }

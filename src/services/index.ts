@@ -5,7 +5,7 @@ import type {
   RegisterNfcTagsInput,
   AuthAccount,
   CreateCompanyInput,
-  PreRegisterEstablishmentInput,
+  PreRegisterCompanyInput,
   InviteDelivery,
   InviteResult,
   PlaceOrderInput,
@@ -52,7 +52,7 @@ export type {
   RegisterNfcTagsInput,
   AuthAccount,
   CreateCompanyInput,
-  PreRegisterEstablishmentInput,
+  PreRegisterCompanyInput,
   InviteDelivery,
   InviteResult,
   PlaceOrderInput,
@@ -145,6 +145,10 @@ export const tenantService = {
   },
   async updateCompany(id: string, updates: Partial<Company>): Promise<Company> {
     return companyRepo.update(id, updates)
+  },
+  /** Conclui o perfil da empresa (primeiro acesso do responsável). */
+  async completeOnboarding(id: string): Promise<Company> {
+    return companyRepo.completeOnboarding(id)
   }
 }
 
@@ -166,9 +170,6 @@ export const restaurantService = {
   },
   async updateRestaurant(id: string, updates: Partial<Restaurant>): Promise<Restaurant> {
     return restaurantRepo.update(id, updates)
-  },
-  async completeOnboarding(id: string): Promise<Restaurant> {
-    return restaurantRepo.completeOnboarding(id)
   }
 }
 
@@ -177,7 +178,7 @@ export const establishmentService = {
   getAll(): Promise<EstablishmentInvitation[]> {
     return establishmentRepo.getAll()
   },
-  preregister(input: PreRegisterEstablishmentInput): Promise<EstablishmentInvitation> {
+  preregister(input: PreRegisterCompanyInput): Promise<EstablishmentInvitation> {
     return establishmentRepo.preregister(input)
   },
   /** Convite de acesso: o responsável define a palavra-passe ao abrir o link. */
@@ -186,7 +187,7 @@ export const establishmentService = {
   },
   update(
     id: string,
-    updates: Partial<Pick<EstablishmentInvitation, 'ownerName' | 'ownerPhone' | 'country' | 'city' | 'internalNotes'>>
+    updates: Partial<Pick<EstablishmentInvitation, 'ownerName' | 'ownerPhone' | 'country' | 'province' | 'city' | 'internalNotes'>>
   ): Promise<EstablishmentInvitation> {
     return establishmentRepo.update(id, updates)
   }

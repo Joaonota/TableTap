@@ -6,6 +6,8 @@ import { useOrderStore } from '@/stores/order'
 import { useSubscriptionStore } from '@/stores/subscription'
 import { reportService } from '@/services'
 import MetricCard from '@/components/ui/MetricCard.vue'
+import CompanyOverview from '@/components/dashboard/CompanyOverview.vue'
+import { useAuthStore } from '@/stores/auth'
 import TableGrid from '@/components/tables/TableGrid.vue'
 import TableDetailDrawer from '@/components/tables/TableDetailDrawer.vue'
 import { useTableStore } from '@/stores/table'
@@ -29,6 +31,7 @@ import {
 
 const router = useRouter()
 const tenantStore = useTenantStore()
+const authStore = useAuthStore()
 const orderStore = useOrderStore()
 const subscriptionStore = useSubscriptionStore()
 const tableStore = useTableStore()
@@ -164,6 +167,9 @@ const maxSalesAmount = () => {
         </router-link>
       </div>
     </div>
+
+    <!-- Visão da empresa (todos os estabelecimentos) — só para o responsável -->
+    <CompanyOverview v-if="authStore.isCompanyOwner && !authStore.isSuperAdmin" />
 
     <!-- Metrics Cards Grid -->
     <div class="metrics-grid">

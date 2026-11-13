@@ -86,6 +86,10 @@ const handleRestaurantChange = (val: string | number) => {
 }
 
 const handleSave = async () => {
+  if (!hasCustomizationFeature.value) {
+    isUpgradeModalOpen.value = true
+    return
+  }
   await customizationStore.save(tenantStore.currentCompany?.name || 'Administrador')
 }
 
@@ -127,7 +131,8 @@ const handleReset = async () => {
 
         <AppButton
           variant="primary"
-          :disabled="!customizationStore.isDirty || customizationStore.isSaving"
+          :disabled="!hasCustomizationFeature || !customizationStore.isDirty || customizationStore.isSaving"
+          :title="hasCustomizationFeature ? undefined : 'Personalização não incluída no seu plano'"
           @click="handleSave"
         >
           <Save :size="15" />
@@ -154,7 +159,7 @@ const handleReset = async () => {
     <!-- Main Builder Split View -->
     <div class="builder-split-grid" :class="{ 'is-locked-view': !hasCustomizationFeature }">
       <!-- Left Controls Panel -->
-      <div class="builder-controls-panel">
+      <div class="builder-controls-panel" :inert="!hasCustomizationFeature || undefined">
         <!-- Tabs -->
         <div class="builder-tabs-nav">
           <button
@@ -238,6 +243,13 @@ const handleReset = async () => {
 </template>
 
 <style scoped>
+/* Funcionalidade fora do plano: controlos visíveis mas bloqueados. */
+.is-locked-view .builder-controls-panel {
+  opacity: 0.55;
+  filter: grayscale(0.4);
+  cursor: not-allowed;
+}
+
 .menu-builder-page {
   display: flex;
   flex-direction: column;

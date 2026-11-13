@@ -48,6 +48,8 @@ export interface ICompanyRepository {
   getById(id: string): Promise<Company | null>
   create(input: CreateCompanyInput): Promise<Company>
   update(id: string, updates: Partial<Company>): Promise<Company>
+  /** Marca o perfil da empresa (primeiro acesso do responsável) como concluído. */
+  completeOnboarding(id: string): Promise<Company>
 }
 
 export interface IRestaurantRepository {
@@ -57,8 +59,6 @@ export interface IRestaurantRepository {
   getAll(): Promise<Restaurant[]> // For super admin
   create(restaurant: Omit<Restaurant, 'id' | 'createdAt'>): Promise<Restaurant>
   update(id: string, updates: Partial<Restaurant>): Promise<Restaurant>
-  /** Marca a configuração inicial (assistente do primeiro acesso) como concluída. */
-  completeOnboarding(id: string): Promise<Restaurant>
 }
 
 export interface IUserRepository {
@@ -75,8 +75,8 @@ export interface AuthAccount {
   needsOnboarding: boolean
   /** Primeiro acesso: tem de definir uma palavra-passe antes de continuar. */
   mustSetPassword: boolean
-  /** Restaurante com a configuração inicial por concluir (só para o dono). */
-  setupRestaurantId: string | null
+  /** Empresa com o perfil por completar (primeiro acesso do dono). */
+  setupCompanyId: string | null
   email: string
   fullName: string
 }
@@ -98,17 +98,22 @@ export interface IAuthRepository {
   onAuthChange(callback: (event: string) => void): () => void
 }
 
-/** Dados do pré-registo de um estabelecimento (Super Admin). */
-export interface PreRegisterEstablishmentInput {
-  establishmentName: string
+/** Dados do pré-registo de uma empresa cliente (Super Admin). */
+export interface PreRegisterCompanyInput {
+  /** Nome legal da empresa. */
   companyName: string
+  /** Nome comercial (por omissão, igual ao nome legal). */
+  commercialName: string
   ownerName: string
   ownerEmail: string
   ownerPhone: string
   country: string
+  province: string
   city: string
   planId: string
   subscriptionStatus: SubscriptionStatus
+  /** Estado da conta: empresa ativa ou suspensa. */
+  accountActive: boolean
   /** AAAA-MM-DD */
   startDate: string
   internalNotes: string
@@ -129,13 +134,13 @@ export interface InviteResult {
 
 export interface IEstablishmentRepository {
   getAll(): Promise<EstablishmentInvitation[]>
-  /** Cria empresa, subscrição, restaurante e responsável. Devolve o pré-registo. */
-  preregister(input: PreRegisterEstablishmentInput): Promise<EstablishmentInvitation>
+  /** Cria empresa, subscrição e responsável (sem estabelecimentos). Devolve o pré-registo. */
+  preregister(input: PreRegisterCompanyInput): Promise<EstablishmentInvitation>
   /** Emite (ou reemite) o convite de acesso do responsável. */
   invite(invitationId: string, delivery: InviteDelivery, redirectTo: string): Promise<InviteResult>
   update(
     id: string,
-    updates: Partial<Pick<EstablishmentInvitation, 'ownerName' | 'ownerPhone' | 'country' | 'city' | 'internalNotes'>>
+    updates: Partial<Pick<EstablishmentInvitation, 'ownerName' | 'ownerPhone' | 'country' | 'province' | 'city' | 'internalNotes'>>
   ): Promise<EstablishmentInvitation>
 }
 

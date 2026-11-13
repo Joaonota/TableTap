@@ -39,6 +39,21 @@ const formDisplayOrder = ref(1)
 const formFeatures = ref<PlanFeature[]>([])
 const formLimits = ref<PlanLimit[]>([])
 
+/** Nº de estabelecimentos (filiais): o limite RESTAURANTS, editável logo nas informações gerais. */
+const branchesEntry = computed(() => formLimits.value.find(l => l.resourceKey === 'RESTAURANTS'))
+const branchesUnlimited = computed({
+  get: () => branchesEntry.value?.limit === null,
+  set: (unlimited: boolean) => {
+    if (branchesEntry.value) branchesEntry.value.limit = unlimited ? null : 1
+  }
+})
+const branchesLimit = computed({
+  get: () => branchesEntry.value?.limit ?? '',
+  set: (v: number | string) => {
+    if (branchesEntry.value) branchesEntry.value.limit = v === '' ? 0 : Math.max(0, Math.floor(Number(v)))
+  }
+})
+
 const isEditMode = computed(() => !!props.initialPlan?.id)
 const errors = ref<PlanDraftErrors>({})
 const limitErrors = computed(() =>
@@ -113,7 +128,8 @@ const handleSave = () => {
     (props.otherPlans ?? []).filter(p => p.id !== formId.value)
   )
   if (Object.keys(errors.value).length) {
-    activeTab.value = errors.value.name || errors.value.slug || errors.value.price ? 'general' : 'limits'
+    activeTab.value =
+      errors.value.name || errors.value.slug || errors.value.price || limitErrors.value.RESTAURANTS ? 'general' : 'limits'
     return
   }
 
@@ -244,6 +260,28 @@ const handleSave = () => {
           </div>
         </div>
 
+        <div class="form-group branches-box">
+          <label class="form-label" for="plan-branches">Estabelecimentos (filiais) incluídos</label>
+          <div class="branches-row">
+            <input
+              id="plan-branches"
+              v-model="branchesLimit"
+              type="number"
+              min="0"
+              step="1"
+              class="form-select branches-input"
+              :disabled="branchesUnlimited"
+              :placeholder="branchesUnlimited ? 'Ilimitado' : ''"
+            />
+            <label class="branches-unlimited">
+              <input v-model="branchesUnlimited" type="checkbox" />
+              <span>Ilimitado</span>
+            </label>
+          </div>
+          <span class="field-hint">Quantos estabelecimentos a empresa pode criar com este plano.</span>
+          <span v-if="limitErrors.RESTAURANTS" class="field-error">{{ limitErrors.RESTAURANTS }}</span>
+        </div>
+
         <div class="toggles-box">
           <label class="toggle-row">
             <input type="checkbox" v-model="formActive" />
@@ -301,6 +339,33 @@ const handleSave = () => {
   gap: 0.35rem;
   font-size: 0.8rem;
   color: var(--color-danger-600);
+}
+
+.branches-box {
+  margin-top: 0.25rem;
+}
+
+.branches-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.branches-input {
+  max-width: 160px;
+}
+
+.branches-unlimited {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.875rem;
+  cursor: pointer;
+}
+
+.field-hint {
+  font-size: 0.75rem;
+  color: #64748b;
 }
 
 .limits-help {

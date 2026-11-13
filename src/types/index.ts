@@ -38,6 +38,12 @@ export interface Company {
   planId: string
   subscriptionId: string
   isActive: boolean
+  country: string
+  province: string
+  city: string
+  address: string
+  /** null = perfil da empresa por completar (primeiro acesso do responsável). */
+  onboardingCompletedAt?: string | null
   createdAt: string
 }
 
@@ -112,19 +118,25 @@ export const ESTABLISHMENT_CATEGORIES = [
   'Outro'
 ] as const
 
-/** Pré-registo de um estabelecimento (dados internos da equipa TapMenu). */
+/** Pré-registo de uma empresa cliente (dados internos da equipa TapMenu). */
 export type EstablishmentInvitationStatus = 'pending' | 'invited' | 'accepted'
 
 export interface EstablishmentInvitation {
   id: string
   tenantId: string
-  restaurantId?: string
-  establishmentName: string
+  /** Nome comercial da empresa. */
+  commercialName: string
+  /** Nome legal da empresa. */
   companyName: string
+  /** Estado da conta (empresa ativa/suspensa). */
+  accountActive: boolean
+  /** Número de estabelecimentos já criados pela empresa. */
+  restaurantCount: number
   ownerName: string
   ownerEmail: string
   ownerPhone: string
   country: string
+  province: string
   city: string
   internalNotes: string
   status: EstablishmentInvitationStatus
@@ -132,7 +144,7 @@ export interface EstablishmentInvitation {
   inviteCount: number
   invitedAt?: string
   acceptedAt?: string
-  /** Data em que o responsável concluiu a configuração inicial. */
+  /** Data em que o responsável concluiu o perfil da empresa. */
   onboardingCompletedAt?: string
   createdAt: string
 }

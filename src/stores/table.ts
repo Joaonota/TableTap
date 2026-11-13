@@ -79,7 +79,10 @@ export const useTableStore = defineStore('table', () => {
 
   const createTable = async (input: TableInput) => {
     const restaurant = tenantStore.currentRestaurant
-    if (!restaurant) return null
+    if (!restaurant) {
+      toastStore.warning('Sem estabelecimento', 'Crie ou selecione um estabelecimento antes de criar mesas.')
+      return null
+    }
     try {
       const created = await tableService.createTable(restaurant.id, input)
       replaceTable(created)

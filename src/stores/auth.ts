@@ -17,8 +17,8 @@ export const useAuthStore = defineStore('auth', () => {
   const needsOnboarding = ref(false)
   /** Primeiro acesso: tem de definir a palavra-passe antes de usar a aplicação. */
   const mustSetPassword = ref(false)
-  /** Restaurante cuja configuração inicial (assistente) está por concluir. */
-  const setupRestaurantId = ref<string | null>(null)
+  /** Empresa cujo perfil (primeiro acesso) está por completar. */
+  const setupCompanyId = ref<string | null>(null)
   const accountEmail = ref('')
   const accountName = ref('')
   const isLoading = ref(false)
@@ -88,7 +88,7 @@ export const useAuthStore = defineStore('auth', () => {
       currentUser.value = account?.user ?? null
       needsOnboarding.value = !!account?.needsOnboarding
       mustSetPassword.value = !!account?.mustSetPassword
-      setupRestaurantId.value = account?.setupRestaurantId ?? null
+      setupCompanyId.value = account?.setupCompanyId ?? null
       accountEmail.value = account?.email ?? ''
       accountName.value = account?.fullName ?? ''
     } finally {
@@ -139,7 +139,7 @@ export const useAuthStore = defineStore('auth', () => {
       hasSession.value = false
       needsOnboarding.value = false
       mustSetPassword.value = false
-      setupRestaurantId.value = null
+      setupCompanyId.value = null
       try {
         localStorage.removeItem('tapmenu_selected_tenant_id')
         localStorage.removeItem('tapmenu_selected_restaurant_id')
@@ -154,7 +154,7 @@ export const useAuthStore = defineStore('auth', () => {
     hasSession,
     needsOnboarding,
     mustSetPassword,
-    setupRestaurantId,
+    setupCompanyId,
     accountEmail,
     accountName,
     isLoading,

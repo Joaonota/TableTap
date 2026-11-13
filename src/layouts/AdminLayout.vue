@@ -76,6 +76,16 @@ const handleRestaurantChange = async (e: Event) => {
   await reloadContextData()
 }
 
+/** Páginas ao nível da empresa, que funcionam sem estabelecimento selecionado. */
+const COMPANY_LEVEL_PATHS = ['/app/estabelecimentos', '/app/meu-plano']
+const needsEstablishment = computed(
+  () =>
+    tenantStore.hasLoaded &&
+    !tenantStore.currentRestaurant &&
+    !authStore.isSuperAdmin &&
+    !COMPANY_LEVEL_PATHS.includes(route.path)
+)
+
 const reloadContextData = async () => {
   await Promise.all([
     orderStore.loadOrders(),
@@ -345,6 +355,17 @@ onMounted(async () => {
             <div class="nav-label">GESTÃO & RELATÓRIOS</div>
 
             <router-link
+              v-if="authStore.can('manage_company')"
+              to="/app/estabelecimentos"
+              class="nav-link"
+              :class="{ 'is-active': route.path === '/app/estabelecimentos' }"
+              @click="isMobileSidebarOpen = false"
+            >
+              <Store :size="18" />
+              <span>Estabelecimentos</span>
+            </router-link>
+
+            <router-link
               to="/app/meu-plano"
               class="nav-link"
               :class="{ 'is-active': route.path === '/app/meu-plano' }"
@@ -403,7 +424,23 @@ onMounted(async () => {
 
       <!-- Main Content View -->
       <main class="admin-main">
-        <router-view />
+        <!-- Mesas, tags, menu, pedidos… pertencem a um estabelecimento: sem nenhum, explicar o passo seguinte. -->
+        <div v-if="needsEstablishment" class="no-establishment">
+          <Store :size="36" />
+          <template v-if="authStore.can('manage_company')">
+            <h2>Crie o seu primeiro estabelecimento</h2>
+            <p>
+              Mesas, tags NFC, menu, pedidos e relatórios pertencem a um estabelecimento. Crie um estabelecimento para
+              começar a configurá-los.
+            </p>
+            <router-link to="/app/estabelecimentos" class="no-establishment-btn">Ir para Estabelecimentos</router-link>
+          </template>
+          <template v-else>
+            <h2>Sem estabelecimento atribuído</h2>
+            <p>A sua conta ainda não está associada a nenhum estabelecimento. Peça ao responsável da empresa para o adicionar.</p>
+          </template>
+        </div>
+        <router-view v-else />
       </main>
     </div>
 
@@ -413,6 +450,42 @@ onMounted(async () => {
 </template>
 
 <style scoped>
+.no-establishment {
+  max-width: 520px;
+  margin: 4rem auto;
+  padding: 2.5rem 1.5rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+  text-align: center;
+  background: #ffffff;
+  border: 1px dashed #cbd5e1;
+  border-radius: 12px;
+  color: #64748b;
+}
+
+.no-establishment h2 {
+  font-size: 1.125rem;
+  font-weight: 800;
+  color: #0f172a;
+}
+
+.no-establishment p {
+  font-size: 0.875rem;
+}
+
+.no-establishment-btn {
+  margin-top: 0.5rem;
+  padding: 0.6rem 1.1rem;
+  border-radius: 8px;
+  background: var(--primary, #0ea5e9);
+  color: #ffffff;
+  font-weight: 600;
+  font-size: 0.875rem;
+  text-decoration: none;
+}
+
 .admin-wrapper {
   display: flex;
   flex-direction: column;

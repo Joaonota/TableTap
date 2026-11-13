@@ -49,7 +49,7 @@ import type {
   IEstablishmentRepository,
   InviteDelivery,
   InviteResult,
-  PreRegisterEstablishmentInput,
+  PreRegisterCompanyInput,
   ICategoryRepository,
   ICompanyRepository,
   IMediaRepository,
@@ -145,26 +145,20 @@ export class SupabaseAuthRepository implements IAuthRepository {
     const membership = unwrap(await supabase.from('staff_members').select('*').eq('user_id', auth.user.id).maybeSingle())
     const user = profile.is_super_admin || (membership && membership.is_active) ? mapUser(profile, membership) : null
 
-    // Dono de um estabelecimento pré-registado que ainda não concluiu a configuração inicial.
-    let setupRestaurantId: string | null = null
+    // Dono de uma empresa pré-registada que ainda não completou o perfil da empresa.
+    let setupCompanyId: string | null = null
     if (!profile.is_super_admin && membership?.is_active && membership.role === 'company_owner') {
-      const pending = unwrap(
-        await supabase
-          .from('restaurants')
-          .select('id')
-          .eq('company_id', membership.company_id)
-          .is('onboarding_completed_at', null)
-          .order('created_at')
-          .limit(1)
-      ) as Json[]
-      setupRestaurantId = pending[0]?.id ?? null
+      const company = unwrap(
+        await supabase.from('companies').select('id, onboarding_completed_at').eq('id', membership.company_id).maybeSingle()
+      ) as Json | null
+      if (company && !company.onboarding_completed_at) setupCompanyId = company.id
     }
 
     return {
       user,
       needsOnboarding: !profile.is_super_admin && !membership,
       mustSetPassword: !!profile.must_change_password,
-      setupRestaurantId,
+      setupCompanyId,
       email: profile.email,
       fullName: profile.full_name
     }
@@ -243,6 +237,13 @@ export class SupabaseCompanyRepository implements ICompanyRepository {
     return created
   }
 
+  async completeOnboarding(id: string): Promise<Company> {
+    await rpc('complete_company_onboarding', { p_company_id: id })
+    const company = await this.getById(id)
+    if (!company) throw new DomainError('not_found', 'Empresa não encontrada.')
+    return company
+  }
+
   async update(id: string, updates: Partial<Company>): Promise<Company> {
     const row = companyToRow(updates)
     if (Object.keys(row).length) {
@@ -291,10 +292,6 @@ export class SupabaseRestaurantRepository implements IRestaurantRepository {
     delete row.slug // imutável: está gravado nas etiquetas NFC
     return mapRestaurant(unwrapOne(await supabase.from('restaurants').update(row).eq('id', id).select('*').single()))
   }
-
-  async completeOnboarding(id: string): Promise<Restaurant> {
-    return mapRestaurant(await rpc('complete_restaurant_onboarding', { p_restaurant_id: id }))
-  }
 }
 
 // =====================================================================
@@ -313,18 +310,20 @@ export class SupabaseEstablishmentRepository implements IEstablishmentRepository
     ).map(mapInvitation)
   }
 
-  async preregister(input: PreRegisterEstablishmentInput): Promise<EstablishmentInvitation> {
-    const id = await rpc<string>('admin_preregister_establishment', {
+  async preregister(input: PreRegisterCompanyInput): Promise<EstablishmentInvitation> {
+    const id = await rpc<string>('admin_preregister_company', {
       p_data: {
-        establishmentName: input.establishmentName,
         companyName: input.companyName,
+        commercialName: input.commercialName,
         ownerName: input.ownerName,
         ownerEmail: input.ownerEmail,
         ownerPhone: input.ownerPhone,
         country: input.country,
+        province: input.province,
         city: input.city,
         planId: input.planId,
         subscriptionStatus: input.subscriptionStatus,
+        accountActive: input.accountActive,
         startDate: input.startDate,
         internalNotes: input.internalNotes,
         customPrice: input.customPrice ?? null,
@@ -359,7 +358,7 @@ export class SupabaseEstablishmentRepository implements IEstablishmentRepository
 
   async update(
     id: string,
-    updates: Partial<Pick<EstablishmentInvitation, 'ownerName' | 'ownerPhone' | 'country' | 'city' | 'internalNotes'>>
+    updates: Partial<Pick<EstablishmentInvitation, 'ownerName' | 'ownerPhone' | 'country' | 'province' | 'city' | 'internalNotes'>>
   ): Promise<EstablishmentInvitation> {
     const row = clean({
       owner_name: updates.ownerName,

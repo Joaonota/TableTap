@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
 import { tenantService, restaurantService } from '@/services'
 import { usePlatformStore } from '@/stores/platform'
 import { usePlansStore } from '@/stores/plans'
@@ -20,6 +21,8 @@ import {
   CreditCard
 } from 'lucide-vue-next'
 
+// Novas empresas são criadas pelo pré-registo (empresa + plano + convite ao responsável).
+const router = useRouter()
 const toastStore = useToastStore()
 const platformStore = usePlatformStore()
 const plansStore = usePlansStore()
@@ -182,7 +185,7 @@ const toggleCompanyStatus = async (comp: Company) => {
         <p class="page-subtitle">Organizações SaaS cadastradas com isolamento lógico de dados, planos e subscrições</p>
       </div>
 
-      <AppButton variant="primary" @click="openAddModal">
+      <AppButton variant="primary" @click="router.push('/super-admin/pre-registos')">
         <template #icon-left>
           <Plus :size="16" />
         </template>

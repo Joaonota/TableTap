@@ -85,9 +85,9 @@ const isMobileSidebarOpen = ref(false)
           </router-link>
 
           <router-link
-            to="/super-admin/estabelecimentos"
+            to="/super-admin/pre-registos"
             class="super-nav-link"
-            :class="{ 'is-active': route.path === '/super-admin/estabelecimentos' }"
+            :class="{ 'is-active': route.path === '/super-admin/pre-registos' }"
             @click="isMobileSidebarOpen = false"
           >
             <UserPlus :size="18" />

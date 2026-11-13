@@ -91,17 +91,17 @@ export const menuCustomizationService = {
     })
   },
 
+  /**
+   * Repõe o tema padrão apagando a personalização (sem registo, o menu usa o
+   * tema padrão). Funciona em qualquer plano, mesmo sem MENU_CUSTOMIZATION.
+   */
   async resetToDefault(
     restaurantId: string,
     tenantId: string,
     updatedBy: string = 'Administrador'
   ): Promise<MenuCustomization> {
-    return this.saveCustomization({
-      restaurantId,
-      tenantId,
-      theme: getDefaultTheme(),
-      updatedBy: `${updatedBy} (Reset Padrão)`
-    })
+    await repositories.menuCustomizations.delete(restaurantId)
+    return { id: '', tenantId, restaurantId, theme: getDefaultTheme(), updatedAt: '', updatedBy: `${updatedBy} (Reset Padrão)` }
   },
 
   applyThemeCssVars(theme: MenuTheme, targetElement?: HTMLElement): void {
