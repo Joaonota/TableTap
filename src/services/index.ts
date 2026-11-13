@@ -4,8 +4,10 @@ import type {
   StartSessionInput,
   RegisterNfcTagsInput,
   AuthAccount,
-  RegisterCompanyInput,
   CreateCompanyInput,
+  PreRegisterEstablishmentInput,
+  InviteDelivery,
+  InviteResult,
   PlaceOrderInput,
   CreateServiceRequestInput,
   PublicTableContext,
@@ -40,7 +42,8 @@ import type {
   ServiceRequestStatus,
   DashboardMetrics,
   PlatformAuditLog,
-  PlatformConfig
+  PlatformConfig,
+  EstablishmentInvitation
 } from '@/types'
 
 export type {
@@ -48,8 +51,10 @@ export type {
   StartSessionInput,
   RegisterNfcTagsInput,
   AuthAccount,
-  RegisterCompanyInput,
   CreateCompanyInput,
+  PreRegisterEstablishmentInput,
+  InviteDelivery,
+  InviteResult,
   PlaceOrderInput,
   CreateServiceRequestInput,
   PublicTableContext,
@@ -80,7 +85,8 @@ const {
   plans: planRepo,
   subscriptions: subscriptionRepo,
   auditLogs: auditRepo,
-  platformConfig: platformConfigRepo
+  platformConfig: platformConfigRepo,
+  establishments: establishmentRepo
 } = repositories
 
 // ================= Autenticação (Supabase Auth) =================
@@ -90,9 +96,6 @@ export const authService = {
   },
   signIn(email: string, password: string): Promise<void> {
     return authRepo.signIn(email, password)
-  },
-  signUp(email: string, password: string, fullName: string, redirectTo: string) {
-    return authRepo.signUp(email, password, fullName, redirectTo)
   },
   signOut(): Promise<void> {
     return authRepo.signOut()
@@ -106,8 +109,14 @@ export const authService = {
   claimInvitations(): Promise<number> {
     return authRepo.claimInvitations()
   },
-  registerCompany(input: RegisterCompanyInput): Promise<string> {
-    return authRepo.registerCompany(input)
+  verifyEmailToken(tokenHash: string, type: 'invite' | 'recovery' | 'magiclink' | 'email'): Promise<void> {
+    return authRepo.verifyEmailToken(tokenHash, type)
+  },
+  setSessionFromTokens(accessToken: string, refreshToken: string): Promise<void> {
+    return authRepo.setSessionFromTokens(accessToken, refreshToken)
+  },
+  completeFirstAccess(): Promise<void> {
+    return authRepo.completeFirstAccess()
   },
   onAuthChange(callback: (event: string) => void): () => void {
     return authRepo.onAuthChange(callback)
@@ -157,6 +166,29 @@ export const restaurantService = {
   },
   async updateRestaurant(id: string, updates: Partial<Restaurant>): Promise<Restaurant> {
     return restaurantRepo.update(id, updates)
+  },
+  async completeOnboarding(id: string): Promise<Restaurant> {
+    return restaurantRepo.completeOnboarding(id)
+  }
+}
+
+// ================= Pré-registo de estabelecimentos (Super Admin) =================
+export const establishmentService = {
+  getAll(): Promise<EstablishmentInvitation[]> {
+    return establishmentRepo.getAll()
+  },
+  preregister(input: PreRegisterEstablishmentInput): Promise<EstablishmentInvitation> {
+    return establishmentRepo.preregister(input)
+  },
+  /** Convite de acesso: o responsável define a palavra-passe ao abrir o link. */
+  invite(invitationId: string, delivery: InviteDelivery): Promise<InviteResult> {
+    return establishmentRepo.invite(invitationId, delivery, `${window.location.origin}/convite`)
+  },
+  update(
+    id: string,
+    updates: Partial<Pick<EstablishmentInvitation, 'ownerName' | 'ownerPhone' | 'country' | 'city' | 'internalNotes'>>
+  ): Promise<EstablishmentInvitation> {
+    return establishmentRepo.update(id, updates)
   }
 }
 

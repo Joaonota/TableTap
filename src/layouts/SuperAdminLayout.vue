@@ -5,6 +5,7 @@ import { useAuthStore } from '@/stores/auth'
 import AppToast from '@/components/ui/AppToast.vue'
 import AppLogo from '@/components/ui/AppLogo.vue'
 import {
+  UserPlus,
   Building2,
   Store,
   Users,
@@ -81,6 +82,16 @@ const isMobileSidebarOpen = ref(false)
           >
             <Building2 :size="18" />
             <span>Empresas (Tenants)</span>
+          </router-link>
+
+          <router-link
+            to="/super-admin/estabelecimentos"
+            class="super-nav-link"
+            :class="{ 'is-active': route.path === '/super-admin/estabelecimentos' }"
+            @click="isMobileSidebarOpen = false"
+          >
+            <UserPlus :size="18" />
+            <span>Pré-registos</span>
           </router-link>
 
           <router-link

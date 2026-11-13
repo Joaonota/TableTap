@@ -24,7 +24,11 @@ import type {
   PlatformAuditLog,
   PlatformConfig,
   LimitKey,
-  PaymentMethod
+  PaymentMethod,
+  EstablishmentInvitation,
+  PlanFeature,
+  PlanLimit,
+  SubscriptionStatus
 } from '@/types'
 
 /** Empresa registada pelo Super Admin (o dono é convidado por email). */
@@ -53,6 +57,8 @@ export interface IRestaurantRepository {
   getAll(): Promise<Restaurant[]> // For super admin
   create(restaurant: Omit<Restaurant, 'id' | 'createdAt'>): Promise<Restaurant>
   update(id: string, updates: Partial<Restaurant>): Promise<Restaurant>
+  /** Marca a configuração inicial (assistente do primeiro acesso) como concluída. */
+  completeOnboarding(id: string): Promise<Restaurant>
 }
 
 export interface IUserRepository {
@@ -65,33 +71,72 @@ export interface IUserRepository {
 /** Conta autenticada: perfil + ligação à empresa (se existir). */
 export interface AuthAccount {
   user: User | null
-  /** Conta válida mas ainda sem empresa (precisa de concluir o registo). */
+  /** Conta válida mas sem estabelecimento associado (aguarda a equipa TapMenu). */
   needsOnboarding: boolean
+  /** Primeiro acesso: tem de definir uma palavra-passe antes de continuar. */
+  mustSetPassword: boolean
+  /** Restaurante com a configuração inicial por concluir (só para o dono). */
+  setupRestaurantId: string | null
   email: string
   fullName: string
-}
-
-export interface RegisterCompanyInput {
-  companyName: string
-  restaurantName: string
-  legalName?: string
-  taxId?: string
-  phone?: string
-  city?: string
 }
 
 export interface IAuthRepository {
   getAccount(): Promise<AuthAccount | null>
   signIn(email: string, password: string): Promise<void>
-  /** Devolve `needsEmailConfirmation` quando o Supabase exige confirmar o email. */
-  signUp(email: string, password: string, fullName: string, redirectTo: string): Promise<{ needsEmailConfirmation: boolean }>
   signOut(): Promise<void>
   sendPasswordReset(email: string, redirectTo: string): Promise<void>
   updatePassword(password: string): Promise<void>
   /** Liga convites de equipa pendentes ao utilizador (email confirmado). */
   claimInvitations(): Promise<number>
-  registerCompany(input: RegisterCompanyInput): Promise<string>
+  /** Valida o token do link de convite/recuperação e inicia a sessão. */
+  verifyEmailToken(tokenHash: string, type: 'invite' | 'recovery' | 'magiclink' | 'email'): Promise<void>
+  /** Inicia a sessão com os tokens devolvidos no fragmento (#) de um link do Supabase. */
+  setSessionFromTokens(accessToken: string, refreshToken: string): Promise<void>
+  /** Depois de definir a palavra-passe: liga a conta ao estabelecimento e aceita o convite. */
+  completeFirstAccess(): Promise<void>
   onAuthChange(callback: (event: string) => void): () => void
+}
+
+/** Dados do pré-registo de um estabelecimento (Super Admin). */
+export interface PreRegisterEstablishmentInput {
+  establishmentName: string
+  companyName: string
+  ownerName: string
+  ownerEmail: string
+  ownerPhone: string
+  country: string
+  city: string
+  planId: string
+  subscriptionStatus: SubscriptionStatus
+  /** AAAA-MM-DD */
+  startDate: string
+  internalNotes: string
+  /** Condições comerciais ajustadas — omitir para usar as do plano. */
+  customPrice?: number | null
+  customFeatures?: PlanFeature[] | null
+  customLimits?: PlanLimit[] | null
+}
+
+export type InviteDelivery = 'email' | 'link'
+
+export interface InviteResult {
+  delivery: InviteDelivery
+  email: string
+  /** Link de convite de uso único (apenas quando delivery = 'link'). */
+  link: string | null
+}
+
+export interface IEstablishmentRepository {
+  getAll(): Promise<EstablishmentInvitation[]>
+  /** Cria empresa, subscrição, restaurante e responsável. Devolve o pré-registo. */
+  preregister(input: PreRegisterEstablishmentInput): Promise<EstablishmentInvitation>
+  /** Emite (ou reemite) o convite de acesso do responsável. */
+  invite(invitationId: string, delivery: InviteDelivery, redirectTo: string): Promise<InviteResult>
+  update(
+    id: string,
+    updates: Partial<Pick<EstablishmentInvitation, 'ownerName' | 'ownerPhone' | 'country' | 'city' | 'internalNotes'>>
+  ): Promise<EstablishmentInvitation>
 }
 
 /** Dados editáveis de uma mesa. O slug (URL) é gerado na criação e é imutável. */

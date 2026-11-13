@@ -1,7 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import type { User, UserRole } from '@/types'
-import type { RegisterCompanyInput } from '@/services'
 import { authService } from '@/services'
 import { isSupabaseConfigured } from '@/lib/supabase'
 
@@ -16,6 +15,10 @@ export const useAuthStore = defineStore('auth', () => {
   const hasSession = ref(false)
   /** Conta autenticada sem empresa: tem de concluir o registo. */
   const needsOnboarding = ref(false)
+  /** Primeiro acesso: tem de definir a palavra-passe antes de usar a aplicação. */
+  const mustSetPassword = ref(false)
+  /** Restaurante cuja configuração inicial (assistente) está por concluir. */
+  const setupRestaurantId = ref<string | null>(null)
   const accountEmail = ref('')
   const accountName = ref('')
   const isLoading = ref(false)
@@ -84,6 +87,8 @@ export const useAuthStore = defineStore('auth', () => {
       hasSession.value = !!account
       currentUser.value = account?.user ?? null
       needsOnboarding.value = !!account?.needsOnboarding
+      mustSetPassword.value = !!account?.mustSetPassword
+      setupRestaurantId.value = account?.setupRestaurantId ?? null
       accountEmail.value = account?.email ?? ''
       accountName.value = account?.fullName ?? ''
     } finally {
@@ -114,18 +119,16 @@ export const useAuthStore = defineStore('auth', () => {
     await refresh()
   }
 
-  const signUp = (email: string, password: string, fullName: string) =>
-    authService.signUp(email, password, fullName, `${window.location.origin}/login?confirmado=1`)
-
   const sendPasswordReset = (email: string) =>
     authService.sendPasswordReset(email, `${window.location.origin}/redefinir-palavra-passe`)
 
   const updatePassword = (password: string) => authService.updatePassword(password)
 
-  const registerCompany = async (input: RegisterCompanyInput) => {
-    const companyId = await authService.registerCompany(input)
+  /** Define a palavra-passe do primeiro acesso e liga a conta ao estabelecimento. */
+  const completeFirstAccess = async (password: string) => {
+    await authService.updatePassword(password)
+    await authService.completeFirstAccess()
     await refresh()
-    return companyId
   }
 
   const logout = async () => {
@@ -135,6 +138,8 @@ export const useAuthStore = defineStore('auth', () => {
       currentUser.value = null
       hasSession.value = false
       needsOnboarding.value = false
+      mustSetPassword.value = false
+      setupRestaurantId.value = null
       try {
         localStorage.removeItem('tapmenu_selected_tenant_id')
         localStorage.removeItem('tapmenu_selected_restaurant_id')
@@ -148,6 +153,8 @@ export const useAuthStore = defineStore('auth', () => {
     currentUser,
     hasSession,
     needsOnboarding,
+    mustSetPassword,
+    setupRestaurantId,
     accountEmail,
     accountName,
     isLoading,
@@ -165,10 +172,9 @@ export const useAuthStore = defineStore('auth', () => {
     init,
     refresh,
     signIn,
-    signUp,
     sendPasswordReset,
     updatePassword,
-    registerCompany,
+    completeFirstAccess,
     logout
   }
 })

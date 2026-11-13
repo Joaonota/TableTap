@@ -2,7 +2,7 @@ import { createRouter, createWebHistory, type RouteRecordRaw } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useTenantStore } from '@/stores/tenant'
 import { isSupabaseConfigured } from '@/lib/supabase'
-import { homePathFor } from './homePath'
+import { homePathFor, pendingStepPath, ESTABLISHMENT_SETUP_PATH } from './homePath'
 
 // Layouts
 import PublicLayout from '@/layouts/PublicLayout.vue'
@@ -34,11 +34,14 @@ const routes: RouteRecordRaw[] = [
       { path: 'funcionalidades', name: 'features', component: () => import('@/pages/public/FeaturesPage.vue'), meta: { worksWithoutBackend: true } },
       { path: 'precos', name: 'pricing', component: () => import('@/pages/public/PricingPage.vue') },
       { path: 'login', name: 'login', component: () => import('@/pages/auth/LoginPage.vue') },
-      { path: 'registo', name: 'register', component: () => import('@/pages/auth/RegisterPage.vue') },
-      { path: 'registo/empresa', name: 'onboarding', component: () => import('@/pages/auth/OnboardingPage.vue') },
+      // Não há registo público: os estabelecimentos são pré-registados pelo Super Admin.
+      { path: 'registo', redirect: '/login' },
+      { path: 'registo/empresa', redirect: '/sem-estabelecimento' },
+      { path: 'convite', name: 'accept-invite', component: () => import('@/pages/auth/AcceptInvitePage.vue') },
+      { path: 'sem-estabelecimento', name: 'no-establishment', component: () => import('@/pages/auth/NoEstablishmentPage.vue') },
       { path: 'recuperar-palavra-passe', name: 'forgot-password', component: () => import('@/pages/auth/ForgotPasswordPage.vue') },
       { path: 'redefinir-palavra-passe', name: 'reset-password', component: () => import('@/pages/auth/ResetPasswordPage.vue') },
-      { path: 'demonstracao', redirect: '/registo' }
+      { path: 'demonstracao', redirect: '/login' }
     ]
   },
 
@@ -58,6 +61,14 @@ const routes: RouteRecordRaw[] = [
     path: '/pedido/:orderId',
     component: CustomerMenuLayout,
     children: [{ path: '', name: 'order-tracking', component: () => import('@/pages/public/OrderTrackingPage.vue') }]
+  },
+
+  // Primeiro acesso: assistente de configuração do estabelecimento
+  {
+    path: ESTABLISHMENT_SETUP_PATH,
+    name: 'establishment-setup',
+    component: () => import('@/pages/onboarding/EstablishmentSetupPage.vue'),
+    meta: { requiresAuth: true }
   },
 
   // Ecrã de cozinha (KDS)
@@ -101,6 +112,7 @@ const routes: RouteRecordRaw[] = [
       { path: '', redirect: '/super-admin/dashboard' },
       { path: 'dashboard', name: 'super-dashboard', component: () => import('@/pages/super-admin/SuperDashboardPage.vue') },
       { path: 'empresas', name: 'super-companies', component: () => import('@/pages/super-admin/CompaniesPage.vue') },
+      { path: 'estabelecimentos', name: 'super-establishments', component: () => import('@/pages/super-admin/EstablishmentsPage.vue') },
       { path: 'restaurantes', name: 'super-restaurants', component: () => import('@/pages/super-admin/RestaurantsPage.vue') },
       { path: 'utilizadores', name: 'super-users', component: () => import('@/pages/super-admin/UsersPage.vue') },
       { path: 'menus', name: 'super-menus', component: () => import('@/pages/super-admin/SuperMenusPage.vue') },
@@ -148,8 +160,11 @@ router.beforeEach(async to => {
   await authStore.init()
 
   if (!authStore.hasSession) return { name: 'login', query: { redirect: to.fullPath } }
-  if (authStore.needsOnboarding) return { name: 'onboarding' }
-  if (!authStore.currentUser) return { name: 'unauthorized' }
+
+  // Passos obrigatórios: palavra-passe → estabelecimento → configuração inicial.
+  const pending = pendingStepPath(authStore)
+  if (pending && pending !== to.path) return pending
+  if (!pending && to.name === 'establishment-setup') return homePathFor(authStore)
 
   if (to.matched.some(r => r.meta.superAdmin) && !authStore.isSuperAdmin) return { name: 'unauthorized' }
 

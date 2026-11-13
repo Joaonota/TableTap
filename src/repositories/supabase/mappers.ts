@@ -5,6 +5,7 @@
 import type {
   Category,
   Company,
+  EstablishmentInvitation,
   MenuCustomization,
   Notification,
   NfcTag,
@@ -132,7 +133,10 @@ export const mapSubscription = (r: Row): Subscription => {
     status: r.status,
     startDate: r.start_date,
     renewalDate: r.renewal_date,
-    monthlyPrice: plan ? monthlyPrice({ price: num(plan.price), billingPeriod: plan.billing_period }) : 0,
+    // Preço ajustado na subscrição (condições comerciais) prevalece sobre o do plano.
+    monthlyPrice: plan
+      ? monthlyPrice({ price: num(r.custom_price ?? plan.price), billingPeriod: plan.billing_period })
+      : 0,
     isAutoRenew: r.is_auto_renew,
     history: ((r.subscription_events ?? []) as Row[])
       .map(mapSubscriptionEvent)
@@ -177,6 +181,15 @@ export const mapRestaurant = (r: Row): Restaurant => ({
   isActive: r.is_active ?? r.isActive,
   taxRate: num(r.tax_rate ?? r.taxRate),
   settings: { ...DEFAULT_SETTINGS, ...(r.settings ?? {}) },
+  category: r.category ?? '',
+  language: r.language ?? 'pt',
+  location:
+    r.location && Number.isFinite(Number(r.location.lat)) && Number.isFinite(Number(r.location.lng))
+      ? { lat: Number(r.location.lat), lng: Number(r.location.lng) }
+      : null,
+  additionalInfo: r.additional_info ?? '',
+  openingSchedule: Array.isArray(r.opening_schedule) ? r.opening_schedule : [],
+  onboardingCompletedAt: r.onboarding_completed_at ?? null,
   createdAt: r.created_at ?? r.createdAt
 })
 
@@ -197,7 +210,40 @@ export const restaurantToRow = (r: Partial<Restaurant>): Row => {
   if (r.isActive !== undefined) row.is_active = r.isActive
   if (r.taxRate !== undefined) row.tax_rate = r.taxRate
   if (r.settings !== undefined) row.settings = r.settings
+  if (r.category !== undefined) row.category = r.category
+  if (r.language !== undefined) row.language = r.language
+  if (r.location !== undefined) row.location = r.location
+  if (r.additionalInfo !== undefined) row.additional_info = r.additionalInfo
+  if (r.openingSchedule !== undefined) row.opening_schedule = r.openingSchedule
   return row
+}
+
+// ------------------------------------------------ Pré-registos (Super Admin)
+export const INVITATION_SELECT = '*, companies(name), restaurants(name, onboarding_completed_at)'
+
+export const mapInvitation = (r: Row): EstablishmentInvitation => {
+  const company = one(r.companies)
+  const restaurant = one(r.restaurants)
+  return {
+    id: r.id,
+    tenantId: r.company_id,
+    restaurantId: opt(r.restaurant_id),
+    establishmentName: restaurant?.name ?? '',
+    companyName: company?.name ?? '',
+    ownerName: r.owner_name,
+    ownerEmail: r.owner_email,
+    ownerPhone: r.owner_phone ?? '',
+    country: r.country ?? '',
+    city: r.city ?? '',
+    internalNotes: r.internal_notes ?? '',
+    status: r.status,
+    delivery: opt(r.delivery),
+    inviteCount: r.invite_count ?? 0,
+    invitedAt: opt(r.invited_at),
+    acceptedAt: opt(r.accepted_at),
+    onboardingCompletedAt: opt(restaurant?.onboarding_completed_at),
+    createdAt: r.created_at
+  }
 }
 
 // --------------------------------------------------- Equipa e utilizadores

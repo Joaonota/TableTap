@@ -5,7 +5,7 @@ import { useAuthStore } from '@/stores/auth'
 import { useTenantStore } from '@/stores/tenant'
 import { useToastStore } from '@/stores/toast'
 import { errorMessage } from '@/domain/errors'
-import { homePathFor } from '@/router/homePath'
+import { homePathFor, pendingStepPath } from '@/router/homePath'
 import AuthCard from '@/components/auth/AuthCard.vue'
 import AppButton from '@/components/ui/AppButton.vue'
 import AppInput from '@/components/ui/AppInput.vue'
@@ -32,8 +32,8 @@ onMounted(async () => {
 })
 
 const goToApp = async () => {
-  if (authStore.needsOnboarding) return router.replace('/registo/empresa')
-  if (!authStore.currentUser) return router.replace('/403')
+  const pending = pendingStepPath(authStore)
+  if (pending) return router.replace(pending)
   await tenantStore.loadContext()
   const redirect = typeof route.query.redirect === 'string' && route.query.redirect.startsWith('/') ? route.query.redirect : ''
   return router.replace(redirect || homePathFor(authStore))
@@ -91,7 +91,7 @@ const handleLogin = async () => {
     </form>
 
     <template #footer>
-      Ainda não tem conta? <router-link to="/registo">Registe o seu restaurante</router-link>
+      O acesso ao TapMenu é criado pela nossa equipa. Ainda não tem conta? <router-link to="/precos">Fale connosco</router-link>
     </template>
   </AuthCard>
 </template>

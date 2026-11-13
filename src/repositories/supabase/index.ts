@@ -14,6 +14,7 @@ import { normalizePlanEntitlements } from '@/domain/planLimits'
 import type {
   Category,
   Company,
+  EstablishmentInvitation,
   LimitKey,
   MenuCustomization,
   Notification,
@@ -45,6 +46,10 @@ import type {
   CreateServiceRequestInput,
   IAuditLogRepository,
   IAuthRepository,
+  IEstablishmentRepository,
+  InviteDelivery,
+  InviteResult,
+  PreRegisterEstablishmentInput,
   ICategoryRepository,
   ICompanyRepository,
   IMediaRepository,
@@ -71,13 +76,13 @@ import type {
   PublicMenuContent,
   PublicOrderView,
   PublicTableContext,
-  RegisterCompanyInput,
   RegisterNfcTagsInput,
   StartSessionInput,
   TableInput
 } from '../interfaces'
 import {
   COMPANY_SELECT,
+  INVITATION_SELECT,
   ORDER_SELECT,
   PAYMENT_SELECT,
   PRODUCT_SELECT,
@@ -89,6 +94,7 @@ import {
   mapCategory,
   mapCompany,
   mapCustomization,
+  mapInvitation,
   mapNfcTag,
   mapNfcTagEvent,
   mapNotification,
@@ -138,9 +144,27 @@ export class SupabaseAuthRepository implements IAuthRepository {
     if (!profile) return null
     const membership = unwrap(await supabase.from('staff_members').select('*').eq('user_id', auth.user.id).maybeSingle())
     const user = profile.is_super_admin || (membership && membership.is_active) ? mapUser(profile, membership) : null
+
+    // Dono de um estabelecimento pré-registado que ainda não concluiu a configuração inicial.
+    let setupRestaurantId: string | null = null
+    if (!profile.is_super_admin && membership?.is_active && membership.role === 'company_owner') {
+      const pending = unwrap(
+        await supabase
+          .from('restaurants')
+          .select('id')
+          .eq('company_id', membership.company_id)
+          .is('onboarding_completed_at', null)
+          .order('created_at')
+          .limit(1)
+      ) as Json[]
+      setupRestaurantId = pending[0]?.id ?? null
+    }
+
     return {
       user,
       needsOnboarding: !profile.is_super_admin && !membership,
+      mustSetPassword: !!profile.must_change_password,
+      setupRestaurantId,
       email: profile.email,
       fullName: profile.full_name
     }
@@ -149,17 +173,6 @@ export class SupabaseAuthRepository implements IAuthRepository {
   async signIn(email: string, password: string): Promise<void> {
     const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password })
     if (error) throw toDomainError(error)
-  }
-
-  async signUp(email: string, password: string, fullName: string, redirectTo: string) {
-    const { data, error } = await supabase.auth.signUp({
-      email: email.trim(),
-      password,
-      options: { data: { full_name: fullName.trim() }, emailRedirectTo: redirectTo }
-    })
-    if (error) throw toDomainError(error)
-    // Com "Confirm email" ativo, o Supabase não devolve sessão.
-    return { needsEmailConfirmation: !data.session }
   }
 
   async signOut(): Promise<void> {
@@ -181,15 +194,18 @@ export class SupabaseAuthRepository implements IAuthRepository {
     return rpc<number>('claim_staff_invitations')
   }
 
-  async registerCompany(input: RegisterCompanyInput): Promise<string> {
-    return rpc<string>('register_company', {
-      p_company_name: input.companyName,
-      p_restaurant_name: input.restaurantName,
-      p_legal_name: input.legalName ?? null,
-      p_tax_id: input.taxId ?? null,
-      p_phone: input.phone ?? null,
-      p_city: input.city ?? null
-    })
+  async verifyEmailToken(tokenHash: string, type: 'invite' | 'recovery' | 'magiclink' | 'email'): Promise<void> {
+    const { error } = await supabase.auth.verifyOtp({ token_hash: tokenHash, type })
+    if (error) throw toDomainError(error)
+  }
+
+  async setSessionFromTokens(accessToken: string, refreshToken: string): Promise<void> {
+    const { error } = await supabase.auth.setSession({ access_token: accessToken, refresh_token: refreshToken })
+    if (error) throw toDomainError(error)
+  }
+
+  async completeFirstAccess(): Promise<void> {
+    await rpc('complete_first_access')
   }
 
   onAuthChange(callback: (event: string) => void): () => void {
@@ -274,6 +290,86 @@ export class SupabaseRestaurantRepository implements IRestaurantRepository {
     delete row.company_id
     delete row.slug // imutável: está gravado nas etiquetas NFC
     return mapRestaurant(unwrapOne(await supabase.from('restaurants').update(row).eq('id', id).select('*').single()))
+  }
+
+  async completeOnboarding(id: string): Promise<Restaurant> {
+    return mapRestaurant(await rpc('complete_restaurant_onboarding', { p_restaurant_id: id }))
+  }
+}
+
+// =====================================================================
+// Pré-registo de estabelecimentos (Super Admin)
+// =====================================================================
+export class SupabaseEstablishmentRepository implements IEstablishmentRepository {
+  private async getById(id: string): Promise<EstablishmentInvitation> {
+    const row = unwrap(await supabase.from('establishment_invitations').select(INVITATION_SELECT).eq('id', id).maybeSingle())
+    if (!row) throw new DomainError('not_found', 'Pré-registo não encontrado.')
+    return mapInvitation(row)
+  }
+
+  async getAll(): Promise<EstablishmentInvitation[]> {
+    return unwrap(
+      await supabase.from('establishment_invitations').select(INVITATION_SELECT).order('created_at', { ascending: false })
+    ).map(mapInvitation)
+  }
+
+  async preregister(input: PreRegisterEstablishmentInput): Promise<EstablishmentInvitation> {
+    const id = await rpc<string>('admin_preregister_establishment', {
+      p_data: {
+        establishmentName: input.establishmentName,
+        companyName: input.companyName,
+        ownerName: input.ownerName,
+        ownerEmail: input.ownerEmail,
+        ownerPhone: input.ownerPhone,
+        country: input.country,
+        city: input.city,
+        planId: input.planId,
+        subscriptionStatus: input.subscriptionStatus,
+        startDate: input.startDate,
+        internalNotes: input.internalNotes,
+        customPrice: input.customPrice ?? null,
+        customFeatures: input.customFeatures ?? null,
+        customLimits: input.customLimits ?? null
+      }
+    })
+    return this.getById(id)
+  }
+
+  async invite(invitationId: string, delivery: InviteDelivery, redirectTo: string): Promise<InviteResult> {
+    const { data, error } = await supabase.functions.invoke('invite-establishment', {
+      body: { invitationId, delivery, redirectTo }
+    })
+    if (error) {
+      // A função responde { error: { code, message } } com o detalhe.
+      let detail: { code?: string; message?: string } | undefined
+      try {
+        const context = (error as { context?: Response }).context
+        detail = context ? (await context.json())?.error : undefined
+      } catch {
+        detail = undefined
+      }
+      if (detail?.message) throw new DomainError(detail.code ?? 'invite_failed', detail.message)
+      throw new DomainError(
+        'invite_failed',
+        'Não foi possível contactar o serviço de convites. Confirme que a Edge Function "invite-establishment" está publicada.'
+      )
+    }
+    return { delivery: data.delivery, email: data.email, link: data.link ?? null }
+  }
+
+  async update(
+    id: string,
+    updates: Partial<Pick<EstablishmentInvitation, 'ownerName' | 'ownerPhone' | 'country' | 'city' | 'internalNotes'>>
+  ): Promise<EstablishmentInvitation> {
+    const row = clean({
+      owner_name: updates.ownerName,
+      owner_phone: updates.ownerPhone,
+      country: updates.country,
+      city: updates.city,
+      internal_notes: updates.internalNotes
+    })
+    if (Object.keys(row).length) unwrap(await supabase.from('establishment_invitations').update(row).eq('id', id))
+    return this.getById(id)
   }
 }
 

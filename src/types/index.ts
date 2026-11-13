@@ -71,6 +71,69 @@ export interface Restaurant {
     googleReviewUrl?: string
     enableGoogleReviewInvite?: boolean
   }
+  /** Categoria do estabelecimento (ver ESTABLISHMENT_CATEGORIES). */
+  category: string
+  /** Idioma principal do menu (código, ex.: 'pt'). */
+  language: string
+  /** Coordenadas do estabelecimento (opcional). */
+  location: GeoLocation | null
+  additionalInfo: string
+  /** Horário estruturado por dia da semana (openingHours guarda o resumo em texto). */
+  openingSchedule: OpeningDay[]
+  /** undefined/null = assistente de configuração inicial por concluir. */
+  onboardingCompletedAt?: string | null
+  createdAt: string
+}
+
+export interface GeoLocation {
+  lat: number
+  lng: number
+}
+
+/** Horário de um dia da semana. day: 0 = domingo … 6 = sábado. */
+export interface OpeningDay {
+  day: number
+  open: boolean
+  from: string // 'HH:MM'
+  to: string // 'HH:MM'
+}
+
+export const ESTABLISHMENT_CATEGORIES = [
+  'Restaurante',
+  'Café / Pastelaria',
+  'Bar / Lounge',
+  'Fast food',
+  'Pizzaria',
+  'Marisqueira',
+  'Churrasqueira',
+  'Hotel / Resort',
+  'Padaria',
+  'Food truck',
+  'Outro'
+] as const
+
+/** Pré-registo de um estabelecimento (dados internos da equipa TapMenu). */
+export type EstablishmentInvitationStatus = 'pending' | 'invited' | 'accepted'
+
+export interface EstablishmentInvitation {
+  id: string
+  tenantId: string
+  restaurantId?: string
+  establishmentName: string
+  companyName: string
+  ownerName: string
+  ownerEmail: string
+  ownerPhone: string
+  country: string
+  city: string
+  internalNotes: string
+  status: EstablishmentInvitationStatus
+  delivery?: 'email' | 'link'
+  inviteCount: number
+  invitedAt?: string
+  acceptedAt?: string
+  /** Data em que o responsável concluiu a configuração inicial. */
+  onboardingCompletedAt?: string
   createdAt: string
 }
 
