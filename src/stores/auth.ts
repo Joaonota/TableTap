@@ -19,6 +19,8 @@ export const useAuthStore = defineStore('auth', () => {
   const mustSetPassword = ref(false)
   /** Empresa cujo perfil (primeiro acesso) está por completar. */
   const setupCompanyId = ref<string | null>(null)
+  /** A empresa da conta foi suspensa pelo Super Admin do Sistema (acesso bloqueado). */
+  const companySuspended = ref(false)
   const accountEmail = ref('')
   const accountName = ref('')
   const isLoading = ref(false)
@@ -89,6 +91,7 @@ export const useAuthStore = defineStore('auth', () => {
       needsOnboarding.value = !!account?.needsOnboarding
       mustSetPassword.value = !!account?.mustSetPassword
       setupCompanyId.value = account?.setupCompanyId ?? null
+      companySuspended.value = !!account?.companySuspended
       accountEmail.value = account?.email ?? ''
       accountName.value = account?.fullName ?? ''
     } finally {
@@ -140,6 +143,7 @@ export const useAuthStore = defineStore('auth', () => {
       needsOnboarding.value = false
       mustSetPassword.value = false
       setupCompanyId.value = null
+      companySuspended.value = false
       try {
         localStorage.removeItem('tapmenu_selected_tenant_id')
         localStorage.removeItem('tapmenu_selected_restaurant_id')
@@ -155,6 +159,7 @@ export const useAuthStore = defineStore('auth', () => {
     needsOnboarding,
     mustSetPassword,
     setupCompanyId,
+    companySuspended,
     accountEmail,
     accountName,
     isLoading,

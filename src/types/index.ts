@@ -47,6 +47,47 @@ export interface Company {
   createdAt: string
 }
 
+/** Quantidade de dados de uma empresa (resumo antes de a eliminar). */
+export interface CompanyDataCounts {
+  restaurants: number
+  tables: number
+  tableSessions: number
+  nfcTags: number
+  categories: number
+  products: number
+  orders: number
+  payments: number
+  serviceRequests: number
+  staff: number
+  users: number
+}
+
+/** Resumo mostrado ao Super Admin do Sistema antes de eliminar uma empresa. */
+export interface CompanyDeletionPreview {
+  companyId: string
+  name: string
+  legalName: string
+  email: string
+  isActive: boolean
+  createdAt: string
+  planName: string | null
+  subscriptionStatus: string | null
+  counts: CompanyDataCounts
+  /** Contas de acesso (Supabase Auth) que serão removidas. */
+  authAccounts: number
+}
+
+export interface CompanyDeletionResult {
+  companyId: string
+  companyName: string
+  deleted: CompanyDataCounts
+  authAccountsDeleted: number
+  /** Contas que não foi possível remover agora (ficam pendentes para nova tentativa). */
+  authAccountsPending: { email: string; error: string }[]
+  storageFilesRemoved: number
+  storageError: string | null
+}
+
 export interface Restaurant {
   id: string
   tenantId: string

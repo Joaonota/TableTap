@@ -2,7 +2,7 @@ import { createRouter, createWebHistory, type RouteRecordRaw } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useTenantStore } from '@/stores/tenant'
 import { isSupabaseConfigured } from '@/lib/supabase'
-import { homePathFor, pendingStepPath, COMPANY_SETUP_PATH } from './homePath'
+import { homePathFor, pendingStepPath, COMPANY_SETUP_PATH, COMPANY_SUSPENDED_PATH } from './homePath'
 
 // Layouts
 import PublicLayout from '@/layouts/PublicLayout.vue'
@@ -39,6 +39,7 @@ const routes: RouteRecordRaw[] = [
       { path: 'registo/empresa', redirect: '/sem-estabelecimento' },
       { path: 'convite', name: 'accept-invite', component: () => import('@/pages/auth/AcceptInvitePage.vue') },
       { path: 'sem-estabelecimento', name: 'no-establishment', component: () => import('@/pages/auth/NoEstablishmentPage.vue') },
+      { path: COMPANY_SUSPENDED_PATH.slice(1), name: 'company-suspended', component: () => import('@/pages/auth/CompanySuspendedPage.vue') },
       { path: 'recuperar-palavra-passe', name: 'forgot-password', component: () => import('@/pages/auth/ForgotPasswordPage.vue') },
       { path: 'redefinir-palavra-passe', name: 'reset-password', component: () => import('@/pages/auth/ResetPasswordPage.vue') },
       { path: 'demonstracao', redirect: '/login' }

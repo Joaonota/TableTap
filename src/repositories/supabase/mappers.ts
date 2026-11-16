@@ -628,6 +628,47 @@ export const mapAuditLog = (r: Row): PlatformAuditLog => ({
   timestamp: r.created_at
 })
 
+const PLATFORM_DETAIL_LABELS: Record<string, string> = {
+  restaurants: 'estabelecimentos',
+  tables: 'mesas',
+  nfcTags: 'tags NFC',
+  products: 'produtos',
+  orders: 'pedidos',
+  payments: 'pagamentos',
+  staff: 'funcionários'
+}
+
+/** Linha do histórico administrativo global (platform_admin_logs) no formato do registo de atividade. */
+export const mapPlatformAdminLog = (r: Row): PlatformAuditLog => {
+  const d = (r.details ?? {}) as Row
+  const parts: string[] = []
+  if (d.deleted) {
+    const counts = Object.entries(PLATFORM_DETAIL_LABELS)
+      .map(([key, label]) => `${d.deleted[key] ?? 0} ${label}`)
+      .join(', ')
+    parts.push(`Eliminado: ${counts}.`)
+  }
+  if (d.authAccounts !== undefined) parts.push(`Contas de acesso a remover: ${d.authAccounts}.`)
+  if (d.authAccountsDeleted !== undefined) parts.push(`Contas de acesso removidas: ${d.authAccountsDeleted}.`)
+  if (Array.isArray(d.authAccountsFailed) && d.authAccountsFailed.length) {
+    parts.push(`Contas por remover (nova tentativa na próxima eliminação): ${d.authAccountsFailed.length}.`)
+  }
+  if (d.storageFilesRemoved !== undefined) parts.push(`Ficheiros removidos: ${d.storageFilesRemoved}.`)
+  if (d.fromPlan || d.toPlan) parts.push(`Plano: ${d.fromPlan ?? '—'} → ${d.toPlan ?? '—'}.`)
+  if (d.from || d.to) parts.push(`Estado: ${d.from ?? '—'} → ${d.to ?? '—'}.`)
+  return {
+    id: `platform-${r.id}`,
+    tenantId: undefined,
+    userId: r.actor_id ?? '',
+    userName: r.actor_name || r.actor_email || 'Sistema',
+    action: r.action,
+    resource: `${r.target_type === 'company' ? 'Empresa' : r.target_type}: ${r.target_name ?? ''}`,
+    details: parts.join(' ') || 'Operação do Super Admin do Sistema.',
+    createdAt: r.created_at,
+    timestamp: r.created_at
+  }
+}
+
 export const mapPlatformConfig = (r: Row): PlatformConfig => ({
   platformName: r.platform_name,
   supportEmail: r.support_email,

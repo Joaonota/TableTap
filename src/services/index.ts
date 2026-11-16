@@ -18,6 +18,8 @@ import type {
 } from '@/repositories/interfaces'
 import { countTables } from '@/domain/tableRules'
 import type {
+  CompanyDeletionPreview,
+  CompanyDeletionResult,
   User,
   Company,
   Restaurant,
@@ -149,6 +151,17 @@ export const tenantService = {
   /** Conclui o perfil da empresa (primeiro acesso do responsável). */
   async completeOnboarding(id: string): Promise<Company> {
     return companyRepo.completeOnboarding(id)
+  },
+  /** Suspender (bloqueia o acesso, mantém os dados) ou reativar — Super Admin do Sistema. */
+  async setCompanyActive(id: string, active: boolean): Promise<Company> {
+    return companyRepo.setActive(id, active)
+  },
+  async getCompanyDeletionPreview(id: string): Promise<CompanyDeletionPreview> {
+    return companyRepo.getDeletionPreview(id)
+  },
+  /** Eliminação permanente — Super Admin do Sistema; exige o nome da empresa como confirmação. */
+  async deleteCompanyPermanently(id: string, confirmName: string): Promise<CompanyDeletionResult> {
+    return companyRepo.deletePermanently(id, confirmName)
   }
 }
 

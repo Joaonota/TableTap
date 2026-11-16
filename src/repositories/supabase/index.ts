@@ -14,6 +14,8 @@ import { normalizePlanEntitlements } from '@/domain/planLimits'
 import type {
   Category,
   Company,
+  CompanyDeletionPreview,
+  CompanyDeletionResult,
   EstablishmentInvitation,
   LimitKey,
   MenuCustomization,
@@ -91,6 +93,7 @@ import {
   categoryToRow,
   companyToRow,
   mapAuditLog,
+  mapPlatformAdminLog,
   mapCategory,
   mapCompany,
   mapCustomization,
@@ -130,6 +133,26 @@ async function rpc<T = any>(fn: string, args: Record<string, unknown> = {}): Pro
   return data as T
 }
 
+/**
+ * Chama uma Edge Function. As funções respondem `{ error: { code, message } }`
+ * em caso de erro; a mensagem chega ao utilizador tal como está.
+ */
+async function invokeFunction<T>(name: string, body: Json, fallbackCode: string, unreachable: string): Promise<T> {
+  const { data, error } = await supabase.functions.invoke(name, { body })
+  if (error) {
+    let detail: { code?: string; message?: string } | undefined
+    try {
+      const context = (error as { context?: Response }).context
+      detail = context ? (await context.json())?.error : undefined
+    } catch {
+      detail = undefined
+    }
+    if (detail?.message) throw new DomainError(detail.code ?? fallbackCode, detail.message)
+    throw new DomainError(fallbackCode, unreachable)
+  }
+  return data as T
+}
+
 /** Remove `undefined` (o PostgREST trata-os como null). */
 const clean = (o: Json): Json => Object.fromEntries(Object.entries(o).filter(([, v]) => v !== undefined))
 
@@ -145,13 +168,17 @@ export class SupabaseAuthRepository implements IAuthRepository {
     const membership = unwrap(await supabase.from('staff_members').select('*').eq('user_id', auth.user.id).maybeSingle())
     const user = profile.is_super_admin || (membership && membership.is_active) ? mapUser(profile, membership) : null
 
-    // Dono de uma empresa pré-registada que ainda não completou o perfil da empresa.
+    // Estado da empresa: suspensa pelo Super Admin do Sistema? Perfil por completar (primeiro acesso do dono)?
     let setupCompanyId: string | null = null
-    if (!profile.is_super_admin && membership?.is_active && membership.role === 'company_owner') {
+    let companySuspended = false
+    if (!profile.is_super_admin && membership?.is_active) {
       const company = unwrap(
-        await supabase.from('companies').select('id, onboarding_completed_at').eq('id', membership.company_id).maybeSingle()
+        await supabase.from('companies').select('id, is_active, onboarding_completed_at').eq('id', membership.company_id).maybeSingle()
       ) as Json | null
-      if (company && !company.onboarding_completed_at) setupCompanyId = company.id
+      companySuspended = !!company && company.is_active === false
+      if (company && !companySuspended && membership.role === 'company_owner' && !company.onboarding_completed_at) {
+        setupCompanyId = company.id
+      }
     }
 
     return {
@@ -159,6 +186,7 @@ export class SupabaseAuthRepository implements IAuthRepository {
       needsOnboarding: !profile.is_super_admin && !membership,
       mustSetPassword: !!profile.must_change_password,
       setupCompanyId,
+      companySuspended,
       email: profile.email,
       fullName: profile.full_name
     }
@@ -242,6 +270,26 @@ export class SupabaseCompanyRepository implements ICompanyRepository {
     const company = await this.getById(id)
     if (!company) throw new DomainError('not_found', 'Empresa não encontrada.')
     return company
+  }
+
+  async setActive(id: string, active: boolean): Promise<Company> {
+    unwrap(await supabase.from('companies').update({ is_active: active }).eq('id', id))
+    const company = await this.getById(id)
+    if (!company) throw new DomainError('not_found', 'Empresa não encontrada.')
+    return company
+  }
+
+  async getDeletionPreview(id: string): Promise<CompanyDeletionPreview> {
+    return rpc<CompanyDeletionPreview>('admin_company_deletion_preview', { p_company_id: id })
+  }
+
+  async deletePermanently(id: string, confirmName: string): Promise<CompanyDeletionResult> {
+    return invokeFunction<CompanyDeletionResult>(
+      'admin-delete-company',
+      { companyId: id, confirmName },
+      'delete_failed',
+      'Não foi possível contactar o serviço de eliminação. Confirme que a Edge Function "admin-delete-company" está publicada.'
+    )
   }
 
   async update(id: string, updates: Partial<Company>): Promise<Company> {
@@ -961,9 +1009,19 @@ export class SupabasePlanAccessRepository implements IPlanAccessRepository {
 // =====================================================================
 export class SupabaseAuditLogRepository implements IAuditLogRepository {
   async getAll(filter?: { tenantId?: string; limit?: number }): Promise<PlatformAuditLog[]> {
-    let query = supabase.from('audit_logs').select('*').order('created_at', { ascending: false }).limit(filter?.limit ?? 200)
+    const limit = filter?.limit ?? 200
+    let query = supabase.from('audit_logs').select('*').order('created_at', { ascending: false }).limit(limit)
     if (filter?.tenantId) query = query.eq('company_id', filter.tenantId)
-    return unwrap(await query).map(mapAuditLog)
+    const logs = unwrap(await query).map(mapAuditLog)
+    if (filter?.tenantId) return logs
+
+    // Histórico administrativo global (só o Super Admin o lê; para os outros o RLS devolve vazio).
+    const platform = unwrap(
+      await supabase.from('platform_admin_logs').select('*').order('created_at', { ascending: false }).limit(limit)
+    ).map(mapPlatformAdminLog)
+    return [...logs, ...platform]
+      .sort((a, b) => (b.createdAt ?? '').localeCompare(a.createdAt ?? ''))
+      .slice(0, limit)
   }
 
   async create(log: Omit<PlatformAuditLog, 'id' | 'createdAt'>): Promise<PlatformAuditLog> {

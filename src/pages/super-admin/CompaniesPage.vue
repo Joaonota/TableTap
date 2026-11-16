@@ -5,12 +5,14 @@ import { tenantService, restaurantService } from '@/services'
 import { usePlatformStore } from '@/stores/platform'
 import { usePlansStore } from '@/stores/plans'
 import { useToastStore } from '@/stores/toast'
-import type { Company, Restaurant, Subscription } from '@/types'
+import type { Company, CompanyDeletionResult, Restaurant, Subscription } from '@/types'
 import AppButton from '@/components/ui/AppButton.vue'
 import AppBadge from '@/components/ui/AppBadge.vue'
 import AppModal from '@/components/ui/AppModal.vue'
 import AppInput from '@/components/ui/AppInput.vue'
 import SubscriptionManagerModal from '@/components/super-admin/SubscriptionManagerModal.vue'
+import DeleteCompanyModal from '@/components/super-admin/DeleteCompanyModal.vue'
+import ConfirmDialog from '@/components/ui/ConfirmDialog.vue'
 import {
   Building2,
   Plus,
@@ -18,7 +20,8 @@ import {
   Power,
   Store,
   ExternalLink,
-  CreditCard
+  CreditCard,
+  Trash2
 } from 'lucide-vue-next'
 
 // Novas empresas são criadas pelo pré-registo (empresa + plano + convite ao responsável).
@@ -164,16 +167,48 @@ const handleSaveCompany = async () => {
   }
 }
 
-const toggleCompanyStatus = async (comp: Company) => {
+// Suspender: bloqueia o acesso e mantém os dados (reversível). Eliminar: permanente.
+const statusTarget = ref<Company | null>(null)
+const isChangingStatus = ref(false)
+
+const askToggleStatus = (comp: Company) => {
+  statusTarget.value = comp
+}
+
+const confirmToggleStatus = async () => {
+  const comp = statusTarget.value
+  if (!comp) return
   const newStatus = !comp.isActive
+  isChangingStatus.value = true
   try {
-    const updated = await tenantService.updateCompany(comp.id, { isActive: newStatus })
+    const updated = await tenantService.setCompanyActive(comp.id, newStatus)
     const idx = companies.value.findIndex(c => c.id === comp.id)
     if (idx !== -1) companies.value[idx] = updated
-    toastStore.info('Estado Alterado', `${comp.name} agora está ${newStatus ? 'Ativa' : 'Suspensa'}`)
+    toastStore.info(newStatus ? 'Empresa reativada' : 'Empresa suspensa', `${comp.name} está agora ${newStatus ? 'ativa' : 'suspensa'}.`)
+    statusTarget.value = null
   } catch (e) {
     toastStore.error('Erro ao alterar estado', (e as Error).message)
+  } finally {
+    isChangingStatus.value = false
   }
+}
+
+const deleteTarget = ref<Company | null>(null)
+
+const handleCompanyDeleted = async (result: CompanyDeletionResult) => {
+  deleteTarget.value = null
+  companies.value = companies.value.filter(c => c.id !== result.companyId)
+  toastStore.success('Empresa eliminada', `${result.companyName} e todos os dados associados foram eliminados.`)
+  if (result.authAccountsPending.length) {
+    toastStore.warning(
+      'Contas de acesso pendentes',
+      `${result.authAccountsPending.length} conta(s) não foram removidas agora; serão tentadas de novo na próxima eliminação.`
+    )
+  }
+  if (result.storageError) {
+    toastStore.warning('Ficheiros', `Alguns ficheiros da empresa não foram removidos: ${result.storageError}`)
+  }
+  await loadData()
 }
 </script>
 
@@ -250,13 +285,22 @@ const toggleCompanyStatus = async (comp: Company) => {
               <div class="actions-row">
                 <button
                   class="action-btn"
-                  :title="comp.isActive ? 'Suspender Empresa' : 'Ativar Empresa'"
-                  @click="toggleCompanyStatus(comp)"
+                  :title="comp.isActive ? 'Suspender empresa' : 'Reativar empresa'"
+                  :aria-label="comp.isActive ? 'Suspender empresa' : 'Reativar empresa'"
+                  @click="askToggleStatus(comp)"
                 >
                   <Power :size="14" />
                 </button>
                 <button class="action-btn" title="Editar Dados" @click="openEditModal(comp)">
                   <Edit2 :size="14" />
+                </button>
+                <button
+                  class="action-btn action-btn--danger"
+                  title="Eliminar empresa"
+                  aria-label="Eliminar empresa"
+                  @click="deleteTarget = comp"
+                >
+                  <Trash2 :size="14" />
                 </button>
               </div>
             </td>
@@ -344,6 +388,28 @@ const toggleCompanyStatus = async (comp: Company) => {
         </div>
       </form>
     </AppModal>
+
+    <!-- Suspender / reativar -->
+    <ConfirmDialog
+      :is-open="!!statusTarget"
+      :title="statusTarget?.isActive ? 'Suspender empresa' : 'Reativar empresa'"
+      :message="statusTarget?.isActive
+        ? `Suspender ${statusTarget?.name}? A equipa deixa de aceder ao painel, os menus públicos ficam indisponíveis e não são aceites novos pedidos. Os dados são mantidos e pode reativar a empresa a qualquer momento.`
+        : `Reativar ${statusTarget?.name}? A equipa volta a aceder ao painel e os menus públicos ficam novamente disponíveis.`"
+      :confirm-label="statusTarget?.isActive ? 'Suspender empresa' : 'Reativar empresa'"
+      :variant="statusTarget?.isActive ? 'warning' : 'primary'"
+      :is-loading="isChangingStatus"
+      @confirm="confirmToggleStatus"
+      @cancel="statusTarget = null"
+    />
+
+    <!-- Eliminar (permanente) -->
+    <DeleteCompanyModal
+      :is-open="!!deleteTarget"
+      :company="deleteTarget"
+      @close="deleteTarget = null"
+      @deleted="handleCompanyDeleted"
+    />
 
     <!-- Subscription Manager Modal -->
     <SubscriptionManagerModal
@@ -622,6 +688,16 @@ const toggleCompanyStatus = async (comp: Company) => {
 .action-btn:hover {
   background: #e2e8f0;
   color: #0f172a;
+}
+
+.action-btn--danger {
+  color: #b91c1c;
+}
+
+.action-btn--danger:hover {
+  background: #fee2e2;
+  border-color: #fecaca;
+  color: #991b1b;
 }
 
 .text-right {

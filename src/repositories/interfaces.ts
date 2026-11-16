@@ -1,5 +1,7 @@
 import type {
   Company,
+  CompanyDeletionPreview,
+  CompanyDeletionResult,
   Restaurant,
   User,
   Table,
@@ -50,6 +52,12 @@ export interface ICompanyRepository {
   update(id: string, updates: Partial<Company>): Promise<Company>
   /** Marca o perfil da empresa (primeiro acesso do responsável) como concluído. */
   completeOnboarding(id: string): Promise<Company>
+  /** Super Admin do Sistema: suspende (bloqueia o acesso, mantém os dados) ou reativa. */
+  setActive(id: string, active: boolean): Promise<Company>
+  /** Super Admin do Sistema: resumo dos dados que serão eliminados. */
+  getDeletionPreview(id: string): Promise<CompanyDeletionPreview>
+  /** Super Admin do Sistema: elimina permanentemente a empresa e todos os dados (Edge Function). */
+  deletePermanently(id: string, confirmName: string): Promise<CompanyDeletionResult>
 }
 
 export interface IRestaurantRepository {
@@ -77,6 +85,8 @@ export interface AuthAccount {
   mustSetPassword: boolean
   /** Empresa com o perfil por completar (primeiro acesso do dono). */
   setupCompanyId: string | null
+  /** A empresa da conta foi suspensa pelo Super Admin do Sistema. */
+  companySuspended: boolean
   email: string
   fullName: string
 }
