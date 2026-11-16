@@ -34,7 +34,7 @@ import {
   ExternalLink,
   LogOut,
   Palette,
-  Sparkles
+  Crown
 } from 'lucide-vue-next'
 
 const router = useRouter()
@@ -371,7 +371,7 @@ onMounted(async () => {
               :class="{ 'is-active': route.path === '/app/meu-plano' }"
               @click="isMobileSidebarOpen = false"
             >
-              <Sparkles :size="18" />
+              <Crown :size="18" />
               <span>Meu Plano & Limites</span>
             </router-link>
 

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { Category, Product, MenuTheme } from '@/types'
-import { Plus, Sparkles, Flame, Leaf } from 'lucide-vue-next'
+import { Plus, Flame, Leaf, Star } from 'lucide-vue-next'
 
 interface Props {
   categories: Category[]
@@ -53,7 +53,7 @@ const emit = defineEmits<{
 
             <div class="hero-top-badges">
               <span v-if="prod.isPromotion && theme.experience.showPromotions" class="badge-promo">
-                <Sparkles :size="12" /> Destaque
+                <Star :size="12" /> Destaque
               </span>
               <span v-if="prod.isSpicy" class="badge-spicy">
                 <Flame :size="12" />

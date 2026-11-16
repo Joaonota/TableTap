@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { MenuTheme } from '@/types'
 import { FONT_OPTIONS } from '@/services/menuCustomizationService'
-import { Palette, Type, Sparkles } from 'lucide-vue-next'
+import { Palette, Type, SwatchBook } from 'lucide-vue-next'
 
 interface Props {
   theme: MenuTheme
@@ -72,7 +72,7 @@ const applyPalette = (pal: typeof presetPalettes[0]) => {
     <!-- Preset Palettes -->
     <div class="editor-section">
       <div class="section-head">
-        <Sparkles :size="16" class="icon-sparkle" />
+        <SwatchBook :size="16" class="icon-sparkle" />
         <h4 class="section-title">Paletas Pré-definidas</h4>
       </div>
       <div class="palettes-row">

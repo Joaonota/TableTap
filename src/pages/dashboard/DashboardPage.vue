@@ -26,7 +26,7 @@ import {
   ArrowRight,
   ExternalLink,
   Plus,
-  Sparkles
+  Crown
 } from 'lucide-vue-next'
 
 const router = useRouter()
@@ -284,7 +284,7 @@ const maxSalesAmount = () => {
       <div class="widget-header">
         <div class="widget-title-wrap">
           <div class="widget-icon">
-            <Sparkles :size="18" />
+            <Crown :size="18" />
           </div>
           <div>
             <h3 class="widget-title">

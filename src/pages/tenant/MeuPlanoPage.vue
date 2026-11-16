@@ -9,7 +9,6 @@ import UpgradeModal from '@/components/super-admin/UpgradeModal.vue'
 import AppButton from '@/components/ui/AppButton.vue'
 import AppBadge from '@/components/ui/AppBadge.vue'
 import {
-  Sparkles,
   CreditCard,
   Calendar,
   Check,
@@ -18,7 +17,8 @@ import {
   TrendingUp,
   History,
   AlertTriangle,
-  Infinity as InfinityIcon
+  Infinity as InfinityIcon,
+  Crown
 } from 'lucide-vue-next'
 
 const subscriptionStore = useSubscriptionStore()
@@ -66,7 +66,7 @@ const pendingPlanName = computed(() => {
       </div>
 
       <AppButton variant="primary" @click="isUpgradeModalOpen = true">
-        <Sparkles :size="16" />
+        <Crown :size="16" />
         <span>Mudar de plano</span>
       </AppButton>
     </div>
@@ -112,7 +112,7 @@ const pendingPlanName = computed(() => {
 
       <div class="hero-right">
         <div class="plan-badge-icon">
-          <Sparkles :size="36" />
+          <Crown :size="36" />
         </div>
         <button
           type="button"

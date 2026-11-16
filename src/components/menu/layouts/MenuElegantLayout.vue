@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { Category, Product, MenuTheme } from '@/types'
-import { Plus, Sparkles } from 'lucide-vue-next'
+import { Plus } from 'lucide-vue-next'
 
 interface Props {
   categories: Category[]

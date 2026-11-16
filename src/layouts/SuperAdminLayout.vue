@@ -9,7 +9,6 @@ import {
   Building2,
   Store,
   Users,
-  Sparkles,
   CreditCard,
   Activity,
   ArrowLeft,
@@ -22,7 +21,8 @@ import {
   DollarSign,
   BarChart3,
   Settings,
-  Nfc
+  Nfc,
+  Crown
 } from 'lucide-vue-next'
 
 const router = useRouter()
@@ -154,7 +154,7 @@ const isMobileSidebarOpen = ref(false)
             :class="{ 'is-active': route.path === '/super-admin/planos' }"
             @click="isMobileSidebarOpen = false"
           >
-            <Sparkles :size="18" />
+            <Crown :size="18" />
             <span>Planos Comerciais</span>
           </router-link>
 

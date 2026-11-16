@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { MenuLayout } from '@/types'
-import { Check, LayoutGrid, List, Sparkles, Image, AlignLeft } from 'lucide-vue-next'
+import { Check, LayoutGrid, List, Image, AlignLeft, Wine } from 'lucide-vue-next'
 
 interface Props {
   modelValue: MenuLayout
@@ -37,7 +37,7 @@ const layouts: {
     name: 'Elegante',
     subtitle: 'Fine dining & tipografia serifada',
     description: 'Estética sofisticada com inspiração em cartas de vinhos e restaurantes gourmet.',
-    icon: Sparkles
+    icon: Wine
   },
   {
     key: 'compact',

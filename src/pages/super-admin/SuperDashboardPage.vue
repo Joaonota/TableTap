@@ -14,7 +14,6 @@ import {
   CreditCard,
   TrendingUp,
   ShieldCheck,
-  Sparkles,
   ArrowRight,
   Activity,
   Layers,
@@ -101,7 +100,7 @@ const planDistributionList = computed(() => {
       <div class="super-metric-card">
         <div class="m-head">
           <span>RECEITA ANUALIZADA (ARR)</span>
-          <Sparkles :size="18" class="m-icon m-icon-blue" />
+          <TrendingUp :size="18" class="m-icon m-icon-blue" />
         </div>
         <div class="m-val">{{ platformStore.arr.toLocaleString('pt-MZ') }} MT</div>
         <div class="m-sub">Projeção 12 meses</div>

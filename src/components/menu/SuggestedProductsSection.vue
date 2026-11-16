@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import type { Product } from '@/types'
-import { Sparkles, Plus } from 'lucide-vue-next'
+import { Plus, ChefHat } from 'lucide-vue-next'
 
 const props = defineProps<{
   products: Product[]
@@ -23,7 +23,7 @@ const suggestions = computed(() => {
   <div v-if="suggestions.length > 0" class="suggestions-wrapper">
     <div class="suggestions-header">
       <div class="header-badge">
-        <Sparkles :size="16" class="sparkle-icon" />
+        <ChefHat :size="16" class="sparkle-icon" />
         <span class="badge-title">Sugestões do Chefe</span>
       </div>
       <h3 class="suggestions-title">Quer pedir mais alguma coisa?</h3>

@@ -6,7 +6,7 @@ import { useSubscriptionStore } from '@/stores/subscription'
 import AppModal from '@/components/ui/AppModal.vue'
 import AppButton from '@/components/ui/AppButton.vue'
 import AppBadge from '@/components/ui/AppBadge.vue'
-import { Check, Sparkles, ArrowRight, ShieldCheck } from 'lucide-vue-next'
+import { Check, ArrowRight, ShieldCheck, TrendingUp } from 'lucide-vue-next'
 
 interface Props {
   isOpen: boolean
@@ -56,7 +56,7 @@ const formatLimit = (limit: number | null): string => {
     <div class="upgrade-modal-content">
       <!-- Trigger notice if limit was reached -->
       <div v-if="triggerReason" class="limit-trigger-alert">
-        <Sparkles :size="20" class="alert-icon" />
+        <TrendingUp :size="20" class="alert-icon" />
         <div class="alert-text">
           <strong>Aumente a Capacidade da sua Operação</strong>
           <p>{{ triggerReason }}</p>

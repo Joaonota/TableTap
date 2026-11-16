@@ -4,7 +4,7 @@ import { subscriptionService } from '@/services'
 import type { Plan, PlanFeature } from '@/types'
 import { getPlanLimit, getFeatureCatalogEntry } from '@/types/plan'
 import AppButton from '@/components/ui/AppButton.vue'
-import { Check, Sparkles } from 'lucide-vue-next'
+import { Check, Star } from 'lucide-vue-next'
 
 const plans = ref<Plan[]>([])
 const isLoading = ref(true)
@@ -50,7 +50,7 @@ onMounted(async () => {
         :class="{ 'is-featured': plan.highlighted }"
       >
         <div v-if="plan.highlighted" class="featured-badge">
-          <Sparkles :size="13" />
+          <Star :size="13" />
           <span>MAIS POPULAR</span>
         </div>
 

@@ -7,7 +7,7 @@ import { formatLimit, planLimitValue } from '@/domain/planLimits'
 import PlanEditorModal from '@/components/super-admin/PlanEditorModal.vue'
 import AppButton from '@/components/ui/AppButton.vue'
 import AppBadge from '@/components/ui/AppBadge.vue'
-import { Plus, Edit, Sparkles, Check, CheckCircle2, ShieldCheck, Power } from 'lucide-vue-next'
+import { Plus, Edit, Check, CheckCircle2, ShieldCheck, Power, Star } from 'lucide-vue-next'
 
 const plansStore = usePlansStore()
 
@@ -78,7 +78,7 @@ const handleToggleActive = async (plan: Plan) => {
             {{ plan.active ? 'ATIVO' : 'INATIVO' }}
           </AppBadge>
           <span v-if="plan.highlighted" class="badge-tag">
-            <Sparkles :size="12" /> MAIS POPULAR
+            <Star :size="12" /> MAIS POPULAR
           </span>
         </div>
 

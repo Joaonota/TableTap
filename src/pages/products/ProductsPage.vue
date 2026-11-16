@@ -21,9 +21,9 @@ import {
   Trash2,
   CheckCircle2,
   XCircle,
-  Sparkles,
   ChefHat,
-  Wine
+  Wine,
+  Star
 } from 'lucide-vue-next'
 
 const catalogStore = useCatalogStore()
@@ -209,7 +209,7 @@ const handleDeleteProduct = async (id: string) => {
                 <div class="prod-title-row">
                   <strong>{{ prod.name }}</strong>
                   <span v-if="prod.isFeatured" class="featured-badge" title="Prato em Destaque">
-                    <Sparkles :size="12" /> Destaque
+                    <Star :size="12" /> Destaque
                   </span>
                 </div>
                 <p class="prod-desc-snippet">{{ prod.description }}</p>

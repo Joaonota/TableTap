@@ -4,7 +4,7 @@ import { usePlansStore } from '@/stores/plans'
 import type { Plan } from '@/types'
 import { FEATURE_CATALOG } from '@/types/plan'
 import AppButton from '@/components/ui/AppButton.vue'
-import { Check, X, Zap, Layers, Sparkles } from 'lucide-vue-next'
+import { Check, X, Zap, Layers } from 'lucide-vue-next'
 
 const plansStore = usePlansStore()
 const modules = ['Menu & Mesas', 'Operação', 'Pagamentos', 'Inteligência', 'Equipa', 'Avançado'] as const

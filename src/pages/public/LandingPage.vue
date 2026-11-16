@@ -11,10 +11,10 @@ import {
   BarChart3,
   CheckCircle2,
   ArrowRight,
-  Sparkles,
   Zap,
   ShieldCheck,
-  ChevronRight
+  ChevronRight,
+  Rocket
 } from 'lucide-vue-next'
 
 const router = useRouter()
@@ -53,7 +53,7 @@ const toggleFaq = (index: number) => {
     <section class="hero-section">
       <div class="hero-container">
         <div class="hero-badge">
-          <Sparkles :size="14" />
+          <Rocket :size="14" />
           <span>O Futuro dos Menus em Moçambique</span>
         </div>
 

@@ -18,9 +18,9 @@ import {
   Sliders,
   RotateCcw,
   Save,
-  Sparkles,
   Lock,
-  ArrowRight
+  ArrowRight,
+  Crown
 } from 'lucide-vue-next'
 
 const tenantStore = useTenantStore()
@@ -151,7 +151,7 @@ const handleReset = async () => {
         <p>O seu plano atual ({{ subscriptionStore.currentPlan?.name || '—' }}) utiliza o layout clássico padrão. Atualize para personalizar cores, fontes, e escolher entre 5 layouts exclusivos.</p>
       </div>
       <AppButton variant="primary" size="sm" @click="isUpgradeModalOpen = true">
-        <Sparkles :size="14" />
+        <Crown :size="14" />
         <span>Mudar de plano</span>
       </AppButton>
     </div>
