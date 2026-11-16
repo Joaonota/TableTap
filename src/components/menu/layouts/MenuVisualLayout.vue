@@ -48,6 +48,7 @@ const emit = defineEmits<{
               :src="prod.imageUrl"
               :alt="prod.name"
               class="hero-img"
+              natural
             />
             <div class="image-gradient-overlay"></div>
 
@@ -129,6 +130,7 @@ const emit = defineEmits<{
 .visual-gallery-grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
+  align-items: start;
   gap: 1.25rem;
 }
 
@@ -157,7 +159,9 @@ const emit = defineEmits<{
 .hero-image-box {
   position: relative;
   width: 100%;
-  height: 200px;
+  min-height: 200px;
+  --pi-min-h: 200px;
+  --pi-max-h: 440px;
   overflow: hidden;
 }
 

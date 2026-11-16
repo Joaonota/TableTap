@@ -45,7 +45,7 @@ const emit = defineEmits<{
           @click="emit('view-product', prod)"
         >
           <div v-if="theme.experience.showImages && prod.imageUrl" class="card-image-wrap">
-            <ProductImage :src="prod.imageUrl" :alt="prod.name" class="card-img" />
+            <ProductImage :src="prod.imageUrl" :alt="prod.name" class="card-img" natural />
             <div class="image-badges">
               <span v-if="prod.isPromotion && theme.experience.showPromotions" class="badge-promo">
                 <Tag :size="10" /> Promo
@@ -125,6 +125,7 @@ const emit = defineEmits<{
 .modern-cards-grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
+  align-items: start;
   gap: 1rem;
 }
 
@@ -155,7 +156,8 @@ const emit = defineEmits<{
 .card-image-wrap {
   position: relative;
   width: 100%;
-  height: 160px;
+  --pi-min-h: 120px;
+  --pi-max-h: 360px;
   background: #f3f4f6;
   overflow: hidden;
 }

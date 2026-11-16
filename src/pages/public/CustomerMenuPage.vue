@@ -554,7 +554,7 @@ const handleOrderMore = () => {
               @keyup.enter="openProductModal(product)"
             >
               <div class="product-image-box">
-                <ProductImage :src="product.imageUrl" :alt="product.name" class="product-thumb" />
+                <ProductImage :src="product.imageUrl" :alt="product.name" class="product-thumb" natural />
 
                 <div class="badges-corner">
                   <span v-if="product.isFeatured" class="corner-badge featured">Destaque</span>
@@ -738,7 +738,7 @@ const handleOrderMore = () => {
     >
       <div v-if="selectedProduct" class="customization-content">
         <div v-if="selectedProduct.imageUrl" class="modal-product-img">
-          <ProductImage :src="selectedProduct.imageUrl" :alt="selectedProduct.name" loading="eager" />
+          <ProductImage :src="selectedProduct.imageUrl" :alt="selectedProduct.name" loading="eager" natural />
         </div>
         <p class="modal-product-desc">{{ selectedProduct.description }}</p>
 
@@ -1557,6 +1557,7 @@ const handleOrderMore = () => {
 .products-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(min(260px, 100%), 1fr));
+  align-items: start;
   gap: 1rem;
 }
 
@@ -1592,7 +1593,9 @@ const handleOrderMore = () => {
 
 .product-image-box {
   position: relative;
-  height: 170px;
+  min-height: 140px;
+  --pi-min-h: 140px;
+  --pi-max-h: 380px;
   background-color: var(--color-slate-100);
   overflow: hidden;
 }
@@ -2004,7 +2007,8 @@ const handleOrderMore = () => {
 
 .modal-product-img {
   width: 100%;
-  height: clamp(200px, 40vh, 320px);
+  --pi-min-h: 160px;
+  --pi-max-h: 55vh;
   border-radius: var(--radius-lg);
   overflow: hidden;
 }
@@ -2453,11 +2457,7 @@ const handleOrderMore = () => {
   }
 
   .product-image-box {
-    height: 150px;
-  }
-
-  .modal-product-img {
-    height: 150px;
+    --pi-max-h: 320px;
   }
 
   .quantity-row {
