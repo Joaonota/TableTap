@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import ProductImage from '@/components/ui/ProductImage.vue'
 import { computed } from 'vue'
 import type { Product } from '@/types'
 import { Plus, ChefHat } from 'lucide-vue-next'
@@ -40,7 +41,7 @@ const suggestions = computed(() => {
         @click="emit('select-product', product)"
       >
         <div class="suggestion-img-box">
-          <img :src="product.imageUrl" :alt="product.name" class="suggestion-thumb" loading="lazy" />
+          <ProductImage :src="product.imageUrl" :alt="product.name" />
           <span v-if="product.promotionalPrice" class="promo-tag">Promo</span>
         </div>
 
@@ -157,11 +158,6 @@ const suggestions = computed(() => {
   background-color: var(--color-slate-100);
 }
 
-.suggestion-thumb {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
 
 .promo-tag {
   position: absolute;

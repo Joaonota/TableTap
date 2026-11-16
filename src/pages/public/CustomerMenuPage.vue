@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import ProductImage from '@/components/ui/ProductImage.vue'
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { publicTableService } from '@/services'
@@ -553,7 +554,7 @@ const handleOrderMore = () => {
               @keyup.enter="openProductModal(product)"
             >
               <div class="product-image-box">
-                <img :src="product.imageUrl" :alt="product.name" class="product-thumb" loading="lazy" />
+                <ProductImage :src="product.imageUrl" :alt="product.name" class="product-thumb" />
 
                 <div class="badges-corner">
                   <span v-if="product.isFeatured" class="corner-badge featured">Destaque</span>
@@ -736,7 +737,9 @@ const handleOrderMore = () => {
       @close="isProductModalOpen = false"
     >
       <div v-if="selectedProduct" class="customization-content">
-        <img :src="selectedProduct.imageUrl" :alt="selectedProduct.name" class="modal-product-img" />
+        <div v-if="selectedProduct.imageUrl" class="modal-product-img">
+          <ProductImage :src="selectedProduct.imageUrl" :alt="selectedProduct.name" loading="eager" />
+        </div>
         <p class="modal-product-desc">{{ selectedProduct.description }}</p>
 
         <!-- Variants -->
@@ -1595,9 +1598,6 @@ const handleOrderMore = () => {
 }
 
 .product-thumb {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
   transition: transform 0.3s ease;
 }
 
@@ -2004,9 +2004,9 @@ const handleOrderMore = () => {
 
 .modal-product-img {
   width: 100%;
-  height: 180px;
-  object-fit: cover;
+  height: clamp(200px, 40vh, 320px);
   border-radius: var(--radius-lg);
+  overflow: hidden;
 }
 
 .modal-product-desc {

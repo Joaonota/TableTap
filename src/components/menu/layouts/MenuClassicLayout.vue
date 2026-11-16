@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import ProductImage from '@/components/ui/ProductImage.vue'
 import type { Category, Product, MenuTheme } from '@/types'
 import { Plus, Flame, Leaf, Star } from 'lucide-vue-next'
 
@@ -68,7 +69,7 @@ const emit = defineEmits<{
           </div>
 
           <div v-if="theme.experience.showImages && prod.imageUrl" class="item-thumb-wrap">
-            <img :src="prod.imageUrl" :alt="prod.name" class="item-thumb" loading="lazy" />
+            <ProductImage :src="prod.imageUrl" :alt="prod.name" class="item-thumb" />
           </div>
 
           <button
@@ -229,11 +230,6 @@ const emit = defineEmits<{
   flex-shrink: 0;
 }
 
-.item-thumb {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
 
 .classic-add-btn {
   width: 34px;

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import ProductImage from '@/components/ui/ProductImage.vue'
 import type { Category, Product, MenuTheme } from '@/types'
 import { Plus, Flame, Leaf, Tag } from 'lucide-vue-next'
 
@@ -44,7 +45,7 @@ const emit = defineEmits<{
           @click="emit('view-product', prod)"
         >
           <div v-if="theme.experience.showImages && prod.imageUrl" class="card-image-wrap">
-            <img :src="prod.imageUrl" :alt="prod.name" class="card-img" loading="lazy" />
+            <ProductImage :src="prod.imageUrl" :alt="prod.name" class="card-img" />
             <div class="image-badges">
               <span v-if="prod.isPromotion && theme.experience.showPromotions" class="badge-promo">
                 <Tag :size="10" /> Promo
@@ -154,15 +155,12 @@ const emit = defineEmits<{
 .card-image-wrap {
   position: relative;
   width: 100%;
-  height: 140px;
+  height: 160px;
   background: #f3f4f6;
   overflow: hidden;
 }
 
 .card-img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
   transition: transform 0.3s ease;
 }
 

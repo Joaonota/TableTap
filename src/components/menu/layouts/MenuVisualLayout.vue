@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import ProductImage from '@/components/ui/ProductImage.vue'
 import type { Category, Product, MenuTheme } from '@/types'
 import { Plus, Flame, Leaf, Star } from 'lucide-vue-next'
 
@@ -42,12 +43,11 @@ const emit = defineEmits<{
           @click="emit('view-product', prod)"
         >
           <div class="hero-image-box">
-            <img
+            <ProductImage
               v-if="prod.imageUrl"
               :src="prod.imageUrl"
               :alt="prod.name"
               class="hero-img"
-              loading="lazy"
             />
             <div class="image-gradient-overlay"></div>
 
@@ -162,9 +162,6 @@ const emit = defineEmits<{
 }
 
 .hero-img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
   transition: transform 0.4s ease;
 }
 
