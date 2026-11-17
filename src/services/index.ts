@@ -14,8 +14,10 @@ import type {
   PublicMenuContent,
   PublicOrderView,
   PlanChangeRequest,
-  MediaKind
+  MediaKind,
+  ReviewDashboardQuery
 } from '@/repositories/interfaces'
+import type { ReviewDeviceType, ReviewTrackEvent } from '@/domain/reviews'
 import { countTables } from '@/domain/tableRules'
 import type {
   CompanyDeletionPreview,
@@ -45,7 +47,10 @@ import type {
   DashboardMetrics,
   PlatformAuditLog,
   PlatformConfig,
-  EstablishmentInvitation
+  EstablishmentInvitation,
+  SessionClosure,
+  ReviewDashboard,
+  PublishedReviewsSummary
 } from '@/types'
 
 export type {
@@ -63,7 +68,8 @@ export type {
   PublicMenuContent,
   PublicOrderView,
   PlanChangeRequest,
-  MediaKind
+  MediaKind,
+  ReviewDashboardQuery
 }
 
 // Repositórios (fonte única em src/repositories/index.ts)
@@ -88,7 +94,8 @@ const {
   subscriptions: subscriptionRepo,
   auditLogs: auditRepo,
   platformConfig: platformConfigRepo,
-  establishments: establishmentRepo
+  establishments: establishmentRepo,
+  reviews: reviewRepo
 } = repositories
 
 // ================= Autenticação (Supabase Auth) =================
@@ -292,6 +299,28 @@ export const publicTableService = {
   },
   getOrder(orderId: string): Promise<PublicOrderView | null> {
     return publicMenuRepo.getOrder(orderId)
+  },
+  getSessionClosure(sessionId: string, participantToken: string, deviceType?: ReviewDeviceType): Promise<SessionClosure> {
+    return publicMenuRepo.getSessionClosure(sessionId, participantToken, deviceType)
+  },
+  trackReviewRequest(requestId: string, participantToken: string, event: ReviewTrackEvent): Promise<string> {
+    return publicMenuRepo.trackReviewRequest(requestId, participantToken, event)
+  }
+}
+
+// ================= Avaliações =================
+export const reviewService = {
+  /** Pedidos de avaliação feitos pelo TapMenu (não são avaliações publicadas). */
+  getDashboard(query: ReviewDashboardQuery): Promise<ReviewDashboard> {
+    return reviewRepo.getDashboard(query)
+  },
+  /**
+   * Avaliações publicadas no Google. A integração oficial (Google Business
+   * Profile) ainda não existe: devolve sempre 'not_connected', nunca dados
+   * simulados. Quando existir, este é o único ponto a ligar.
+   */
+  async getPublishedSummary(_restaurantId: string): Promise<PublishedReviewsSummary> {
+    return { status: 'not_connected' }
   }
 }
 

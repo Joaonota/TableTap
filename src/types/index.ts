@@ -115,9 +115,12 @@ export interface Restaurant {
     serviceFeePercent: number
     themeAccentColor: string
     enabledPaymentMethods: PaymentMethod[]
-    googleReviewUrl?: string
-    enableGoogleReviewInvite?: boolean
   }
+  /**
+   * Link oficial de avaliação do estabelecimento no Google ('' = sem link).
+   * Apresentado ao cliente só depois de a sessão da mesa ser encerrada.
+   */
+  googleReviewUrl: string
   /** Categoria do estabelecimento (ver ESTABLISHMENT_CATEGORIES). */
   category: string
   /** Idioma principal do menu (código, ex.: 'pt'). */
@@ -739,3 +742,85 @@ export interface SmartInsight {
 }
 
 
+
+// =====================================================================
+// AVALIAÇÕES (pedidos de avaliação no Google após a sessão da mesa)
+// Ver src/domain/reviews.ts e a migração 1000.
+// =====================================================================
+
+/** Pedido de avaliação apresentado no ecrã de agradecimento do cliente. */
+export interface ReviewRequestRef {
+  id: string
+  provider: import('@/domain/reviews').ReviewProvider
+  url: string
+  status: import('@/domain/reviews').ReviewRequestStatus
+}
+
+/** Estado final da sessão, visto pelo telemóvel de um participante. */
+export interface SessionClosure {
+  sessionId: string
+  status: TableSession['status']
+  closedAt: string | null
+  restaurant: { id: string; name: string; logoUrl: string }
+  /** null = sessão não encerrada, cancelada ou estabelecimento sem link. */
+  reviewRequest: ReviewRequestRef | null
+}
+
+export interface ReviewRestaurantStats {
+  restaurantId: string
+  restaurantName: string
+  hasReviewUrl: boolean
+  /** Sessões encerradas no período. */
+  closedSessions: number
+  /** Sessões encerradas com pelo menos um pedido apresentado. */
+  requestedSessions: number
+  /** Pedidos apresentados (um por telemóvel participante). */
+  presented: number
+  /** Clientes que tocaram em "Avaliar no Google". */
+  opened: number
+  /** Clientes cujo navegador saiu para o Google (automático ou botão). */
+  forwarded: number
+  /** Encaminhados automaticamente no fim da sessão. */
+  autoRedirected: number
+  /** Clientes que chegaram ao Google, por qualquer via. */
+  reached: number
+}
+
+export interface ReviewRequestRow {
+  id: string
+  restaurantId: string
+  restaurantName: string
+  tableSessionId: string
+  tableNumber: string | null
+  provider: import('@/domain/reviews').ReviewProvider
+  status: import('@/domain/reviews').ReviewRequestStatus
+  redirectMode: import('@/domain/reviews').ReviewRedirectMode | null
+  reviewUrl: string
+  deviceType: import('@/domain/reviews').ReviewDeviceType | null
+  presentedAt: string
+  openedAt: string | null
+  forwardedAt: string | null
+}
+
+export interface ReviewDashboard {
+  from: string
+  to: string
+  byRestaurant: ReviewRestaurantStats[]
+  recent: ReviewRequestRow[]
+}
+
+/**
+ * Avaliações PUBLICADAS no Google (classificação média, comentários,
+ * respostas…). Só existirão com a integração oficial do Google Business
+ * Profile; até lá o estado é sempre 'not_connected' e não há dados —
+ * o TapMenu nunca apresenta avaliações simuladas.
+ */
+export type PublishedReviewsSummary =
+  | { status: 'not_connected' }
+  | {
+      status: 'connected'
+      provider: import('@/domain/reviews').ReviewProvider
+      averageRating: number
+      totalReviews: number
+      lastSyncedAt: string
+    }

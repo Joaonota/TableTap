@@ -199,6 +199,7 @@ export const mapRestaurant = (r: Row): Restaurant => ({
   additionalInfo: r.additional_info ?? '',
   openingSchedule: Array.isArray(r.opening_schedule) ? r.opening_schedule : [],
   onboardingCompletedAt: r.onboarding_completed_at ?? null,
+  googleReviewUrl: r.google_review_url ?? r.googleReviewUrl ?? '',
   createdAt: r.created_at ?? r.createdAt
 })
 
@@ -223,6 +224,7 @@ export const restaurantToRow = (r: Partial<Restaurant>): Row => {
   if (r.language !== undefined) row.language = r.language
   if (r.location !== undefined) row.location = r.location
   if (r.additionalInfo !== undefined) row.additional_info = r.additionalInfo
+  if (r.googleReviewUrl !== undefined) row.google_review_url = r.googleReviewUrl.trim() || null
   if (r.openingSchedule !== undefined) row.opening_schedule = r.openingSchedule
   return row
 }

@@ -11,6 +11,7 @@ import { supabase, MEDIA_BUCKET } from '@/lib/supabase'
 import { toDomainError, unwrap, unwrapOne } from '@/lib/supabaseErrors'
 import { DomainError } from '@/domain/errors'
 import { normalizePlanEntitlements } from '@/domain/planLimits'
+import type { ReviewDeviceType, ReviewTrackEvent } from '@/domain/reviews'
 import type {
   Category,
   Company,
@@ -32,7 +33,9 @@ import type {
   PlatformConfig,
   Product,
   Restaurant,
+  ReviewDashboard,
   ServiceRequest,
+  SessionClosure,
   ServiceRequestStatus,
   SessionParticipant,
   StaffMember,
@@ -65,6 +68,8 @@ import type {
   IPlatformConfigRepository,
   IProductRepository,
   IPublicMenuRepository,
+  IReviewRepository,
+  ReviewDashboardQuery,
   IRestaurantRepository,
   IServiceRequestRepository,
   IStaffRepository,
@@ -1113,6 +1118,58 @@ export class SupabasePublicMenuRepository implements IPublicMenuRepository {
     const result = await rpc<Json | null>('get_public_order', { p_order_id: orderId })
     if (!result) return null
     return { order: normalizeOrderJson(result.order), restaurant: result.restaurant }
+  }
+
+  async getSessionClosure(sessionId: string, participantToken: string, deviceType?: ReviewDeviceType): Promise<SessionClosure> {
+    const r = await rpc<Json>('get_session_closure', {
+      p_session_id: sessionId,
+      p_participant_token: participantToken,
+      p_device_type: deviceType ?? null
+    })
+    return {
+      sessionId: r.sessionId,
+      status: r.status,
+      closedAt: r.closedAt ?? null,
+      restaurant: { id: r.restaurant.id, name: r.restaurant.name, logoUrl: r.restaurant.logoUrl ?? '' },
+      reviewRequest: r.reviewRequest ?? null
+    }
+  }
+
+  trackReviewRequest(requestId: string, participantToken: string, event: ReviewTrackEvent): Promise<string> {
+    return rpc<string>('track_review_request', { p_request_id: requestId, p_participant_token: participantToken, p_event: event })
+  }
+}
+
+// =====================================================================
+// Avaliações (painel do proprietário)
+// =====================================================================
+export class SupabaseReviewRepository implements IReviewRepository {
+  async getDashboard(query: ReviewDashboardQuery): Promise<ReviewDashboard> {
+    const r = await rpc<Json>('get_review_dashboard', {
+      p_company_id: query.companyId,
+      p_restaurant_id: query.restaurantId ?? null,
+      p_from: query.from.toISOString(),
+      p_to: query.to ? query.to.toISOString() : null,
+      p_recent_limit: query.recentLimit ?? 20
+    })
+    const n = (v: unknown) => Number(v ?? 0)
+    return {
+      from: r.from,
+      to: r.to,
+      byRestaurant: ((r.byRestaurant ?? []) as Json[]).map(x => ({
+        restaurantId: x.restaurantId,
+        restaurantName: x.restaurantName,
+        hasReviewUrl: !!x.hasReviewUrl,
+        closedSessions: n(x.closedSessions),
+        requestedSessions: n(x.requestedSessions),
+        presented: n(x.presented),
+        opened: n(x.opened),
+        forwarded: n(x.forwarded),
+        autoRedirected: n(x.autoRedirected),
+        reached: n(x.reached)
+      })),
+      recent: (r.recent ?? []) as ReviewDashboard['recent']
+    }
   }
 }
 

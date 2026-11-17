@@ -14,8 +14,10 @@ import type {
   ProductAddon,
   PaymentMethod,
   ServiceRequestType,
-  Order
+  Order,
+  SessionClosure
 } from '@/types'
+import { AUTO_REDIRECT_DELAY_MS, detectDeviceType } from '@/domain/reviews'
 
 // UI Components
 import AppButton from '@/components/ui/AppButton.vue'
@@ -27,6 +29,7 @@ import UnavailableNoticeScreen from '@/components/menu/UnavailableNoticeScreen.v
 import SessionHistoryModal from '@/components/menu/SessionHistoryModal.vue'
 import BillRequestModal from '@/components/menu/BillRequestModal.vue'
 import SuggestedProductsSection from '@/components/menu/SuggestedProductsSection.vue'
+import SessionClosedScreen from '@/components/menu/SessionClosedScreen.vue'
 
 import {
   Search,
@@ -140,6 +143,104 @@ const loadSessionOrders = async () => {
   }
 }
 
+// ---------------------------------------------------------------------
+// Fim da sessão → ecrã de agradecimento → "Avaliar no Google"
+// O pedido de avaliação só aparece DEPOIS de a equipa encerrar a sessão.
+// ---------------------------------------------------------------------
+const closure = ref<SessionClosure | null>(null)
+/** Sessões encerradas há mais tempo do que isto já não mostram o ecrã. */
+const CLOSURE_MAX_AGE_MS = 12 * 60 * 60 * 1000
+/** Momento em que o cliente tocou em "Avaliar no Google" (para detetar a saída para o Google). */
+let reviewClickedAt = 0
+
+/**
+ * Encaminhamento automático: com a sessão encerrada (conta paga e confirmada
+ * pela equipa), o Google abre sozinho após AUTO_REDIRECT_DELAY_MS — só na
+ * primeira vez (pedido ainda "apresentado"). Ao voltar, o cliente vê o ecrã
+ * normal com o botão. O cliente pode cancelar ("Ficar no TapMenu").
+ */
+const isRedirecting = ref(false)
+let redirectTimer: number | undefined
+
+const cancelAutoRedirect = () => {
+  window.clearTimeout(redirectTimer)
+  redirectTimer = undefined
+  isRedirecting.value = false
+}
+
+const scheduleAutoRedirect = () => {
+  const request = closure.value?.reviewRequest
+  if (!request || request.status !== 'presented') return
+  isRedirecting.value = true
+  redirectTimer = window.setTimeout(async () => {
+    const token = tableSessionStore.endedParticipation?.token
+    if (!isRedirecting.value || !token) return
+    // Registar antes de sair da página (sem bloquear mais de 1,2 s).
+    await Promise.race([
+      publicTableService.trackReviewRequest(request.id, token, 'auto_redirected').catch(() => {}),
+      new Promise(resolve => window.setTimeout(resolve, 1200))
+    ])
+    if (!isRedirecting.value) return
+    isRedirecting.value = false
+    if (closure.value?.reviewRequest) closure.value.reviewRequest.status = 'forwarded'
+    window.location.assign(request.url)
+  }, AUTO_REDIRECT_DELAY_MS)
+}
+
+const loadClosure = async () => {
+  const ended = tableSessionStore.endedParticipation
+  if (!ended?.token) {
+    closure.value = null
+    return
+  }
+  if (closure.value?.sessionId === ended.sessionId) return
+  try {
+    const result = await publicTableService.getSessionClosure(ended.sessionId, ended.token, detectDeviceType())
+    const tooOld = !!result.closedAt && Date.now() - new Date(result.closedAt).getTime() > CLOSURE_MAX_AGE_MS
+    if (result.status === 'closed' && !tooOld) {
+      closure.value = result
+      hasEnteredMenu.value = false
+      scheduleAutoRedirect()
+      return
+    }
+    if (result.status === 'cancelled' && !tooOld) {
+      toastStore.info('Sessão encerrada', 'A sessão desta mesa foi encerrada pelo restaurante.')
+    }
+  } catch {
+    // Sem confirmação do servidor: não mostrar o pedido de avaliação.
+  }
+  tableSessionStore.dismissEnded()
+  closure.value = null
+}
+
+watch(() => tableSessionStore.endedParticipation?.sessionId, loadClosure)
+
+const handleReviewClick = () => {
+  const request = closure.value?.reviewRequest
+  const token = tableSessionStore.endedParticipation?.token
+  if (!request || !token) return
+  cancelAutoRedirect()
+  reviewClickedAt = Date.now()
+  // Apenas regista o clique; o link abre normalmente (não é bloqueado).
+  publicTableService.trackReviewRequest(request.id, token, 'google_opened').catch(() => {})
+}
+
+/** O navegador saiu do TapMenu logo após o clique → cliente encaminhado para o Google. */
+const trackForwardedIfLeaving = () => {
+  const request = closure.value?.reviewRequest
+  const token = tableSessionStore.endedParticipation?.token
+  if (!request || !token || !reviewClickedAt || Date.now() - reviewClickedAt > 15000) return
+  reviewClickedAt = 0
+  publicTableService.trackReviewRequest(request.id, token, 'forwarded').catch(() => {})
+}
+
+const handleClosureBack = () => {
+  cancelAutoRedirect()
+  tableSessionStore.dismissEnded()
+  closure.value = null
+  hasEnteredMenu.value = false
+}
+
 const loadMenu = async () => {
   isLoading.value = true
   hasEnteredMenu.value = false
@@ -149,6 +250,7 @@ const loadMenu = async () => {
       router.replace({ name: 'not-found', params: { pathMatch: route.path.substring(1).split('/') } })
       return
     }
+    await loadClosure()
     cartStore.setRestaurantAndTable(restaurant.value, table.value)
 
     // Menu publicado: só categorias e produtos ativos.
@@ -170,17 +272,58 @@ watch(() => [restaurantSlug.value, tableKey.value], loadMenu)
 
 /** Ao voltar à página, o estado da mesa pode ter mudado (ex.: sessão encerrada). */
 const onVisibilityChange = async () => {
-  if (document.visibilityState !== 'visible' || !table.value) return
+  if (document.visibilityState === 'hidden') {
+    trackForwardedIfLeaving()
+    return
+  }
+  if (!table.value || closure.value) return
   const wasParticipant = isSessionActive.value
   await tableSessionStore.refresh()
-  if (wasParticipant && !isSessionActive.value) {
-    hasEnteredMenu.value = false
-    toastStore.info('Sessão encerrada', 'A sessão desta mesa foi encerrada pelo restaurante.')
-  }
+  // Sessão terminada: o watcher de endedParticipation mostra o ecrã final.
+  if (wasParticipant && !isSessionActive.value) hasEnteredMenu.value = false
   await loadSessionOrders()
 }
-onMounted(() => document.addEventListener('visibilitychange', onVisibilityChange))
-onUnmounted(() => document.removeEventListener('visibilitychange', onVisibilityChange))
+
+/**
+ * Enquanto participa numa sessão ativa, o telemóvel verifica periodicamente
+ * se a equipa a encerrou (para mostrar o ecrã final sem o cliente ter de
+ * recarregar a página). Depois de pedir a conta verifica mais vezes, para o
+ * encaminhamento para o Google acontecer logo após a confirmação.
+ */
+const SESSION_POLL_MS = 15000
+const SESSION_POLL_AFTER_BILL_MS = 4000
+let sessionPollTimer: number | undefined
+let isUnmounted = false
+
+const scheduleSessionPoll = () => {
+  if (isUnmounted) return
+  const delay = activeSession.value?.billRequestedAt ? SESSION_POLL_AFTER_BILL_MS : SESSION_POLL_MS
+  sessionPollTimer = window.setTimeout(pollSession, delay)
+}
+
+const pollSession = async () => {
+  try {
+    if (document.visibilityState === 'visible' && isSessionActive.value && !closure.value) {
+      await tableSessionStore.refresh()
+      if (!isSessionActive.value) hasEnteredMenu.value = false
+    }
+  } catch {
+    // Sem rede: tenta de novo no próximo ciclo.
+  } finally {
+    scheduleSessionPoll()
+  }
+}
+
+onMounted(() => {
+  document.addEventListener('visibilitychange', onVisibilityChange)
+  scheduleSessionPoll()
+})
+onUnmounted(() => {
+  isUnmounted = true
+  document.removeEventListener('visibilitychange', onVisibilityChange)
+  window.clearTimeout(sessionPollTimer)
+  cancelAutoRedirect()
+})
 
 // Keep orders updated if session changes
 watch(() => activeSession.value?.orderIds.length, loadSessionOrders)
@@ -356,6 +499,19 @@ const handleOrderMore = () => {
     <UtensilsCrossed :size="36" class="spin-icon" />
     <p class="loading-text">A preparar o menu digital da mesa...</p>
   </div>
+
+  <!-- Sessão encerrada: agradecimento e convite (voluntário) para avaliar no Google -->
+  <SessionClosedScreen
+    v-else-if="closure"
+    :restaurant-name="closure.restaurant.name"
+    :logo-url="closure.restaurant.logoUrl || restaurant?.logoUrl"
+    :cover-image="restaurant?.coverImage"
+    :review-url="closure.reviewRequest?.url ?? null"
+    :redirecting="isRedirecting"
+    @review-click="handleReviewClick"
+    @cancel-redirect="cancelAutoRedirect"
+    @back="handleClosureBack"
+  />
 
   <!-- Mesa indisponível ou desativada -->
   <UnavailableNoticeScreen

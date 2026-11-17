@@ -9,13 +9,15 @@ import AppButton from '@/components/ui/AppButton.vue'
 import AppInput from '@/components/ui/AppInput.vue'
 import AppSelect from '@/components/ui/AppSelect.vue'
 import type { PaymentMethod } from '@/types'
+import GoogleReviewLinkEditor from '@/components/establishments/GoogleReviewLinkEditor.vue'
 import {
   Settings,
   Store,
   Building2,
   DollarSign,
   CheckCircle2,
-  ImageIcon
+  ImageIcon,
+  Star
 } from 'lucide-vue-next'
 
 const tenantStore = useTenantStore()
@@ -286,6 +288,22 @@ const handleSaveSettings = async () => {
             type="email"
           />
         </div>
+      </div>
+
+      <!-- Avaliações Google (por estabelecimento) -->
+      <div v-if="tenantStore.currentRestaurant" class="app-card">
+        <div class="card-header">
+          <div class="header-icon"><Star :size="18" /></div>
+          <div>
+            <h2 class="card-title">Avaliações Google</h2>
+            <p class="card-desc">
+              Link próprio de <strong>{{ tenantStore.currentRestaurant.name }}</strong> (estabelecimento selecionado no topo).
+              Guardado à parte, com o botão Guardar deste cartão.
+            </p>
+          </div>
+        </div>
+
+        <GoogleReviewLinkEditor :restaurant="tenantStore.currentRestaurant" />
       </div>
 
       <!-- Imagens (Supabase Storage) -->

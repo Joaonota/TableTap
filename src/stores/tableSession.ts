@@ -42,6 +42,41 @@ function writeParticipation(tableId: string, value: DeviceParticipation | null) 
   }
 }
 
+/**
+ * Participação numa sessão que entretanto terminou (encerrada pela equipa).
+ * Guardada para mostrar o ecrã de agradecimento; expira ao fim de ENDED_TTL_MS.
+ */
+export interface EndedParticipation extends DeviceParticipation {
+  endedAt: number
+}
+
+const ENDED_TTL_MS = 6 * 60 * 60 * 1000
+const endedKey = (tableId: string) => `tapmenu_ended_session_${tableId}`
+
+function readEnded(tableId: string): EndedParticipation | null {
+  try {
+    const raw = localStorage.getItem(endedKey(tableId))
+    if (!raw) return null
+    const value = JSON.parse(raw) as EndedParticipation
+    if (!value?.token || Date.now() - value.endedAt > ENDED_TTL_MS) {
+      localStorage.removeItem(endedKey(tableId))
+      return null
+    }
+    return value
+  } catch {
+    return null
+  }
+}
+
+function writeEnded(tableId: string, value: EndedParticipation | null) {
+  try {
+    if (value) localStorage.setItem(endedKey(tableId), JSON.stringify(value))
+    else localStorage.removeItem(endedKey(tableId))
+  } catch {
+    // Sem armazenamento local: o ecrã de agradecimento dura apenas esta visita.
+  }
+}
+
 export type TableAccessState = 'not_found' | 'unavailable' | 'free' | 'occupied'
 
 export const useTableSessionStore = defineStore('tableSession', () => {
@@ -51,6 +86,8 @@ export const useTableSessionStore = defineStore('tableSession', () => {
   const table = ref<Table | null>(null)
   const currentSession = ref<TableSession | null>(null)
   const participation = ref<DeviceParticipation | null>(null)
+  /** Sessão em que este dispositivo participou e que já terminou. */
+  const endedParticipation = ref<EndedParticipation | null>(null)
   const isLoading = ref(false)
   const isSubmitting = ref(false)
 
@@ -76,14 +113,29 @@ export const useTableSessionStore = defineStore('tableSession', () => {
     currentSession.value = ctx?.activeSession ?? null
     if (!ctx) {
       participation.value = null
+      endedParticipation.value = null
       return
     }
     const stored = readParticipation(ctx.table.id)
     const session = ctx.activeSession
     const valid = !!stored && !!session && stored.sessionId === session.id && session.participants.some(p => p.id === stored.participantId)
     participation.value = valid ? stored : null
-    // Participação de uma sessão já encerrada: descartar.
-    if (stored && !valid) writeParticipation(ctx.table.id, null)
+    if (stored && !valid) {
+      // A sessão deste dispositivo terminou: guardar a referência para o ecrã
+      // de agradecimento (o servidor confirma se foi encerrada ou cancelada).
+      writeParticipation(ctx.table.id, null)
+      const sessionEnded = !session || session.id !== stored.sessionId
+      if (sessionEnded && stored.token) writeEnded(ctx.table.id, { ...stored, endedAt: Date.now() })
+    }
+    // A participar numa nova sessão: a anterior já não interessa.
+    if (participation.value) writeEnded(ctx.table.id, null)
+    endedParticipation.value = participation.value ? null : readEnded(ctx.table.id)
+  }
+
+  /** O cliente fechou o ecrã de agradecimento (ou ele já não se aplica). */
+  const dismissEnded = () => {
+    if (table.value) writeEnded(table.value.id, null)
+    endedParticipation.value = null
   }
 
   /** Consulta o estado atual da mesa a partir da URL pública. */
@@ -105,6 +157,8 @@ export const useTableSessionStore = defineStore('tableSession', () => {
     currentSession.value = session
     participation.value = { sessionId: session.id, participantId: participant.id, name: participant.name, token: participant.token }
     writeParticipation(session.tableId, participation.value)
+    writeEnded(session.tableId, null)
+    endedParticipation.value = null
   }
 
   /** Mesa livre → inicia a sessão (mesa passa a Ocupada). */
@@ -173,6 +227,7 @@ export const useTableSessionStore = defineStore('tableSession', () => {
     table,
     currentSession,
     participation,
+    endedParticipation,
     isLoading,
     isSubmitting,
     accessState,
@@ -183,6 +238,7 @@ export const useTableSessionStore = defineStore('tableSession', () => {
     refresh,
     startSession,
     joinSession,
-    requestBill
+    requestBill,
+    dismissEnded
   }
 })

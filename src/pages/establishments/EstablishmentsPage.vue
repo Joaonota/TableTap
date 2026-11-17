@@ -12,7 +12,8 @@ import AppModal from '@/components/ui/AppModal.vue'
 import AppInput from '@/components/ui/AppInput.vue'
 import ImageUploadField from '@/components/ui/ImageUploadField.vue'
 import PlanLimitNotice from '@/components/plans/PlanLimitNotice.vue'
-import { Plus, Edit2, Power, Store, MapPin, Phone, ArrowRight } from 'lucide-vue-next'
+import GoogleReviewLinkEditor from '@/components/establishments/GoogleReviewLinkEditor.vue'
+import { Plus, Edit2, Power, Store, MapPin, Phone, ArrowRight, Star } from 'lucide-vue-next'
 
 /**
  * Estabelecimentos da empresa. O responsável cria e gere os seus
@@ -134,6 +135,7 @@ const handleSave = async () => {
         language: 'pt',
         location: null,
         additionalInfo: '',
+        googleReviewUrl: '',
         settings: {
           allowCustomerOrdering: true,
           requireTableForOrder: true,
@@ -163,6 +165,14 @@ const toggleActive = async (r: Restaurant) => {
   } catch (e) {
     toastStore.error('Erro ao alterar estado', (e as Error).message)
   }
+}
+
+// ---------------- Google (link de avaliação próprio de cada estabelecimento) ----------------
+const googleRestaurantId = ref<string | null>(null)
+/** Sempre a versão atual do estabelecimento (atualizada após guardar). */
+const googleRestaurant = computed(() => establishments.value.find(r => r.id === googleRestaurantId.value) ?? null)
+const openGoogle = (r: Restaurant) => {
+  googleRestaurantId.value = r.id
 }
 
 /** Passa a gerir este estabelecimento (mesas, tags, menu…). */
@@ -220,6 +230,10 @@ const manage = (r: Restaurant) => {
           <li><MapPin :size="14" /> {{ [r.address?.street, r.address?.city].filter(Boolean).join(', ') || '—' }}</li>
           <li v-if="r.phone"><Phone :size="14" /> {{ r.phone }}</li>
           <li v-if="r.openingHours" class="muted">{{ r.openingHours }}</li>
+          <li class="google-line" :class="r.googleReviewUrl ? 'is-ok' : 'is-missing'">
+            <Star :size="14" />
+            {{ r.googleReviewUrl ? 'Link do Google configurado' : 'Sem link do Google' }}
+          </li>
         </ul>
         <footer class="card-actions">
           <button class="icon-btn" :title="r.isActive ? 'Desativar' : 'Ativar'" @click="toggleActive(r)">
@@ -228,6 +242,10 @@ const manage = (r: Restaurant) => {
           <button class="icon-btn" title="Editar" @click="openEdit(r)">
             <Edit2 :size="14" />
           </button>
+          <AppButton size="sm" variant="ghost" :title="`Link de avaliação Google de ${r.name}`" @click="openGoogle(r)">
+            <template #icon-left><Star :size="14" /></template>
+            Google
+          </AppButton>
           <AppButton size="sm" variant="outline" @click="manage(r)">
             Gerir
             <template #icon-right><ArrowRight :size="14" /></template>
@@ -307,6 +325,16 @@ const manage = (r: Restaurant) => {
           </AppButton>
         </div>
       </form>
+    </AppModal>
+
+    <!-- Estabelecimento → Configurações → Google -->
+    <AppModal
+      :is-open="!!googleRestaurant"
+      :title="googleRestaurant ? `Google — ${googleRestaurant.name}` : 'Google'"
+      max-width="560px"
+      @close="googleRestaurantId = null"
+    >
+      <GoogleReviewLinkEditor v-if="googleRestaurant" :restaurant="googleRestaurant" />
     </AppModal>
   </div>
 </template>
@@ -429,6 +457,14 @@ const manage = (r: Restaurant) => {
   display: flex;
   align-items: center;
   gap: 0.4rem;
+}
+
+.meta li.google-line.is-ok {
+  color: var(--color-success-700, #047857);
+}
+
+.meta li.google-line.is-missing {
+  color: var(--color-warning-700, #b45309);
 }
 
 .card-actions {

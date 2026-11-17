@@ -101,6 +101,7 @@ const routes: RouteRecordRaw[] = [
       { path: 'pagamentos', name: 'admin-payments', component: () => import('@/pages/payments/PaymentsPage.vue'), meta: { permission: 'manage_orders' } },
       { path: 'funcionarios', name: 'admin-staff', component: () => import('@/pages/staff/StaffPage.vue'), meta: { permission: 'manage_staff' } },
       { path: 'relatorios', name: 'admin-reports', component: () => import('@/pages/reports/ReportsPage.vue'), meta: { permission: 'view_reports' } },
+      { path: 'avaliacoes', name: 'admin-reviews', component: () => import('@/pages/reviews/ReviewsPage.vue'), meta: { permission: 'view_reports' } },
       { path: 'configuracoes', name: 'admin-settings', component: () => import('@/pages/settings/SettingsPage.vue'), meta: { permission: 'manage_restaurants' } }
     ]
   },

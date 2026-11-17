@@ -34,7 +34,8 @@ import {
   ExternalLink,
   LogOut,
   Palette,
-  Crown
+  Crown,
+  Star
 } from 'lucide-vue-next'
 
 const router = useRouter()
@@ -393,6 +394,17 @@ onMounted(async () => {
             >
               <BarChart3 :size="18" />
               <span>Relatórios</span>
+            </router-link>
+
+            <router-link
+              v-if="authStore.can('view_reports')"
+              to="/app/avaliacoes"
+              class="nav-link"
+              :class="{ 'is-active': route.path === '/app/avaliacoes' }"
+              @click="isMobileSidebarOpen = false"
+            >
+              <Star :size="18" />
+              <span>Avaliações</span>
             </router-link>
 
             <router-link

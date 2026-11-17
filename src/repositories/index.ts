@@ -29,7 +29,8 @@ import {
   SupabaseNotificationRepository,
   SupabasePublicMenuRepository,
   SupabaseMediaRepository,
-  SupabaseEstablishmentRepository
+  SupabaseEstablishmentRepository,
+  SupabaseReviewRepository
 } from './supabase'
 import type {
   IAuthRepository,
@@ -54,7 +55,8 @@ import type {
   INotificationRepository,
   IPublicMenuRepository,
   IMediaRepository,
-  IEstablishmentRepository
+  IEstablishmentRepository,
+  IReviewRepository
 } from './interfaces'
 
 export interface RepositoryRegistry {
@@ -81,6 +83,7 @@ export interface RepositoryRegistry {
   publicMenu: IPublicMenuRepository
   media: IMediaRepository
   establishments: IEstablishmentRepository
+  reviews: IReviewRepository
 }
 
 export const repositories: RepositoryRegistry = {
@@ -106,5 +109,6 @@ export const repositories: RepositoryRegistry = {
   notifications: new SupabaseNotificationRepository(),
   publicMenu: new SupabasePublicMenuRepository(),
   media: new SupabaseMediaRepository(),
-  establishments: new SupabaseEstablishmentRepository()
+  establishments: new SupabaseEstablishmentRepository(),
+  reviews: new SupabaseReviewRepository()
 }

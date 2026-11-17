@@ -30,8 +30,11 @@ import type {
   EstablishmentInvitation,
   PlanFeature,
   PlanLimit,
-  SubscriptionStatus
+  SubscriptionStatus,
+  SessionClosure,
+  ReviewDashboard
 } from '@/types'
+import type { ReviewDeviceType, ReviewTrackEvent } from '@/domain/reviews'
 
 /** Empresa registada pelo Super Admin (o dono é convidado por email). */
 export interface CreateCompanyInput {
@@ -414,6 +417,31 @@ export interface IPublicMenuRepository {
   requestBill(sessionId: string, participantToken?: string, paymentMethod?: PaymentMethod, notes?: string): Promise<TableSession>
   createServiceRequest(input: CreateServiceRequestInput): Promise<{ request: ServiceRequest; alreadyExisted: boolean }>
   getOrder(orderId: string): Promise<PublicOrderView | null>
+  /**
+   * Ecrã de agradecimento: estado final da sessão. Se estiver encerrada e o
+   * estabelecimento tiver link do Google, regista o pedido como apresentado.
+   */
+  getSessionClosure(sessionId: string, participantToken: string, deviceType?: ReviewDeviceType): Promise<SessionClosure>
+  /** Regista o clique ou o encaminhamento para o Google. Nunca indica avaliação publicada. */
+  trackReviewRequest(requestId: string, participantToken: string, event: ReviewTrackEvent): Promise<string>
+}
+
+// =====================================================================
+// AVALIAÇÕES (painel do proprietário)
+// =====================================================================
+
+export interface ReviewDashboardQuery {
+  companyId: string
+  /** Omitido = todos os estabelecimentos que o utilizador gere. */
+  restaurantId?: string
+  from: Date
+  /** Omitido = agora, pela hora do servidor (evita erros de relógio do dispositivo). */
+  to?: Date
+  recentLimit?: number
+}
+
+export interface IReviewRepository {
+  getDashboard(query: ReviewDashboardQuery): Promise<ReviewDashboard>
 }
 
 // =====================================================================
