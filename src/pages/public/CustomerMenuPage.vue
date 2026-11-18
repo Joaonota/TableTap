@@ -30,6 +30,12 @@ import SessionHistoryModal from '@/components/menu/SessionHistoryModal.vue'
 import BillRequestModal from '@/components/menu/BillRequestModal.vue'
 import SuggestedProductsSection from '@/components/menu/SuggestedProductsSection.vue'
 import SessionClosedScreen from '@/components/menu/SessionClosedScreen.vue'
+import CustomerNotificationStack from '@/components/menu/CustomerNotificationStack.vue'
+import SessionOrdersTracker from '@/components/menu/SessionOrdersTracker.vue'
+import NotificationPermissionCard from '@/components/menu/NotificationPermissionCard.vue'
+import { useCustomerNotificationStore } from '@/stores/customerNotifications'
+import { customerNotificationService } from '@/services/customerNotifications'
+import type { CustomerEvent } from '@/domain/customerNotifications'
 
 import {
   Search,
@@ -61,6 +67,7 @@ const cartStore = useCartStore()
 const tableSessionStore = useTableSessionStore()
 const serviceRequestStore = useServiceRequestStore()
 const toastStore = useToastStore()
+const customerNotifications = useCustomerNotificationStore()
 
 /**
  * Fluxo: NFC/QR → URL da mesa → restaurante + mesa → estado atual → experiência.
@@ -138,9 +145,65 @@ const loadSessionOrders = async () => {
   try {
     // Só os pedidos desta sessão, autorizados pelo token deste dispositivo.
     sessionOrders.value = await publicTableService.getSessionOrders(session.id, tableSessionStore.participantToken)
+    // Avisa (uma vez) alterações que este dispositivo não recebeu em tempo real.
+    customerNotifications.reconcile(sessionOrders.value)
   } catch {
     sessionOrders.value = []
   }
+}
+
+// ---------------------------------------------------------------------
+// Tempo real: canal privado deste dispositivo (Supabase Realtime, migração 1300)
+// ---------------------------------------------------------------------
+let ordersReloadTimer: number | undefined
+/** Recarrega os pedidos completos logo a seguir a um evento (agrupa rajadas). */
+const reloadOrdersSoon = () => {
+  window.clearTimeout(ordersReloadTimer)
+  ordersReloadTimer = window.setTimeout(() => void loadSessionOrders(), 300)
+}
+
+const handleCustomerEvent = async (event: CustomerEvent) => {
+  switch (event.type) {
+    case 'order.status_changed': {
+      // Atualiza já o estado no ecrã; os detalhes chegam com a recarga.
+      const order = sessionOrders.value.find(o => o.id === event.orderId)
+      if (order && event.status) order.status = event.status as Order['status']
+      reloadOrdersSoon()
+      break
+    }
+    case 'payment.confirmed':
+      reloadOrdersSoon()
+      break
+    case 'session.closed':
+    case 'session.cancelled':
+      // Fim da sessão: o ecrã final (agradecimento / Google) aparece de imediato.
+      await tableSessionStore.refresh()
+      if (!isSessionActive.value) hasEnteredMenu.value = false
+      break
+    default:
+      break
+  }
+}
+
+watch(
+  () => [isSessionActive.value, activeSession.value?.id, tableSessionStore.participantToken] as const,
+  ([active, sessionId, token]) => {
+    if (active && sessionId && token) {
+      customerNotifications.start({ sessionId, participantToken: token, onEvent: handleCustomerEvent })
+    } else {
+      customerNotifications.stop()
+    }
+  },
+  { immediate: true }
+)
+
+const showPermissionCard = computed(
+  () => isSessionActive.value && sessionOrders.value.length > 0 && customerNotifications.canOfferPermission
+)
+const handleEnableNotifications = async () => {
+  const result = await customerNotifications.requestPermission()
+  if (result === 'granted') toastStore.success('Notificações ativadas', 'Vai ser avisado das alterações do seu pedido.')
+  else if (result === 'denied') toastStore.info('Notificações bloqueadas', 'Pode ativá-las mais tarde nas definições do navegador.')
 }
 
 // ---------------------------------------------------------------------
@@ -295,9 +358,16 @@ const SESSION_POLL_AFTER_BILL_MS = 4000
 let sessionPollTimer: number | undefined
 let isUnmounted = false
 
+/** Com o tempo real ligado, a verificação periódica é só uma rede de segurança. */
+const SESSION_POLL_REALTIME_MS = 60000
+
 const scheduleSessionPoll = () => {
   if (isUnmounted) return
-  const delay = activeSession.value?.billRequestedAt ? SESSION_POLL_AFTER_BILL_MS : SESSION_POLL_MS
+  const delay = customerNotifications.isConnected
+    ? SESSION_POLL_REALTIME_MS
+    : activeSession.value?.billRequestedAt
+      ? SESSION_POLL_AFTER_BILL_MS
+      : SESSION_POLL_MS
   sessionPollTimer = window.setTimeout(pollSession, delay)
 }
 
@@ -314,12 +384,18 @@ const pollSession = async () => {
   }
 }
 
+let stopAudioUnlock: (() => void) | undefined
 onMounted(() => {
   document.addEventListener('visibilitychange', onVisibilityChange)
   scheduleSessionPoll()
+  // Os navegadores só permitem som depois do primeiro toque na página.
+  stopAudioUnlock = customerNotificationService.unlockAudioOnFirstGesture()
 })
 onUnmounted(() => {
   isUnmounted = true
+  stopAudioUnlock?.()
+  window.clearTimeout(ordersReloadTimer)
+  customerNotifications.stop()
   document.removeEventListener('visibilitychange', onVisibilityChange)
   window.clearTimeout(sessionPollTimer)
   cancelAutoRedirect()
@@ -495,6 +571,9 @@ const handleOrderMore = () => {
 </script>
 
 <template>
+  <!-- Notificações em tempo real do pedido / sessão (discretas, no topo) -->
+  <CustomerNotificationStack />
+
   <div v-if="isLoading" class="loading-screen">
     <UtensilsCrossed :size="36" class="spin-icon" />
     <p class="loading-text">A preparar o menu digital da mesa...</p>
@@ -590,6 +669,22 @@ const handleOrderMore = () => {
           </button>
         </div>
       </div>
+    </div>
+
+    <!-- Área do pedido: estado em tempo real -->
+    <div v-if="isSessionActive && sessionOrders.length" class="orders-tracker-wrap">
+      <SessionOrdersTracker
+        :orders="sessionOrders"
+        :connected="customerNotifications.isConnected"
+        :sound-enabled="customerNotifications.soundEnabled"
+        @toggle-sound="customerNotifications.setSoundEnabled(!customerNotifications.soundEnabled)"
+        @open-history="isSessionHistoryOpen = true"
+      />
+      <NotificationPermissionCard
+        v-if="showPermissionCard"
+        @enable="handleEnableNotifications"
+        @dismiss="customerNotifications.dismissPermissionPrompt()"
+      />
     </div>
 
     <!-- A ver o menu sem participar na sessão -->
@@ -1307,6 +1402,10 @@ const handleOrderMore = () => {
 }
 
 /* Session Status Banner */
+.orders-tracker-wrap {
+  padding: 0 1rem;
+}
+
 .session-status-banner {
   background: linear-gradient(90deg, #1e3a8a 0%, #1e40af 100%);
   color: #ffffff;

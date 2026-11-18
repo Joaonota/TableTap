@@ -9,6 +9,8 @@ interface ImportMetaEnv {
   /** Domínio público usado nas URLs das mesas (etiquetas NFC e QR Code). */
   readonly VITE_PUBLIC_BASE_URL?: string
   readonly VITE_APP_TITLE?: string
+  /** Chave pública VAPID para Web Push (opcional; ainda não usada — ver services/customerNotifications/webPush.ts). */
+  readonly VITE_WEB_PUSH_PUBLIC_KEY?: string
 }
 
 interface ImportMeta {

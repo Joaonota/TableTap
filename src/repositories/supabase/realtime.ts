@@ -25,3 +25,36 @@ export function subscribeToRestaurant(table: RealtimeTable, restaurantId: string
     void supabase.removeChannel(channel)
   }
 }
+
+// =====================================================================
+// Canal privado do CLIENTE (menu da mesa) — migração 1300
+// =====================================================================
+
+export type CustomerChannelStatus = 'connecting' | 'connected' | 'error' | 'closed'
+
+/**
+ * Escuta os eventos enviados pela base de dados para ESTE dispositivo
+ * (topic `customer:<token do participante>`, Broadcast privado).
+ * O RLS em realtime.messages só autoriza o canal a quem tem o token de uma
+ * sessão válida; os eventos chegam apenas aos participantes da sessão.
+ * Devolve a função para cancelar a subscrição.
+ */
+export function subscribeToCustomerChannel(
+  participantToken: string,
+  onEvent: (payload: unknown) => void,
+  onStatus?: (status: CustomerChannelStatus) => void
+): () => void {
+  if (!isSupabaseConfigured || !participantToken) return () => {}
+  onStatus?.('connecting')
+  const channel = supabase
+    .channel(`customer:${participantToken}`, { config: { private: true, broadcast: { self: false } } })
+    .on('broadcast', { event: '*' }, message => onEvent(message.payload))
+    .subscribe(status => {
+      if (status === 'SUBSCRIBED') onStatus?.('connected')
+      else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') onStatus?.('error')
+      else if (status === 'CLOSED') onStatus?.('closed')
+    })
+  return () => {
+    void supabase.removeChannel(channel)
+  }
+}

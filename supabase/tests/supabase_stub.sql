@@ -58,3 +58,28 @@ grant usage on schema public to anon, authenticated, service_role;
 alter default privileges in schema public grant select, insert, update, delete on tables to anon, authenticated, service_role;
 alter default privileges in schema public grant execute on functions to anon, authenticated, service_role;
 alter default privileges in schema public grant usage, select on sequences to anon, authenticated, service_role;
+
+-- Realtime (Broadcast a partir da base de dados): realtime.send grava a
+-- mensagem em realtime.messages; realtime.topic() devolve o canal que o
+-- cliente está a tentar abrir (nos testes: set_config('realtime.topic', …)).
+create schema realtime;
+create table realtime.messages (
+  id uuid primary key default gen_random_uuid(),
+  topic text not null,
+  extension text not null,
+  payload jsonb,
+  event text,
+  private boolean default false,
+  inserted_at timestamptz default now()
+);
+alter table realtime.messages enable row level security;
+create function realtime.topic() returns text language sql stable as $$
+  select nullif(current_setting('realtime.topic', true), '')
+$$;
+create function realtime.send(payload jsonb, event text, topic text, private boolean default true)
+returns void language sql security definer as $$
+  insert into realtime.messages (topic, extension, payload, event, private) values (topic, 'broadcast', payload, event, private)
+$$;
+grant usage on schema realtime to anon, authenticated, service_role;
+grant select on realtime.messages to anon, authenticated;
+grant execute on all functions in schema realtime to anon, authenticated, service_role;

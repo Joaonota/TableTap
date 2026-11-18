@@ -677,5 +677,5 @@ export const notificationService = {
 
 
 // ================= Tempo real (Supabase Realtime) =================
-export { subscribeToRestaurant as subscribeToRealtime } from '@/repositories/supabase/realtime'
-export type { RealtimeTable } from '@/repositories/supabase/realtime'
+export { subscribeToRestaurant as subscribeToRealtime, subscribeToCustomerChannel } from '@/repositories/supabase/realtime'
+export type { RealtimeTable, CustomerChannelStatus } from '@/repositories/supabase/realtime'
