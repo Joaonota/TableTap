@@ -33,6 +33,7 @@ import SessionClosedScreen from '@/components/menu/SessionClosedScreen.vue'
 import CustomerNotificationStack from '@/components/menu/CustomerNotificationStack.vue'
 import SessionOrdersTracker from '@/components/menu/SessionOrdersTracker.vue'
 import NotificationPermissionCard from '@/components/menu/NotificationPermissionCard.vue'
+import { useScreenWakeLock } from '@/composables/useScreenWakeLock'
 import { useCustomerNotificationStore } from '@/stores/customerNotifications'
 import { customerNotificationService } from '@/services/customerNotifications'
 import type { CustomerEvent } from '@/domain/customerNotifications'
@@ -200,6 +201,15 @@ watch(
 const showPermissionCard = computed(
   () => isSessionActive.value && sessionOrders.value.length > 0 && customerNotifications.canOfferPermission
 )
+/**
+ * Ecrã sempre ligado enquanto há pedidos por entregar — para o aviso com som
+ * funcionar em telemóveis sem Web Push (iPhone no navegador). Quem recebe
+ * avisos com o ecrã bloqueado (Android com notificações) não precisa.
+ */
+const hasPendingOrders = computed(() => sessionOrders.value.some(o => o.status !== 'delivered' && o.status !== 'cancelled'))
+const keepScreenAwake = computed(() => isSessionActive.value && hasPendingOrders.value && !customerNotifications.pushActive)
+const { isLocked: screenAwake } = useScreenWakeLock(keepScreenAwake)
+
 const showInstallHint = computed(
   () => isSessionActive.value && sessionOrders.value.length > 0 && customerNotifications.showInstallHint
 )
@@ -704,6 +714,7 @@ const handleOrderMore = () => {
         :orders="sessionOrders"
         :connected="customerNotifications.isConnected"
         :sound-enabled="customerNotifications.soundEnabled"
+        :screen-awake="screenAwake"
         @toggle-sound="customerNotifications.setSoundEnabled(!customerNotifications.soundEnabled)"
         @open-history="isSessionHistoryOpen = true"
       />

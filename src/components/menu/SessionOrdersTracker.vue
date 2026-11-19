@@ -2,7 +2,7 @@
 import { computed } from 'vue'
 import type { Order } from '@/types'
 import OrderStatusTimeline from './OrderStatusTimeline.vue'
-import { Volume2, VolumeX, Wifi, WifiOff } from 'lucide-vue-next'
+import { Sun, Volume2, VolumeX, Wifi, WifiOff } from 'lucide-vue-next'
 
 /**
  * Área do pedido: estado de cada pedido da sessão, atualizado em tempo real
@@ -13,6 +13,8 @@ const props = defineProps<{
   orders: Order[]
   connected: boolean
   soundEnabled: boolean
+  /** O ecrã está a ser mantido ligado enquanto o cliente espera (sem Web Push). */
+  screenAwake?: boolean
 }>()
 const emit = defineEmits<{ (e: 'toggle-sound'): void; (e: 'open-history'): void }>()
 
@@ -32,6 +34,10 @@ const finishedCount = computed(() => props.orders.length - activeOrders.value.le
         <p class="sot-live" :class="{ 'is-off': !connected }">
           <component :is="connected ? Wifi : WifiOff" :size="12" />
           {{ connected ? 'Atualizações em tempo real' : 'A ligar às atualizações…' }}
+        </p>
+        <p v-if="screenAwake && activeOrders.length" class="sot-awake">
+          <Sun :size="12" />
+          Ecrã ligado até o pedido chegar
         </p>
       </div>
       <button
@@ -96,6 +102,16 @@ const finishedCount = computed(() => props.orders.length - activeOrders.value.le
   font-size: 0.7rem;
   font-weight: 600;
   color: #059669;
+}
+
+.sot-awake {
+  margin: 0.1rem 0 0;
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: #b45309;
 }
 
 .sot-live.is-off {
