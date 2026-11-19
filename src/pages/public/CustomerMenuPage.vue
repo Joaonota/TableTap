@@ -1155,11 +1155,7 @@ const handleOrderMore = () => {
               <span>Subtotal:</span>
               <span>{{ cartStore.subtotal.toLocaleString('pt-MZ') }} MT</span>
             </div>
-            <div class="breakdown-row">
-              <span>IVA ({{ restaurant.taxRate }}%):</span>
-              <span>{{ cartStore.taxAmount.toLocaleString('pt-MZ') }} MT</span>
-            </div>
-            <div class="breakdown-row">
+            <div v-if="cartStore.serviceFee > 0" class="breakdown-row">
               <span>Taxa de Serviço ({{ restaurant.settings.serviceFeePercent }}%):</span>
               <span>{{ cartStore.serviceFee.toLocaleString('pt-MZ') }} MT</span>
             </div>
@@ -1167,6 +1163,7 @@ const handleOrderMore = () => {
               <strong>Total Deste Pedido:</strong>
               <strong>{{ cartStore.grandTotal.toLocaleString('pt-MZ') }} MT</strong>
             </div>
+            <p v-if="restaurant.taxRate > 0" class="vat-note">Preços com IVA incluído.</p>
           </div>
 
           <!-- Customer info / Session confirmation -->
@@ -1402,6 +1399,13 @@ const handleOrderMore = () => {
 }
 
 /* Session Status Banner */
+.vat-note {
+  margin: 0.35rem 0 0;
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  text-align: right;
+}
+
 .orders-tracker-wrap {
   padding: 0 1rem;
 }

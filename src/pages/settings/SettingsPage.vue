@@ -232,7 +232,7 @@ const handleSaveSettings = async () => {
               v-model="restTaxRate"
               label="Taxa de IVA (%)"
               type="number"
-              hint="Padrão legal: 16% IVA"
+              hint="Os preços dos produtos já incluem o IVA (padrão: 16%). Usado para indicar o IVA incluído nos recibos."
             />
 
             <AppInput

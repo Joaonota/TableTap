@@ -130,6 +130,18 @@ select tests.put('o3', (public.place_order(tests.id('s1'), tests.id('tokBruno'),
 
 select tests.ok('criar o pedido não gera notificação (o cliente já sabe)', (select count(*) from realtime.messages) = 0);
 
+-- Migração 1600: preços com IVA incluído (refresco a 150 MT custa 150 MT).
+update public.restaurants set tax_rate = 16 where id = tests.id('restA2');
+select tests.login(null);
+select tests.put('oVat', (public.place_order(tests.id('s3'), tests.id('tokDino'),
+  jsonb_build_array(jsonb_build_object('productId', tests.id('prodA2'), 'quantity', 2))) ->> 'id')::uuid);
+select tests.ok('IVA incluído: o total é a soma dos preços (2 × 500 = 1000 MT, sem acréscimo)',
+  (select total = 1000 and subtotal = 1000 from public.orders where id = tests.id('oVat')));
+select tests.ok('IVA incluído no preço registado à parte (1000 × 16 ÷ 116 = 137,93 MT)',
+  (select tax_amount = 137.93 from public.orders where id = tests.id('oVat')));
+select tests.ok('total da sessão = total dos pedidos (sem IVA por cima)',
+  (select total = 1000 from public.table_sessions where id = tests.id('s3')));
+
 -- ---------------------------------------------------------------------
 -- 1. Mudança de estado pelo funcionário → só a sessão desse pedido
 -- ---------------------------------------------------------------------
@@ -185,6 +197,19 @@ update public.orders set payment_status = 'paid' where id in (tests.id('o1'), te
 reset role;
 select tests.ok('depois de entregue, o pagamento pode ficar pago',
   (select bool_and(payment_status = 'paid') from public.orders where id in (tests.id('o1'), tests.id('o3'))));
+
+-- Migração 1500: só se reembolsa um pagamento já pago.
+select tests.login('ownerA'); set role authenticated;
+select tests.ok('não se reembolsa um pagamento pendente',
+  tests.error_hint(format('update public.orders set payment_status = %L where id = %L', 'refunded', tests.id('o2'))) = 'refund_before_paid'
+  and (select payment_status from public.orders where id = tests.id('o2')) = 'pending');
+select tests.ok('reembolsar em Pagamentos um pagamento ainda não pago também é recusado',
+  tests.error_hint(format('insert into public.payments (restaurant_id, order_id, amount, method, status, transaction_reference) values (%L, %L, 1000, %L, %L, %L)',
+    tests.id('restA1'), tests.id('o2'), 'cash', 'refunded', '')) = 'refund_before_paid');
+update public.orders set payment_status = 'refunded' where id = tests.id('o1');
+reset role;
+select tests.ok('depois de pago, o pagamento pode ser reembolsado',
+  (select payment_status from public.orders where id = tests.id('o1')) = 'refunded');
 select tests.ok('pagamento confirmado chega à sessão',
   tests.msgs('tokAna', 'payment.confirmed') >= 1 and tests.msgs('tokCarla', 'payment.confirmed') = 0);
 select tests.ok('vários pedidos pagos partilham o mesmo eventId (o telemóvel mostra um só aviso)',

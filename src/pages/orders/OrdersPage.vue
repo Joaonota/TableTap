@@ -70,10 +70,29 @@ const canMarkPaid = computed(
   () => !!selectedOrder.value && (selectedOrder.value.status === 'delivered' || selectedOrder.value.paymentStatus === 'paid')
 )
 
+/**
+ * Desde a migração 1600 os preços incluem o IVA (total = subtotal + serviço).
+ * Pedidos antigos tinham o IVA somado por cima — o rótulo distingue os dois.
+ */
+const vatLabel = (order: Order) => {
+  const rate = tenantStore.currentRestaurant?.taxRate ?? 0
+  const added = order.taxAmount > 0 && order.total > order.subtotal + order.serviceFee + 0.005
+  return added ? `IVA (${rate}%)` : `IVA incluído (${rate}%)`
+}
+
+/** Só se reembolsa um pagamento já pago (migração 1500). */
+const canRefund = computed(
+  () => !!selectedOrder.value && ['paid', 'confirmed', 'refunded'].includes(selectedOrder.value.paymentStatus)
+)
+
 const handlePaymentChange = async (newStatus: PaymentStatus) => {
   if (!selectedOrder.value) return
   if (newStatus === 'paid' && !canMarkPaid.value) {
     toastStore.warning('Pedido ainda não entregue', 'Marque o pedido como "Entregue na Mesa" antes de o marcar como pago.')
+    return
+  }
+  if (newStatus === 'refunded' && !canRefund.value) {
+    toastStore.warning('Pagamento ainda não pago', 'Só pode reembolsar depois de o pagamento estar marcado como pago.')
     return
   }
   const updated = await orderStore.updatePaymentStatus(selectedOrder.value.id, newStatus)
@@ -397,6 +416,8 @@ const handlePrintReceipt = () => {
             <button
               class="pay-btn"
               :class="{ 'is-active': selectedOrder.paymentStatus === 'refunded' }"
+              :disabled="!canRefund"
+              :title="canRefund ? undefined : 'Disponível depois de o pagamento estar pago'"
               @click="handlePaymentChange('refunded')"
             >
               Reembolsado
@@ -435,7 +456,7 @@ const handlePrintReceipt = () => {
 
           <div class="financials-summary">
             <div>Subtotal: <strong>{{ selectedOrder.subtotal.toLocaleString('pt-MZ') }} MT</strong></div>
-            <div>IVA ({{ tenantStore.currentRestaurant?.taxRate }}%): <strong>{{ selectedOrder.taxAmount.toLocaleString('pt-MZ') }} MT</strong></div>
+            <div>{{ vatLabel(selectedOrder) }}: <strong>{{ selectedOrder.taxAmount.toLocaleString('pt-MZ') }} MT</strong></div>
             <div>Taxa de Serviço: <strong>{{ selectedOrder.serviceFee.toLocaleString('pt-MZ') }} MT</strong></div>
             <div class="grand-total">Total: <strong>{{ selectedOrder.total.toLocaleString('pt-MZ') }} MT</strong></div>
           </div>
@@ -514,7 +535,7 @@ const handlePrintReceipt = () => {
 
         <div class="receipt-totals">
           <div class="r-row"><span>Subtotal:</span><span>{{ selectedOrder.subtotal }} MT</span></div>
-          <div class="r-row"><span>IVA ({{ tenantStore.currentRestaurant?.taxRate }}%):</span><span>{{ selectedOrder.taxAmount }} MT</span></div>
+          <div class="r-row"><span>{{ vatLabel(selectedOrder) }}:</span><span>{{ selectedOrder.taxAmount }} MT</span></div>
           <div class="r-row"><span>Serviço:</span><span>{{ selectedOrder.serviceFee }} MT</span></div>
           <div class="r-row r-grand"><span>TOTAL PAGO:</span><span>{{ selectedOrder.total }} MT</span></div>
           <div class="r-row"><span>Método:</span><span>{{ selectedOrder.paymentMethod?.toUpperCase() || 'M-PESA' }}</span></div>

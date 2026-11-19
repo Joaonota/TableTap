@@ -27,9 +27,10 @@ export const useCartStore = defineStore('cart', () => {
     return items.value.reduce((sum, item) => sum + item.totalPrice, 0)
   })
 
+  /** IVA INCLUÍDO nos preços (informativo) — não é somado ao total (migração 1600). */
   const taxAmount = computed(() => {
     const rate = activeRestaurant.value?.taxRate ?? 0
-    return Math.round((subtotal.value * (rate / 100)) * 100) / 100
+    return Math.round(((subtotal.value * rate) / (100 + rate)) * 100) / 100
   })
 
   const serviceFee = computed(() => {
@@ -38,7 +39,8 @@ export const useCartStore = defineStore('cart', () => {
   })
 
   const grandTotal = computed(() => {
-    return Math.round((subtotal.value + taxAmount.value + serviceFee.value) * 100) / 100
+    // Os preços já incluem o IVA: total = preços + taxa de serviço (se houver).
+    return Math.round((subtotal.value + serviceFee.value) * 100) / 100
   })
 
   const setRestaurantAndTable = (restaurant: Restaurant, table?: Table) => {
