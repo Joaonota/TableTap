@@ -8,6 +8,8 @@ import type { Order, OrderStatus, PaymentStatus } from '@/types'
 import AppButton from '@/components/ui/AppButton.vue'
 import AppBadge from '@/components/ui/AppBadge.vue'
 import AppModal from '@/components/ui/AppModal.vue'
+import ConfirmDialog from '@/components/ui/ConfirmDialog.vue'
+import { useCloseSessionAfterPayment } from '@/composables/useCloseSessionAfterPayment'
 import {
   Search,
   Filter,
@@ -27,6 +29,7 @@ const orderStore = useOrderStore()
 const authStore = useAuthStore()
 const tenantStore = useTenantStore()
 const toastStore = useToastStore()
+const closeAfterPayment = useCloseSessionAfterPayment()
 
 const viewMode = ref<'table' | 'kanban'>('table')
 const selectedOrder = ref<Order | null>(null)
@@ -66,6 +69,10 @@ const handlePaymentChange = async (newStatus: PaymentStatus) => {
   if (!selectedOrder.value) return
   const updated = await orderStore.updatePaymentStatus(selectedOrder.value.id, newStatus)
   selectedOrder.value = updated
+  // Pago: se a mesa já não deve nada, perguntar se encerra a sessão.
+  if (updated && (newStatus === 'paid' || newStatus === 'confirmed')) {
+    await closeAfterPayment.checkAfterPayment(updated.id)
+  }
 }
 
 const exportToCsv = () => {
@@ -521,6 +528,18 @@ const handlePrintReceipt = () => {
         </AppButton>
       </template>
     </AppModal>
+    <!-- Pagamento confirmado: perguntar se encerra a sessão da mesa -->
+    <ConfirmDialog
+      :is-open="closeAfterPayment.isOpen.value"
+      :title="closeAfterPayment.title.value"
+      :message="closeAfterPayment.message.value"
+      confirm-label="Encerrar sessão"
+      cancel-label="Manter aberta"
+      variant="primary"
+      :is-loading="closeAfterPayment.isClosing.value"
+      @confirm="closeAfterPayment.confirmClose()"
+      @cancel="closeAfterPayment.keepOpen()"
+    />
   </div>
 </template>
 

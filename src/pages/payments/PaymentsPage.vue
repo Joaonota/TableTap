@@ -7,6 +7,8 @@ import type { Payment, PaymentStatus } from '@/types'
 import AppButton from '@/components/ui/AppButton.vue'
 import AppBadge from '@/components/ui/AppBadge.vue'
 import AppModal from '@/components/ui/AppModal.vue'
+import ConfirmDialog from '@/components/ui/ConfirmDialog.vue'
+import { useCloseSessionAfterPayment } from '@/composables/useCloseSessionAfterPayment'
 import {
   CreditCard,
   DollarSign,
@@ -20,6 +22,7 @@ import {
 
 const tenantStore = useTenantStore()
 const toastStore = useToastStore()
+const closeAfterPayment = useCloseSessionAfterPayment()
 
 const payments = ref<Payment[]>([])
 const isLoading = ref(true)
@@ -68,6 +71,8 @@ const handleConfirmPayment = async (pay: Payment) => {
     if (index !== -1) payments.value[index] = updated
     toastStore.success('Pagamento Confirmado', `Recebimento do pedido ${pay.orderCode} confirmado com sucesso.`)
     isDetailModalOpen.value = false
+    // Se a mesa já não deve nada, perguntar se encerra a sessão.
+    await closeAfterPayment.checkAfterPayment(pay.orderId)
   } catch (e) {
     toastStore.error('Erro ao atualizar pagamento', (e as Error).message)
   }
@@ -283,6 +288,18 @@ const handleRefundPayment = async (pay: Payment) => {
         </AppButton>
       </template>
     </AppModal>
+    <!-- Pagamento confirmado: perguntar se encerra a sessão da mesa -->
+    <ConfirmDialog
+      :is-open="closeAfterPayment.isOpen.value"
+      :title="closeAfterPayment.title.value"
+      :message="closeAfterPayment.message.value"
+      confirm-label="Encerrar sessão"
+      cancel-label="Manter aberta"
+      variant="primary"
+      :is-loading="closeAfterPayment.isClosing.value"
+      @confirm="closeAfterPayment.confirmClose()"
+      @cancel="closeAfterPayment.keepOpen()"
+    />
   </div>
 </template>
 

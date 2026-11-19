@@ -14,12 +14,13 @@ const props = withDefaults(
     title: string
     message: string
     confirmLabel?: string
+    cancelLabel?: string
     variant?: 'danger' | 'primary' | 'warning'
     isLoading?: boolean
     inputLabel?: string
     inputPlaceholder?: string
   }>(),
-  { confirmLabel: 'Confirmar', variant: 'danger', isLoading: false }
+  { confirmLabel: 'Confirmar', cancelLabel: 'Cancelar', variant: 'danger', isLoading: false }
 )
 
 const emit = defineEmits<{
@@ -52,7 +53,7 @@ watch(
       </div>
     </div>
     <template #footer>
-      <AppButton variant="secondary" :disabled="isLoading" @click="emit('cancel')">Cancelar</AppButton>
+      <AppButton variant="secondary" :disabled="isLoading" @click="emit('cancel')">{{ cancelLabel }}</AppButton>
       <AppButton :variant="variant" :loading="isLoading" @click="emit('confirm', inputValue.trim())">{{ confirmLabel }}</AppButton>
     </template>
   </AppModal>
