@@ -237,7 +237,10 @@ export interface SessionParticipant {
   id: string
   name: string
   joinedAt: string
+  /** Organizador da sessão (o primeiro participante). */
   isPrimary: boolean
+  /** Cor do avatar escolhida pelo participante (ver domain/groupBill). */
+  avatar?: string
   /** Só no dispositivo do próprio participante: autoriza pedidos na sessão. */
   token?: string
 }
@@ -263,6 +266,9 @@ export interface TableSession {
   total: number
   /** Quando algum participante pediu a conta. */
   billRequestedAt?: string
+  /** Fecho forçado por um gerente com valores por pagar (migração 1800). */
+  unpaidAtClose?: number
+  forcedCloseReason?: string
 }
 
 export * from './nfcTag'
@@ -381,6 +387,9 @@ export interface Order {
   tableId?: string
   tableNumber?: string
   tableSessionId?: string
+  /** Modo Grupo: participante que fez o pedido. */
+  participantId?: string
+  participantName?: string
   isAdditional?: boolean
   orderCode: string // e.g. #ORD-1042
   type: OrderType
@@ -404,9 +413,15 @@ export interface Payment {
   id: string
   tenantId: string
   restaurantId: string
+  /** Vazio nos pagamentos da conta dividida (cobrem itens de vários pedidos). */
   orderId: string
   orderCode: string
   tableNumber?: string
+  /** Modo Grupo (migração 1800): conta da mesa. */
+  tableSessionId?: string
+  participantId?: string
+  payerName?: string
+  splitMode?: 'own' | 'equal' | 'items' | 'all'
   /** Estado do pedido: o pagamento só pode ser confirmado depois de "delivered". */
   orderStatus?: OrderStatus
   amount: number

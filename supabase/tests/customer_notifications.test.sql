@@ -223,7 +223,7 @@ select tests.login(null);
 select tests.put('sr1', (public.create_service_request(tests.id('tA101'), 'water', tests.id('s1'), tests.id('tokAna')) ->> 'id')::uuid);
 select tests.login('ownerA'); set role authenticated;
 update public.service_requests set status = 'in_progress' where id = tests.id('sr1');
-select public.close_table_session(tests.id('s1'));
+select public.close_table_session(tests.id('s1'), true, 'Teste: fecho com valores em aberto');
 reset role;
 select tests.ok('atendimento em curso notifica a sessão',
   tests.msgs('tokBruno', 'service_request.status_changed') = 1
@@ -325,7 +325,7 @@ select public.unregister_push_subscription(tests.id('tokDino'), 'https://fcm.goo
 select tests.ok('outro cliente não remove a subscrição alheia',
   exists (select 1 from public.push_subscriptions where endpoint = 'https://fcm.googleapis.com/fcm/send/abc123'));
 select tests.login('ownerA'); set role authenticated;
-select public.close_table_session(tests.id('s2'));
+select public.close_table_session(tests.id('s2'), true, 'Teste: fecho com valores em aberto');
 reset role;
 select tests.ok('fim da sessão apaga as subscrições push (e não envia push)',
   not exists (select 1 from public.push_subscriptions where session_id = tests.id('s2'))

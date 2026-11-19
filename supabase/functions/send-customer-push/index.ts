@@ -28,6 +28,8 @@ interface CustomerEvent {
   sessionId: string
   orderCode?: string
   status?: string
+  /** Modo Grupo (1800): dono do pedido / quem pagou — só ele recebe o push. */
+  participantId?: string | null
 }
 
 interface PushMessage {
@@ -54,7 +56,9 @@ function describe(event: CustomerEvent): PushMessage | null {
       return event.orderCode ? { ...base, title: `${base.title} · ${event.orderCode}` } : base
     }
     case 'payment.confirmed':
-      return { title: 'Pagamento confirmado', body: 'O pagamento foi confirmado pela equipa. Obrigado!' }
+      return event.participantId
+        ? { title: 'Pagamento confirmado', body: 'O seu pagamento foi confirmado pela equipa. Obrigado!' }
+        : { title: 'Pagamento confirmado', body: 'O pagamento foi confirmado pela equipa. Obrigado!' }
     case 'service_request.status_changed':
       return event.status === 'in_progress'
         ? { title: 'Pedido de atendimento recebido', body: 'A equipa já está a tratar do seu pedido.' }
@@ -104,10 +108,10 @@ Deno.serve(async req => {
   const admin = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!, {
     auth: { persistSession: false }
   })
-  const { data: subs, error } = await admin
-    .from('push_subscriptions')
-    .select('id, endpoint, p256dh, auth, page_url')
-    .eq('session_id', body.sessionId)
+  // Pedidos e pagamentos de uma pessoa: só o telemóvel dela (não expor consumos aos outros).
+  let query = admin.from('push_subscriptions').select('id, endpoint, p256dh, auth, page_url').eq('session_id', body.sessionId)
+  if (event.participantId) query = query.eq('participant_id', event.participantId)
+  const { data: subs, error } = await query
   if (error) return json(500, { error: 'db_error', message: error.message })
 
   let sent = 0

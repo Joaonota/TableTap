@@ -15,6 +15,8 @@ export type CustomerEventType =
   | 'service_request.status_changed'
   | 'session.closed'
   | 'session.cancelled'
+  /** Modo Grupo (1800): alguém registou/cancelou um pagamento — recarregar a conta. */
+  | 'bill.updated'
 
 /**
  * Preparados para o futuro (ainda não emitidos pela base de dados):
@@ -39,6 +41,8 @@ export interface CustomerEvent {
   previousStatus?: string
   serviceRequestId?: string
   requestType?: string
+  /** Modo Grupo: dono do pedido / quem pagou. */
+  participantId?: string
 }
 
 export type NotificationTone = 'info' | 'progress' | 'success' | 'warning' | 'danger'
@@ -126,22 +130,50 @@ const SERVICE_MESSAGES: Record<string, CustomerNotificationContent> = {
   }
 }
 
-/** Texto da notificação para um evento (null = evento sem notificação visível). */
-export function describeCustomerEvent(event: CustomerEvent): CustomerNotificationContent | null {
+/**
+ * Texto da notificação para um evento (null = evento sem notificação visível).
+ *
+ * Modo Grupo: cada pessoa é avisada (com som) dos SEUS pedidos e pagamentos.
+ * Dos pedidos dos outros só chega um aviso discreto "pedido da mesa pronto",
+ * sem nomes nem valores.
+ */
+export function describeCustomerEvent(event: CustomerEvent, meParticipantId?: string): CustomerNotificationContent | null {
+  const isOthers = !!event.participantId && !!meParticipantId && event.participantId !== meParticipantId
   switch (event.type) {
     case 'order.status_changed': {
+      if (isOthers) {
+        if (event.status !== 'ready') return null
+        return {
+          title: event.orderCode ? `Pedido da mesa pronto · ${event.orderCode}` : 'Pedido da mesa pronto',
+          message: 'Um pedido da sua mesa está pronto.',
+          tone: 'success',
+          icon: 'ready',
+          alert: false
+        }
+      }
       const base = ORDER_MESSAGES[event.status as OrderStatus]
       if (!base) return null
       return event.orderCode ? { ...base, title: `${base.title} · ${event.orderCode}` } : base
     }
     case 'payment.confirmed':
+      if (isOthers) {
+        return {
+          title: 'Conta da mesa atualizada',
+          message: 'Foi confirmado um pagamento na conta da mesa.',
+          tone: 'info',
+          icon: 'payment',
+          alert: false
+        }
+      }
       return {
         title: 'Pagamento confirmado',
-        message: 'O pagamento foi confirmado pela equipa. Obrigado!',
+        message: event.participantId ? 'O seu pagamento foi confirmado pela equipa. Obrigado!' : 'O pagamento foi confirmado pela equipa. Obrigado!',
         tone: 'success',
         icon: 'payment',
         alert: true
       }
+    case 'bill.updated':
+      return null
     case 'service_request.status_changed':
       return SERVICE_MESSAGES[event.status ?? ''] ?? null
     // O fim da sessão tem o seu próprio ecrã (agradecimento / avaliação).
@@ -212,6 +244,7 @@ export function parseCustomerEvent(raw: unknown): CustomerEvent | null {
     status: str(r.status),
     previousStatus: str(r.previousStatus),
     serviceRequestId: str(r.serviceRequestId),
-    requestType: str(r.requestType)
+    requestType: str(r.requestType),
+    participantId: str(r.participantId)
   }
 }

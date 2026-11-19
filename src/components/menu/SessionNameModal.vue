@@ -2,6 +2,7 @@
 import { reactive, ref, watch } from 'vue'
 import AppModal from '@/components/ui/AppModal.vue'
 import AppButton from '@/components/ui/AppButton.vue'
+import { AVATAR_COLORS, AVATAR_KEYS } from '@/domain/groupBill'
 
 /**
  * Pede o nome do cliente para iniciar a sessão (mesa livre) ou juntar-se
@@ -18,10 +19,10 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   (e: 'close'): void
-  (e: 'submit', payload: { name: string; partySize?: number; notes?: string }): void
+  (e: 'submit', payload: { name: string; partySize?: number; notes?: string; avatar?: string }): void
 }>()
 
-const form = reactive({ name: '', partySize: 2, notes: '' })
+const form = reactive({ name: '', partySize: 2, notes: '', avatar: '' })
 const error = ref('')
 
 watch(
@@ -31,6 +32,7 @@ watch(
     form.name = props.initialName ?? ''
     form.partySize = Math.min(2, props.maxPartySize ?? 2)
     form.notes = ''
+    form.avatar = ''
     error.value = ''
   }
 )
@@ -48,7 +50,8 @@ const submit = () => {
   emit('submit', {
     name,
     partySize: props.mode === 'start' ? form.partySize : undefined,
-    notes: props.mode === 'start' ? form.notes.trim() || undefined : undefined
+    notes: props.mode === 'start' ? form.notes.trim() || undefined : undefined,
+    avatar: form.avatar || undefined
   })
 }
 </script>
@@ -75,6 +78,26 @@ const submit = () => {
         />
         <span v-if="error" class="error">{{ error }}</span>
       </label>
+
+      <div class="field">
+        <span class="label">Cor do seu avatar (opcional)</span>
+        <div class="avatars" role="radiogroup" aria-label="Cor do avatar">
+          <button
+            v-for="key in AVATAR_KEYS"
+            :key="key"
+            type="button"
+            role="radio"
+            class="avatar-dot"
+            :aria-checked="form.avatar === key"
+            :aria-label="key"
+            :class="{ 'is-selected': form.avatar === key }"
+            :style="{ background: AVATAR_COLORS[key] }"
+            @click="form.avatar = form.avatar === key ? '' : key"
+          >
+            {{ form.avatar === key ? (form.name.trim()[0] ?? '').toUpperCase() : '' }}
+          </button>
+        </div>
+      </div>
 
       <template v-if="mode === 'start'">
         <div class="field">
@@ -110,6 +133,29 @@ const submit = () => {
 </template>
 
 <style scoped>
+.avatars {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.avatar-dot {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  border: 3px solid transparent;
+  color: #fff;
+  font-weight: 800;
+  font-size: 0.85rem;
+  cursor: pointer;
+  box-shadow: 0 0 0 1px rgba(15, 23, 42, 0.08);
+}
+
+.avatar-dot.is-selected {
+  border-color: #fff;
+  box-shadow: 0 0 0 2px #0f172a;
+}
+
 .name-form {
   display: flex;
   flex-direction: column;

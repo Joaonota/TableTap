@@ -35,6 +35,7 @@ import type {
   ReviewDashboard
 } from '@/types'
 import type { ReviewDeviceType, ReviewTrackEvent } from '@/domain/reviews'
+import type { ItemSelection, SessionBill, SplitMode } from '@/domain/groupBill'
 
 /** Empresa registada pelo Super Admin (o dono é convidado por email). */
 export interface CreateCompanyInput {
@@ -303,9 +304,17 @@ export interface ITableSessionRepository {
   /** Inicia sessão e coloca a mesa como Ocupada. Recusa se a mesa não estiver livre. */
   start(input: StartSessionInput): Promise<{ session: TableSession; participant: SessionParticipant | null }>
   /** Outro cliente/dispositivo junta-se à sessão ativa da mesa. */
-  join(sessionId: string, name: string): Promise<{ session: TableSession; participant: SessionParticipant }>
-  /** Encerra a sessão e liberta a mesa (Ocupada → Livre). */
-  close(sessionId: string, actor: string): Promise<TableSession>
+  join(sessionId: string, name: string, avatar?: string): Promise<{ session: TableSession; participant: SessionParticipant }>
+  /**
+   * Encerra a sessão e liberta a mesa (Ocupada → Livre). Com valores por
+   * pagar é recusado (session_has_pending), excepto "force" por um gerente
+   * com motivo (fica registado na auditoria).
+   */
+  close(sessionId: string, actor: string, options?: CloseSessionOptions): Promise<TableSession>
+  /** Modo Grupo: conta da sessão vista pela equipa. */
+  getBill(sessionId: string): Promise<SessionBill>
+  /** Retira um dispositivo da sessão (o token deixa de funcionar). */
+  revokeParticipant(participantId: string, reason?: string): Promise<TableSession>
   /** Cancela a sessão e liberta a mesa. */
   cancel(sessionId: string, actor: string, reason?: string): Promise<TableSession>
 }
@@ -426,7 +435,27 @@ export interface IPublicMenuRepository {
   trackReviewRequest(requestId: string, participantToken: string, event: ReviewTrackEvent): Promise<string>
   /** Web Push (migração 1700): liga a subscrição deste dispositivo à sessão. */
   registerPushSubscription(input: PushSubscriptionInput): Promise<void>
+  /** Modo Grupo (migração 1800): conta individual e da mesa. */
+  getSessionBill(sessionId: string, participantToken: string): Promise<SessionBill>
+  createSessionPayment(input: CreateSessionPaymentInput): Promise<SessionBill & { paymentId: string }>
+  cancelSessionPayment(paymentId: string, participantToken: string): Promise<SessionBill>
+  leaveSession(sessionId: string, participantToken: string): Promise<TableSession>
+  updateParticipantAvatar(sessionId: string, participantToken: string, avatar: string): Promise<void>
   unregisterPushSubscription(participantToken: string, endpoint: string): Promise<void>
+}
+
+export interface CloseSessionOptions {
+  force?: boolean
+  reason?: string
+}
+
+export interface CreateSessionPaymentInput {
+  sessionId: string
+  participantToken: string
+  mode: SplitMode
+  method: PaymentMethod
+  items?: ItemSelection[]
+  notes?: string
 }
 
 export interface PushSubscriptionInput {

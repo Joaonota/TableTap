@@ -106,6 +106,23 @@ export const useTableSessionStore = defineStore('tableSession', () => {
 
   const participantName = computed(() => (isParticipant.value ? participation.value?.name ?? '' : ''))
   const participantToken = computed(() => (isParticipant.value ? participation.value?.token : undefined))
+  const participantId = computed(() => (isParticipant.value ? participation.value?.participantId : undefined))
+  /** Modo Grupo: este dispositivo é o organizador (primeiro participante). */
+  const isOrganizer = computed(
+    () => !!participantId.value && !!currentSession.value?.participants.find(p => p.id === participantId.value)?.isPrimary
+  )
+
+  /** Avatar escolhido na entrada (não bloqueia a entrada se falhar). */
+  const saveAvatar = async (avatar?: string) => {
+    if (!avatar || !currentSession.value || !participantToken.value) return
+    try {
+      await publicTableService.updateParticipantAvatar(currentSession.value.id, participantToken.value, avatar)
+      const me = currentSession.value.participants.find(p => p.id === participantId.value)
+      if (me) me.avatar = avatar
+    } catch {
+      // Opcional: sem avatar, usa-se uma cor automática.
+    }
+  }
 
   const applyContext = (ctx: { restaurant: Restaurant; table: Table; activeSession: TableSession | null } | null) => {
     restaurant.value = ctx?.restaurant ?? null
@@ -162,7 +179,7 @@ export const useTableSessionStore = defineStore('tableSession', () => {
   }
 
   /** Mesa livre → inicia a sessão (mesa passa a Ocupada). */
-  const startSession = async (input: { name: string; partySize?: number; notes?: string }) => {
+  const startSession = async (input: { name: string; partySize?: number; notes?: string; avatar?: string }) => {
     if (!restaurant.value || !table.value) return null
     isSubmitting.value = true
     try {
@@ -175,13 +192,14 @@ export const useTableSessionStore = defineStore('tableSession', () => {
       if (!participant) throw new DomainError('participant_name_required', 'Indique o seu nome.')
       rememberParticipant(session, participant)
       table.value = { ...table.value, status: 'occupied', activeSessionId: session.id }
+      await saveAvatar(input.avatar)
       toastStore.success('Sessão iniciada', `Bem-vindo(a), ${participant.name}.`)
       return session
     } catch (e) {
       // Outra pessoa iniciou a sessão no mesmo instante: juntar-se a ela.
       if (e instanceof DomainError && e.code === 'table_already_occupied') {
         await refresh()
-        if (currentSession.value) return joinSession(input.name)
+        if (currentSession.value) return joinSession(input.name, input.avatar)
       }
       toastStore.error('Não foi possível iniciar a sessão', errorMessage(e))
       return null
@@ -191,11 +209,11 @@ export const useTableSessionStore = defineStore('tableSession', () => {
   }
 
   /** Mesa ocupada → este dispositivo junta-se à sessão existente. */
-  const joinSession = async (name: string) => {
+  const joinSession = async (name: string, avatar?: string) => {
     if (!currentSession.value) return null
     isSubmitting.value = true
     try {
-      const { session, participant } = await tableSessionService.joinSession(currentSession.value.id, name)
+      const { session, participant } = await tableSessionService.joinSession(currentSession.value.id, name, avatar)
       rememberParticipant(session, participant)
       toastStore.success('Juntou-se à mesa', `Os seus pedidos ficam na sessão da Mesa ${table.value?.number}.`)
       return session
@@ -234,6 +252,8 @@ export const useTableSessionStore = defineStore('tableSession', () => {
     isParticipant,
     participantName,
     participantToken,
+    participantId,
+    isOrganizer,
     loadTable,
     refresh,
     startSession,

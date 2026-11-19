@@ -515,7 +515,7 @@ const handlePrintReceipt = () => {
           <div>Pedido: <strong>{{ selectedOrder.orderCode }}</strong></div>
           <div>Mesa: <strong>{{ selectedOrder.tableNumber || 'Balcão' }}</strong></div>
           <div>Data: {{ new Date(selectedOrder.createdAt).toLocaleDateString('pt-PT') }} {{ new Date(selectedOrder.createdAt).toLocaleTimeString('pt-PT') }}</div>
-          <div>Cliente: {{ selectedOrder.customerName || 'Consumidor Final' }}</div>
+          <div>{{ selectedOrder.participantName ? 'Participante' : 'Cliente' }}: {{ selectedOrder.participantName || selectedOrder.customerName || 'Consumidor Final' }}</div>
         </div>
 
         <div class="receipt-divider">--------------------------------</div>

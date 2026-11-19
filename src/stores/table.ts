@@ -184,9 +184,10 @@ export const useTableStore = defineStore('table', () => {
     }
   }
 
-  const closeSession = async (sessionId: string) => {
+  /** Com valores por pagar só fecha com `force` + motivo (gerente; fica na auditoria). */
+  const closeSession = async (sessionId: string, options?: { force?: boolean; reason?: string }) => {
     try {
-      const session = await tableSessionService.closeSession(sessionId, actor())
+      const session = await tableSessionService.closeSession(sessionId, actor(), options)
       await refreshTable(session.tableId)
       const table = tables.value.find(t => t.id === session.tableId)
       toastStore.success('Sessão encerrada', `Mesa ${table?.number ?? ''} está livre. Total: ${session.total.toLocaleString('pt-MZ')} MT.`)

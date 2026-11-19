@@ -128,6 +128,7 @@ const handleAdvanceStatus = async (order: Order) => {
             <span class="ticket-table">MESA {{ order.tableNumber || 'BALCÃO' }}</span>
             <span class="ticket-code">{{ order.orderCode }}</span>
           </div>
+          <div v-if="order.participantName" class="ticket-person">{{ order.participantName }}</div>
 
           <div class="ticket-timer-row">
             <div class="ticket-timer">
@@ -313,6 +314,13 @@ const handleAdvanceStatus = async (order: Order) => {
   font-family: var(--font-heading);
   color: #ffffff;
   letter-spacing: -0.02em;
+}
+
+.ticket-person {
+  margin-top: 0.15rem;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.85);
 }
 
 .ticket-code {

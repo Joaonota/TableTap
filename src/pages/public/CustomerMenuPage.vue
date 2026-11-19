@@ -27,7 +27,8 @@ import TableAccessScreen from '@/components/menu/TableAccessScreen.vue'
 import SessionNameModal from '@/components/menu/SessionNameModal.vue'
 import UnavailableNoticeScreen from '@/components/menu/UnavailableNoticeScreen.vue'
 import SessionHistoryModal from '@/components/menu/SessionHistoryModal.vue'
-import BillRequestModal from '@/components/menu/BillRequestModal.vue'
+import GroupBillModal from '@/components/menu/GroupBillModal.vue'
+import ParticipantAvatar from '@/components/menu/ParticipantAvatar.vue'
 import SuggestedProductsSection from '@/components/menu/SuggestedProductsSection.vue'
 import SessionClosedScreen from '@/components/menu/SessionClosedScreen.vue'
 import CustomerNotificationStack from '@/components/menu/CustomerNotificationStack.vue'
@@ -173,7 +174,11 @@ const handleCustomerEvent = async (event: CustomerEvent) => {
       break
     }
     case 'payment.confirmed':
+      billRefreshKey.value++
       reloadOrdersSoon()
+      break
+    case 'bill.updated':
+      billRefreshKey.value++
       break
     case 'session.closed':
     case 'session.cancelled':
@@ -190,7 +195,12 @@ watch(
   () => [isSessionActive.value, activeSession.value?.id, tableSessionStore.participantToken] as const,
   ([active, sessionId, token]) => {
     if (active && sessionId && token) {
-      customerNotifications.start({ sessionId, participantToken: token, onEvent: handleCustomerEvent })
+      customerNotifications.start({
+        sessionId,
+        participantToken: token,
+        participantId: tableSessionStore.participantId,
+        onEvent: handleCustomerEvent
+      })
     } else {
       customerNotifications.stop()
     }
@@ -460,10 +470,10 @@ const openSessionModal = () => {
 }
 
 /** Mesa livre → iniciar sessão; mesa ocupada → juntar-se à sessão existente. */
-const handleSessionNameSubmit = async (payload: { name: string; partySize?: number; notes?: string }) => {
+const handleSessionNameSubmit = async (payload: { name: string; partySize?: number; notes?: string; avatar?: string }) => {
   const session =
     nameModalMode.value === 'join'
-      ? await tableSessionStore.joinSession(payload.name)
+      ? await tableSessionStore.joinSession(payload.name, payload.avatar)
       : await tableSessionStore.startSession(payload)
   if (!session) return
   isNameModalOpen.value = false
@@ -593,11 +603,24 @@ const handleSendServiceRequest = async () => {
   }
 }
 
-// Bill request
-const handleConfirmBill = async (payload: { paymentMethod: PaymentMethod; notes?: string; totalAmount: number }) => {
-  const updated = await tableSessionStore.requestBill(payload.paymentMethod, payload.notes)
-  if (updated) isBillModalOpen.value = false
+// Conta (Modo Grupo): cada participante vê a sua conta e a da mesa e paga a sua parte.
+const billRefreshKey = ref(0)
+const inviteUrl = computed(() => (typeof window !== 'undefined' ? window.location.href.split(/[?#]/)[0] : ''))
+/** Só o organizador chama a equipa para trazer a conta (os outros pagam a sua parte). */
+const handleCallStaffForBill = async () => {
+  const updated = await tableSessionStore.requestBill()
+  if (updated) toastStore.success('Conta pedida', 'A equipa foi avisada.')
 }
+const handleLeftSession = async () => {
+  isBillModalOpen.value = false
+  await tableSessionStore.refresh()
+  hasEnteredMenu.value = false
+}
+/** Modo Grupo: o acompanhamento mostra os pedidos deste telemóvel (e os registados pela equipa). */
+const myOrders = computed(() =>
+  sessionOrders.value.filter(o => !o.participantId || o.participantId === tableSessionStore.participantId)
+)
+const otherParticipants = computed(() => (activeSession.value?.participants ?? []).slice(0, 5))
 
 const handleOrderMore = () => {
   isSessionHistoryOpen.value = false
@@ -665,6 +688,17 @@ const handleOrderMore = () => {
             {{ sessionOrders.length === 0 ? 'Sessão ativa • Faça o primeiro pedido' : `${sessionOrders.length} ${sessionOrders.length === 1 ? 'pedido' : 'pedidos'} na sessão da mesa` }}
             <template v-if="(activeSession?.participants.length ?? 0) > 1"> • {{ activeSession?.participants.length }} pessoas ligadas</template>
           </span>
+          <span v-if="(activeSession?.participants.length ?? 0) > 1" class="people-stack" aria-label="Participantes da mesa">
+            <ParticipantAvatar
+              v-for="p in otherParticipants"
+              :key="p.id"
+              :id="p.id"
+              :name="p.name"
+              :avatar="p.avatar"
+              :size="24"
+            />
+            <span v-if="(activeSession?.participants.length ?? 0) > 5" class="people-more">+{{ (activeSession?.participants.length ?? 0) - 5 }}</span>
+          </span>
         </div>
 
         <div class="banner-quick-actions">
@@ -687,13 +721,13 @@ const handleOrderMore = () => {
           </button>
 
           <button
-            v-if="sessionOrders.length > 0 && !activeSession?.billRequestedAt"
+            v-if="sessionOrders.length > 0"
             type="button"
             class="banner-btn warning"
             @click="isBillModalOpen = true"
           >
             <Receipt :size="15" />
-            <span>Pedir a Conta</span>
+            <span>Conta</span>
           </button>
 
           <button
@@ -711,7 +745,7 @@ const handleOrderMore = () => {
     <!-- Área do pedido: estado em tempo real -->
     <div v-if="isSessionActive && sessionOrders.length" class="orders-tracker-wrap">
       <SessionOrdersTracker
-        :orders="sessionOrders"
+        :orders="myOrders"
         :connected="customerNotifications.isConnected"
         :sound-enabled="customerNotifications.soundEnabled"
         :screen-awake="screenAwake"
@@ -936,13 +970,13 @@ const handleOrderMore = () => {
             </div>
 
             <button
-              v-if="sessionOrders.length > 0 && !activeSession?.billRequestedAt"
+              v-if="sessionOrders.length > 0"
               type="button"
               class="request-bill-sidebar-btn"
               @click="isBillModalOpen = true"
             >
               <Receipt :size="16" />
-              <span>Pedir a Conta da Mesa</span>
+              <span>Ver conta e pagar</span>
             </button>
           </div>
 
@@ -1310,13 +1344,18 @@ const handleOrderMore = () => {
       @request-bill="isSessionHistoryOpen = false; isBillModalOpen = true"
     />
 
-    <!-- Bill Request Modal -->
-    <BillRequestModal
+    <!-- Conta: minha conta, conta da mesa e pagamento (Modo Grupo) -->
+    <GroupBillModal
       :is-open="isBillModalOpen"
-      :session="activeSession"
-      :orders="sessionOrders"
+      :session-id="activeSession?.id ?? null"
+      :participant-token="tableSessionStore.participantToken"
+      :table-number="table?.number"
+      :is-organizer="tableSessionStore.isOrganizer"
+      :invite-url="inviteUrl"
+      :refresh-key="billRefreshKey"
       @close="isBillModalOpen = false"
-      @confirm-bill="handleConfirmBill"
+      @call-staff="handleCallStaffForBill"
+      @left="handleLeftSession"
     />
   </div>
 
@@ -1442,6 +1481,23 @@ const handleOrderMore = () => {
 }
 
 /* Session Status Banner */
+.people-stack {
+  display: inline-flex;
+  align-items: center;
+  margin-top: 0.35rem;
+}
+
+.people-stack > :deep(.pa) + :deep(.pa) {
+  margin-left: -6px;
+}
+
+.people-more {
+  margin-left: 0.35rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  opacity: 0.85;
+}
+
 .vat-note {
   margin: 0.35rem 0 0;
   font-size: 0.72rem;

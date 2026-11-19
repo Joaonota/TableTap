@@ -64,6 +64,7 @@ export const useCustomerNotificationStore = defineStore('customerNotifications',
 
   let sessionId: string | null = null
   let participantToken: string | null = null
+  let meParticipantId: string | undefined
   let seen = new Set<string>()
   let knownStatuses: Record<string, string> = {}
   let stopChannel: (() => void) | null = null
@@ -137,7 +138,7 @@ export const useCustomerNotificationStore = defineStore('customerNotifications',
     }
     persist()
 
-    const content = describeCustomerEvent(event)
+    const content = describeCustomerEvent(event, meParticipantId)
     if (content) {
       show({
         ...content,
@@ -196,8 +197,9 @@ export const useCustomerNotificationStore = defineStore('customerNotifications',
   }
 
   /** Começa a ouvir a sessão deste dispositivo. Idempotente para a mesma sessão. */
-  const start = (input: { sessionId: string; participantToken: string; onEvent?: CustomerEventListener }) => {
+  const start = (input: { sessionId: string; participantToken: string; participantId?: string; onEvent?: CustomerEventListener }) => {
     listener = input.onEvent ?? null
+    meParticipantId = input.participantId
     if (sessionId === input.sessionId && stopChannel) return
     stop()
     sessionId = input.sessionId

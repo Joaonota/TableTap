@@ -1,6 +1,11 @@
 <script setup lang="ts">
 import { computed, ref, watch, reactive } from 'vue'
 import type { Order, TableSession } from '@/types'
+import type { SessionBill } from '@/domain/groupBill'
+import { formatMt } from '@/domain/groupBill'
+import { errorMessage } from '@/domain/errors'
+import { useToastStore } from '@/stores/toast'
+import ParticipantAvatar from '@/components/menu/ParticipantAvatar.vue'
 import { orderService, tableSessionService } from '@/services'
 import { useTableStore } from '@/stores/table'
 import { useNfcTagStore } from '@/stores/nfcTag'
@@ -35,7 +40,10 @@ import {
   Nfc,
   History,
   UtensilsCrossed,
-  Loader2
+  Loader2,
+  Crown,
+  RefreshCw,
+  UserX
 } from 'lucide-vue-next'
 
 const props = defineProps<{ tableId: string | null }>()
@@ -62,6 +70,29 @@ const historyOrders = ref<Map<string, number>>(new Map())
 const isLoadingDetail = ref(false)
 const isBusy = ref(false)
 const isQrOpen = ref(false)
+const toastStore = useToastStore()
+
+// ---------- Modo Grupo: conta individual e colectiva ----------
+const bill = ref<SessionBill | null>(null)
+const isLoadingBill = ref(false)
+const loadBill = async () => {
+  const current = session.value
+  if (!current) {
+    bill.value = null
+    return
+  }
+  isLoadingBill.value = true
+  try {
+    bill.value = await tableSessionService.getBill(current.id)
+  } catch {
+    bill.value = null
+  } finally {
+    isLoadingBill.value = false
+  }
+}
+const ordersOf = (participantId: string) => sessionOrders.value.filter(o => o.participantId === participantId)
+const hasPending = computed(() => (bill.value?.totals.pending ?? 0) > 0.005)
+const revokeTarget = ref<{ id: string; name: string } | null>(null)
 
 const pendingRequests = computed(() =>
   serviceRequestStore.requests.filter(r => r.tableId === props.tableId && (r.status === 'new' || r.status === 'in_progress'))
@@ -81,6 +112,7 @@ const loadDetail = async () => {
     historyOrders.value = new Map(
       history.value.map(s => [s.id, orders.filter(o => s.orderIds.includes(o.id) || o.tableSessionId === s.id).length])
     )
+    await loadBill()
   } finally {
     isLoadingDetail.value = false
   }
@@ -128,13 +160,22 @@ const submitStart = async () => {
 }
 
 // ---------- Confirmações ----------
-type PendingAction = 'close' | 'cancel' | 'delete' | 'deactivate' | null
+type PendingAction = 'close' | 'cancel' | 'delete' | 'deactivate' | 'revoke' | null
 const pendingAction = ref<PendingAction>(null)
 
 const confirmConfig = computed(() => {
   const n = table.value?.number ?? ''
   switch (pendingAction.value) {
     case 'close':
+      if (hasPending.value) {
+        return {
+          title: 'Encerrar com valores por pagar',
+          message: `A Mesa ${n} ainda tem ${formatMt(bill.value?.totals.pending ?? 0)} por pagar (inclui pagamentos por confirmar). Só um gerente pode encerrar assim, com motivo — fica registado na auditoria.`,
+          confirmLabel: 'Encerrar mesmo assim',
+          variant: 'danger' as const,
+          inputLabel: 'Motivo (obrigatório)'
+        }
+      }
       return {
         title: 'Encerrar sessão',
         message: `Encerrar a sessão da Mesa ${n}? Total: ${(session.value?.total ?? 0).toLocaleString('pt-MZ')} MT. A mesa volta a ficar Livre e os clientes deixam de poder fazer pedidos nesta sessão.`,
@@ -156,6 +197,14 @@ const confirmConfig = computed(() => {
         confirmLabel: 'Remover mesa',
         variant: 'danger' as const
       }
+    case 'revoke':
+      return {
+        title: 'Retirar participante',
+        message: `Retirar ${revokeTarget.value?.name ?? ''} da sessão? O telemóvel deixa de poder fazer pedidos e de ver a conta. Os pedidos já feitos continuam na conta.`,
+        confirmLabel: 'Retirar',
+        variant: 'danger' as const,
+        inputLabel: 'Motivo (opcional)'
+      }
     case 'deactivate':
       return {
         title: 'Desativar mesa',
@@ -173,7 +222,24 @@ const runConfirmed = async (input: string) => {
   isBusy.value = true
   const action = pendingAction.value
   try {
-    if (action === 'close' && session.value) await tableStore.closeSession(session.value.id)
+    if (action === 'close' && session.value) {
+      if (hasPending.value && input.trim().length < 5) {
+        toastStore.warning('Indique o motivo', 'Para encerrar com valores por pagar, escreva o motivo (mín. 5 caracteres).')
+        return
+      }
+      await tableStore.closeSession(session.value.id, hasPending.value ? { force: true, reason: input } : undefined)
+    }
+    if (action === 'revoke' && revokeTarget.value) {
+      try {
+        await tableSessionService.revokeParticipant(revokeTarget.value.id, input)
+        toastStore.success('Participante retirado', `${revokeTarget.value.name} já não faz parte da sessão.`)
+        await tableStore.refreshTable(table.value.id)
+        await loadBill()
+      } catch (e) {
+        toastStore.error('Não foi possível retirar', errorMessage(e))
+      }
+      revokeTarget.value = null
+    }
     if (action === 'cancel' && session.value) await tableStore.cancelSession(session.value.id, input)
     if (action === 'deactivate') await tableStore.setActive(table.value.id, false)
     if (action === 'delete') {
@@ -306,6 +372,53 @@ const updateRequest = (id: string, next: 'in_progress' | 'completed') => service
           </div>
         </section>
 
+        <!-- Modo Grupo: conta individual e colectiva -->
+        <section v-if="session && bill && bill.participants.length" class="block">
+          <h4 class="block-title">
+            <Users :size="14" /> Conta da mesa · {{ bill.participants.filter(p => p.active).length }}
+            {{ bill.participants.filter(p => p.active).length === 1 ? 'participante' : 'participantes' }}
+            <button type="button" class="icon-btn" title="Atualizar" :disabled="isLoadingBill" @click="loadBill">
+              <RefreshCw :size="13" :class="{ spin: isLoadingBill }" />
+            </button>
+          </h4>
+          <div class="gm-totals">
+            <div><span>Total</span><strong>{{ formatMt(bill.totals.total) }}</strong></div>
+            <div><span>Pago</span><strong class="ok">{{ formatMt(bill.totals.paid) }}</strong></div>
+            <div><span>A confirmar</span><strong>{{ formatMt(bill.totals.reserved) }}</strong></div>
+            <div><span>Por pagar</span><strong :class="{ warn: bill.totals.pending > 0 }">{{ formatMt(bill.totals.pending) }}</strong></div>
+          </div>
+          <ul class="gm-people">
+            <li v-for="p in bill.participants" :key="p.id" :class="{ inactive: !p.active }">
+              <div class="gm-head">
+                <ParticipantAvatar :id="p.id" :name="p.name" :avatar="p.avatar" :size="30" />
+                <div class="gm-name">
+                  <strong>{{ p.name }} <Crown v-if="p.isPrimary" :size="12" class="crown" /></strong>
+                  <span class="muted">{{ p.active ? (p.isPrimary ? 'Organizador' : 'Participante') : 'Saiu da sessão' }}</span>
+                </div>
+                <button
+                  v-if="p.active"
+                  type="button"
+                  class="icon-btn danger"
+                  title="Retirar da sessão"
+                  @click="revokeTarget = { id: p.id, name: p.name }; pendingAction = 'revoke'"
+                >
+                  <UserX :size="14" />
+                </button>
+              </div>
+              <dl class="gm-vals">
+                <div><dt>Consumo</dt><dd>{{ formatMt(p.consumption) }}</dd></div>
+                <div><dt>Pago</dt><dd class="ok">{{ formatMt(p.paid) }}</dd></div>
+                <div><dt>Pendente</dt><dd :class="{ warn: p.pending > 0 }">{{ formatMt(p.pending) }}</dd></div>
+              </dl>
+              <div v-if="ordersOf(p.id).length" class="gm-orders">
+                <span v-for="o in ordersOf(p.id)" :key="o.id" class="gm-order">
+                  {{ o.orderCode }} · <AppBadge :variant="ORDER_STATUS[o.status].variant">{{ ORDER_STATUS[o.status].label }}</AppBadge>
+                </span>
+              </div>
+            </li>
+          </ul>
+        </section>
+
         <!-- Pedidos da sessão -->
         <section v-if="session" class="block">
           <h4 class="block-title">Pedidos da sessão</h4>
@@ -315,7 +428,7 @@ const updateRequest = (id: string, next: 'in_progress' | 'completed') => service
             <li v-for="order in sessionOrders" :key="order.id" class="order-row">
               <div class="order-main">
                 <strong>{{ order.orderCode }}</strong>
-                <span class="muted">{{ fmtTime(order.createdAt) }} · {{ order.customerName || 'Cliente' }} · {{ order.items.reduce((s, i) => s + i.quantity, 0) }} itens</span>
+                <span class="muted">{{ fmtTime(order.createdAt) }} · {{ order.participantName || order.customerName || 'Cliente' }} · {{ order.items.reduce((s, i) => s + i.quantity, 0) }} itens</span>
               </div>
               <AppBadge :variant="ORDER_STATUS[order.status].variant">{{ ORDER_STATUS[order.status].label }}</AppBadge>
               <span class="order-total" :class="{ 'is-cancelled': order.status === 'cancelled' }">{{ order.total.toLocaleString('pt-MZ') }} MT</span>
@@ -476,6 +589,144 @@ const updateRequest = (id: string, next: 'in_progress' | 'completed') => service
 </template>
 
 <style scoped>
+.icon-btn {
+  margin-left: auto;
+  width: 28px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--border-color, #e2e8f0);
+  border-radius: 8px;
+  background: #fff;
+  color: var(--text-muted, #64748b);
+  cursor: pointer;
+}
+
+.icon-btn.danger:hover {
+  color: #b91c1c;
+  border-color: #fecaca;
+}
+
+.gm-totals {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0.4rem;
+  margin-bottom: 0.75rem;
+}
+
+.gm-totals > div {
+  display: flex;
+  flex-direction: column;
+  padding: 0.5rem 0.6rem;
+  background: var(--color-slate-50, #f8fafc);
+  border: 1px solid var(--border-color, #e2e8f0);
+  border-radius: 10px;
+}
+
+.gm-totals span {
+  font-size: 0.68rem;
+  color: var(--text-muted, #64748b);
+}
+
+.gm-totals strong {
+  font-size: 0.88rem;
+}
+
+.ok {
+  color: #059669;
+}
+
+.warn {
+  color: #b45309;
+}
+
+.gm-people {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.gm-people li {
+  padding: 0.65rem 0.75rem;
+  border: 1px solid var(--border-color, #e2e8f0);
+  border-radius: 12px;
+}
+
+.gm-people li.inactive {
+  opacity: 0.7;
+  border-style: dashed;
+}
+
+.gm-head {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.gm-name {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1;
+}
+
+.gm-name strong {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.88rem;
+}
+
+.gm-name .muted {
+  font-size: 0.72rem;
+}
+
+.crown {
+  color: #d97706;
+}
+
+.gm-vals {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.35rem;
+  margin: 0.5rem 0 0;
+}
+
+.gm-vals dt {
+  font-size: 0.68rem;
+  color: var(--text-muted, #64748b);
+}
+
+.gm-vals dd {
+  margin: 0;
+  font-weight: 700;
+  font-size: 0.84rem;
+}
+
+.gm-orders {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem 0.75rem;
+  margin-top: 0.45rem;
+  font-size: 0.75rem;
+}
+
+.gm-order {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+@media (max-width: 480px) {
+  .gm-totals {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
 .drawer-head {
   display: flex;
   flex-direction: column;

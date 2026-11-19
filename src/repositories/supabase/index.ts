@@ -12,6 +12,7 @@ import { toDomainError, unwrap, unwrapOne } from '@/lib/supabaseErrors'
 import { DomainError } from '@/domain/errors'
 import { normalizePlanEntitlements } from '@/domain/planLimits'
 import type { ReviewDeviceType, ReviewTrackEvent } from '@/domain/reviews'
+import type { SessionBill } from '@/domain/groupBill'
 import type {
   Category,
   Company,
@@ -56,6 +57,8 @@ import type {
   InviteResult,
   PreRegisterCompanyInput,
   PushSubscriptionInput,
+  CloseSessionOptions,
+  CreateSessionPaymentInput,
   ICategoryRepository,
   ICompanyRepository,
   IMediaRepository,
@@ -553,7 +556,64 @@ const mapParticipant = (p: Json): SessionParticipant & { token?: string } => ({
   name: p.name,
   joinedAt: p.joinedAt,
   isPrimary: p.isPrimary,
+  avatar: p.avatar ?? undefined,
   token: p.token
+})
+
+const n = (v: unknown) => Number(v ?? 0)
+/** Conta devolvida por get_session_bill (já em camelCase; numeric → number). */
+export const normalizeBill = (j: Json): SessionBill => ({
+  sessionId: j.sessionId,
+  status: j.status,
+  meParticipantId: j.meParticipantId ?? undefined,
+  totals: {
+    total: n(j.totals?.total),
+    paid: n(j.totals?.paid),
+    reserved: n(j.totals?.reserved),
+    outstanding: n(j.totals?.outstanding),
+    pending: n(j.totals?.pending)
+  },
+  equalShare: n(j.equalShare),
+  equalPayers: n(j.equalPayers) || 1,
+  participants: ((j.participants ?? []) as Json[]).map(p => ({
+    id: p.id,
+    name: p.name,
+    avatar: p.avatar ?? undefined,
+    isPrimary: !!p.isPrimary,
+    active: !!p.active,
+    isMe: !!p.isMe,
+    consumption: n(p.consumption),
+    paid: n(p.paid),
+    reserved: n(p.reserved),
+    pending: n(p.pending),
+    outstanding: n(p.outstanding)
+  })),
+  lines: ((j.lines ?? []) as Json[]).map(l => ({
+    itemId: l.itemId,
+    orderId: l.orderId,
+    orderCode: l.orderCode,
+    orderStatus: l.orderStatus,
+    participantId: l.participantId ?? undefined,
+    productName: l.productName,
+    quantity: n(l.quantity),
+    unitPrice: n(l.unitPrice),
+    itemTotal: n(l.itemTotal),
+    due: n(l.due),
+    paid: n(l.paid),
+    reserved: n(l.reserved),
+    outstanding: n(l.outstanding)
+  })),
+  payments: ((j.payments ?? []) as Json[]).map(p => ({
+    id: p.id,
+    participantId: p.participantId ?? undefined,
+    payerName: p.payerName ?? undefined,
+    amount: n(p.amount),
+    method: p.method,
+    status: p.status,
+    splitMode: p.splitMode ?? undefined,
+    createdAt: p.createdAt,
+    isMine: !!p.isMine
+  }))
 })
 
 export class SupabaseTableSessionRepository implements ITableSessionRepository {
@@ -595,13 +655,29 @@ export class SupabaseTableSessionRepository implements ITableSessionRepository {
     }
   }
 
-  async join(sessionId: string, name: string) {
-    const result = await rpc<Json>('join_table_session', { p_session_id: sessionId, p_name: name })
+  async join(sessionId: string, name: string, avatar?: string) {
+    const result = await rpc<Json>('join_table_session', { p_session_id: sessionId, p_name: name, p_avatar: avatar ?? null })
     return { session: normalizeSessionJson(result.session), participant: mapParticipant(result.participant) }
   }
 
-  async close(sessionId: string, _actor: string): Promise<TableSession> {
-    return normalizeSessionJson(await rpc('close_table_session', { p_session_id: sessionId }))
+  async close(sessionId: string, _actor: string, options?: CloseSessionOptions): Promise<TableSession> {
+    return normalizeSessionJson(
+      await rpc('close_table_session', {
+        p_session_id: sessionId,
+        p_force: options?.force ?? false,
+        p_reason: options?.reason?.trim() || null
+      })
+    )
+  }
+
+  async getBill(sessionId: string): Promise<SessionBill> {
+    return normalizeBill(await rpc<Json>('get_session_bill', { p_session_id: sessionId, p_participant_token: null }))
+  }
+
+  async revokeParticipant(participantId: string, reason?: string): Promise<TableSession> {
+    return normalizeSessionJson(
+      await rpc('revoke_session_participant', { p_participant_id: participantId, p_reason: reason?.trim() || null })
+    )
   }
 
   async cancel(sessionId: string, _actor: string, reason?: string): Promise<TableSession> {
@@ -1153,6 +1229,34 @@ export class SupabasePublicMenuRepository implements IPublicMenuRepository {
 
   async unregisterPushSubscription(participantToken: string, endpoint: string): Promise<void> {
     await rpc('unregister_push_subscription', { p_participant_token: participantToken, p_endpoint: endpoint })
+  }
+
+  async getSessionBill(sessionId: string, participantToken: string): Promise<SessionBill> {
+    return normalizeBill(await rpc<Json>('get_session_bill', { p_session_id: sessionId, p_participant_token: participantToken }))
+  }
+
+  async createSessionPayment(input: CreateSessionPaymentInput): Promise<SessionBill & { paymentId: string }> {
+    const r = await rpc<Json>('create_session_payment', {
+      p_session_id: input.sessionId,
+      p_participant_token: input.participantToken,
+      p_mode: input.mode,
+      p_method: input.method,
+      p_items: input.mode === 'items' ? (input.items ?? []) : null,
+      p_notes: input.notes?.trim() || null
+    })
+    return { ...normalizeBill(r), paymentId: r.paymentId }
+  }
+
+  async cancelSessionPayment(paymentId: string, participantToken: string): Promise<SessionBill> {
+    return normalizeBill(await rpc<Json>('cancel_session_payment', { p_payment_id: paymentId, p_participant_token: participantToken }))
+  }
+
+  async leaveSession(sessionId: string, participantToken: string): Promise<TableSession> {
+    return normalizeSessionJson(await rpc('leave_table_session', { p_session_id: sessionId, p_participant_token: participantToken }))
+  }
+
+  async updateParticipantAvatar(sessionId: string, participantToken: string, avatar: string): Promise<void> {
+    await rpc('update_participant_avatar', { p_session_id: sessionId, p_participant_token: participantToken, p_avatar: avatar })
   }
 }
 

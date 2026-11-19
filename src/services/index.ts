@@ -1,5 +1,6 @@
 import { repositories } from '@/repositories'
 import { toAbsoluteUrl } from '@/domain/publicUrl'
+import type { SessionBill } from '@/domain/groupBill'
 import type {
   TableInput,
   StartSessionInput,
@@ -8,6 +9,8 @@ import type {
   CreateCompanyInput,
   PreRegisterCompanyInput,
   PushSubscriptionInput,
+  CloseSessionOptions,
+  CreateSessionPaymentInput,
   InviteDelivery,
   InviteResult,
   PlaceOrderInput,
@@ -313,6 +316,21 @@ export const publicTableService = {
   },
   unregisterPushSubscription(participantToken: string, endpoint: string): Promise<void> {
     return publicMenuRepo.unregisterPushSubscription(participantToken, endpoint)
+  },
+  getSessionBill(sessionId: string, participantToken: string): Promise<SessionBill> {
+    return publicMenuRepo.getSessionBill(sessionId, participantToken)
+  },
+  createSessionPayment(input: CreateSessionPaymentInput): Promise<SessionBill & { paymentId: string }> {
+    return publicMenuRepo.createSessionPayment(input)
+  },
+  cancelSessionPayment(paymentId: string, participantToken: string): Promise<SessionBill> {
+    return publicMenuRepo.cancelSessionPayment(paymentId, participantToken)
+  },
+  leaveSession(sessionId: string, participantToken: string): Promise<TableSession> {
+    return publicMenuRepo.leaveSession(sessionId, participantToken)
+  },
+  updateParticipantAvatar(sessionId: string, participantToken: string, avatar: string): Promise<void> {
+    return publicMenuRepo.updateParticipantAvatar(sessionId, participantToken, avatar)
   }
 }
 
@@ -655,12 +673,19 @@ export const tableSessionService = {
   async startSession(input: StartSessionInput): Promise<{ session: TableSession; participant: SessionParticipant | null }> {
     return tableSessionRepo.start(input)
   },
-  async joinSession(sessionId: string, name: string): Promise<{ session: TableSession; participant: SessionParticipant }> {
-    return tableSessionRepo.join(sessionId, name)
+  async joinSession(sessionId: string, name: string, avatar?: string): Promise<{ session: TableSession; participant: SessionParticipant }> {
+    return tableSessionRepo.join(sessionId, name, avatar)
   },
-  /** Ocupada → Livre (sessão encerrada). */
-  async closeSession(sessionId: string, actor: string): Promise<TableSession> {
-    return tableSessionRepo.close(sessionId, actor)
+  /** Ocupada → Livre (sessão encerrada). Recusa com valores por pagar, salvo "force" + motivo (gerente). */
+  async closeSession(sessionId: string, actor: string, options?: CloseSessionOptions): Promise<TableSession> {
+    return tableSessionRepo.close(sessionId, actor, options)
+  },
+  /** Modo Grupo: conta da sessão (equipa). */
+  getBill(sessionId: string): Promise<SessionBill> {
+    return tableSessionRepo.getBill(sessionId)
+  },
+  revokeParticipant(participantId: string, reason?: string): Promise<TableSession> {
+    return tableSessionRepo.revokeParticipant(participantId, reason)
   },
   /** Ocupada → Livre (sessão cancelada). */
   async cancelSession(sessionId: string, actor: string, reason?: string): Promise<TableSession> {

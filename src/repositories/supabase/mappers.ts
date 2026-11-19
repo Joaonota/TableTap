@@ -317,7 +317,8 @@ export const mapTable = (r: Row): Table => ({
   updatedAt: r.updated_at ?? r.updatedAt
 })
 
-export const SESSION_SELECT = '*, session_participants(id, name, joined_at, is_primary), orders(id, created_at)'
+export const SESSION_SELECT =
+  '*, session_participants(id, name, joined_at, is_primary, avatar, left_at, revoked_at), orders(id, created_at)'
 
 export const mapSession = (r: Row): TableSession => ({
   id: r.id,
@@ -330,8 +331,10 @@ export const mapSession = (r: Row): TableSession => ({
   closedBy: opt(r.closed_by),
   cancelReason: opt(r.cancel_reason),
   primaryCustomerName: opt(r.primary_customer_name),
+  // Só os participantes activos (os que saíram ou foram revogados ficam de fora).
   participants: ((r.session_participants ?? []) as Row[])
-    .map(p => ({ id: p.id, name: p.name, joinedAt: p.joined_at, isPrimary: p.is_primary }))
+    .filter(p => !p.left_at && !p.revoked_at)
+    .map(p => ({ id: p.id, name: p.name, joinedAt: p.joined_at, isPrimary: p.is_primary, avatar: opt(p.avatar) }))
     .sort((a, b) => a.joinedAt.localeCompare(b.joinedAt)),
   partySize: optNum(r.party_size),
   notes: opt(r.notes),
@@ -339,7 +342,9 @@ export const mapSession = (r: Row): TableSession => ({
     .sort((a, b) => String(a.created_at).localeCompare(String(b.created_at)))
     .map(o => o.id),
   total: num(r.total),
-  billRequestedAt: opt(r.bill_requested_at)
+  billRequestedAt: opt(r.bill_requested_at),
+  unpaidAtClose: optNum(r.unpaid_at_close),
+  forcedCloseReason: opt(r.forced_close_reason)
 })
 
 /** Sessão devolvida pelas funções SQL (já em camelCase). */
@@ -352,6 +357,8 @@ export const normalizeSessionJson = (j: Row): TableSession => ({
   partySize: optNum(j.partySize),
   notes: opt(j.notes),
   billRequestedAt: opt(j.billRequestedAt),
+  unpaidAtClose: optNum(j.unpaidAtClose),
+  forcedCloseReason: opt(j.forcedCloseReason),
   total: num(j.total),
   participants: j.participants ?? [],
   orderIds: j.orderIds ?? []
@@ -447,7 +454,7 @@ export const productToRow = (p: Partial<Product>): Row => {
 }
 
 // ---------------------------------------------------- Pedidos e pagamentos
-export const ORDER_SELECT = '*, order_items(*), order_status_history(*)'
+export const ORDER_SELECT = '*, order_items(*), order_status_history(*), session_participants(name)'
 
 const mapOrderItem = (r: Row): OrderItem => ({
   id: r.id,
@@ -473,6 +480,8 @@ export const mapOrder = (r: Row): Order => ({
   tableId: opt(r.table_id),
   tableNumber: opt(r.table_number),
   tableSessionId: opt(r.table_session_id),
+  participantId: opt(r.participant_id),
+  participantName: opt(one(r.session_participants)?.name),
   isAdditional: r.is_additional,
   orderCode: r.order_code,
   type: r.type,
@@ -500,6 +509,8 @@ export const normalizeOrderJson = (j: Row): Order => ({
   tableId: opt(j.tableId),
   tableNumber: opt(j.tableNumber),
   tableSessionId: opt(j.tableSessionId),
+  participantId: opt(j.participantId),
+  participantName: opt(j.participantName),
   paymentMethod: opt(j.paymentMethod),
   customerName: opt(j.customerName),
   customerPhone: opt(j.customerPhone),
@@ -524,15 +535,30 @@ export const normalizeOrderJson = (j: Row): Order => ({
 
 export const PAYMENT_SELECT = '*, orders(order_code, table_number, status)'
 
+const SPLIT_LABEL: Record<string, string> = {
+  own: 'o seu consumo',
+  equal: 'parte igual',
+  items: 'produtos escolhidos',
+  all: 'conta toda'
+}
+
 export const mapPayment = (r: Row): Payment => {
   const order = one(r.orders)
+  // Conta dividida (Modo Grupo): cobre itens de vários pedidos — identificar por quem paga.
+  const groupLabel = !r.order_id && r.table_session_id
+    ? `Conta da mesa · ${r.payer_name ?? 'Cliente'}${r.split_mode ? ` (${SPLIT_LABEL[r.split_mode] ?? r.split_mode})` : ''}`
+    : ''
   return {
     id: r.id,
     tenantId: r.company_id,
     restaurantId: r.restaurant_id,
-    orderId: r.order_id,
-    orderCode: order?.order_code ?? '',
-    tableNumber: opt(order?.table_number),
+    orderId: r.order_id ?? '',
+    orderCode: order?.order_code ?? groupLabel,
+    tableNumber: opt(order?.table_number ?? r.table_number),
+    tableSessionId: opt(r.table_session_id),
+    participantId: opt(r.participant_id),
+    payerName: opt(r.payer_name),
+    splitMode: opt(r.split_mode),
     orderStatus: order?.status,
     amount: num(r.amount),
     method: r.method,

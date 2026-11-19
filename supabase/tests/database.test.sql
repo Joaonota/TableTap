@@ -335,7 +335,7 @@ update public.payments set status = 'paid' where order_id = tests.id('order1');
 select tests.ok('confirmar pagamento atualiza o pedido', (select payment_status = 'paid' from public.orders where id = tests.id('order1')));
 select public.update_order_status(tests.id('order1'), 'cancelled');
 select tests.ok('pedido cancelado sai do total da sessão', (select total = 805 from public.table_sessions where id = tests.id('session1')));
-select public.close_table_session(tests.id('session1'));
+select public.close_table_session(tests.id('session1'), true, 'Teste: fecho com valores em aberto');
 select tests.ok('encerrar sessão liberta a mesa', (select status = 'free' and active_session_id is null from public.dining_tables where id = tests.id('table1')));
 reset role;
 select tests.login(null);
