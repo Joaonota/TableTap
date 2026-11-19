@@ -64,7 +64,14 @@ const openDetails = (pay: Payment) => {
   isDetailModalOpen.value = true
 }
 
+/** Só se confirma o recebimento depois de o pedido ser entregue na mesa (migração 1400). */
+const canConfirm = (pay: Payment) => !pay.orderStatus || pay.orderStatus === 'delivered'
+
 const handleConfirmPayment = async (pay: Payment) => {
+  if (!canConfirm(pay)) {
+    toastStore.warning('Pedido ainda não entregue', `Marque o pedido ${pay.orderCode} como entregue antes de confirmar o pagamento.`)
+    return
+  }
   try {
     const updated = await paymentService.updateStatus(pay.id, 'paid')
     const index = payments.value.findIndex(p => p.id === pay.id)
@@ -202,9 +209,11 @@ const handleRefundPayment = async (pay: Payment) => {
                   v-if="pay.status === 'awaiting_confirmation'"
                   variant="success"
                   size="sm"
+                  :disabled="!canConfirm(pay)"
+                  :title="canConfirm(pay) ? undefined : 'Aguarda a entrega do pedido na mesa'"
                   @click="handleConfirmPayment(pay)"
                 >
-                  Confirmar
+                  {{ canConfirm(pay) ? 'Confirmar' : 'Aguarda entrega' }}
                 </AppButton>
                 <AppButton
                   v-else
@@ -274,9 +283,11 @@ const handleRefundPayment = async (pay: Payment) => {
         <AppButton
           v-if="selectedPayment?.status === 'awaiting_confirmation'"
           variant="success"
+          :disabled="!canConfirm(selectedPayment!)"
+          :title="canConfirm(selectedPayment!) ? undefined : 'Aguarda a entrega do pedido na mesa'"
           @click="handleConfirmPayment(selectedPayment!)"
         >
-          Confirmar Recebimento
+          {{ canConfirm(selectedPayment!) ? 'Confirmar Recebimento' : 'Aguarda entrega do pedido' }}
         </AppButton>
         <AppButton
           v-if="selectedPayment?.status === 'paid'"

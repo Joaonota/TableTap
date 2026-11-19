@@ -522,7 +522,7 @@ export const normalizeOrderJson = (j: Row): Order => ({
   history: ((j.history ?? []) as Row[]).map(h => ({ status: h.status, timestamp: h.timestamp, updatedBy: h.updatedBy, note: opt(h.note) }))
 })
 
-export const PAYMENT_SELECT = '*, orders(order_code, table_number)'
+export const PAYMENT_SELECT = '*, orders(order_code, table_number, status)'
 
 export const mapPayment = (r: Row): Payment => {
   const order = one(r.orders)
@@ -533,6 +533,7 @@ export const mapPayment = (r: Row): Payment => {
     orderId: r.order_id,
     orderCode: order?.order_code ?? '',
     tableNumber: opt(order?.table_number),
+    orderStatus: order?.status,
     amount: num(r.amount),
     method: r.method,
     status: r.status,

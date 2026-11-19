@@ -38,6 +38,16 @@ begin
   perform set_config('realtime.topic', '', true);
   return v;
 end $$;
+/** Executa SQL e devolve o hint do erro ('' se não falhar). */
+create function tests.error_hint(p_sql text) returns text language plpgsql as $$
+declare v_hint text;
+begin
+  execute p_sql;
+  return '';
+exception when others then
+  get stacked diagnostics v_hint = pg_exception_hint;
+  return coalesce(nullif(v_hint, ''), sqlstate);
+end $$;
 grant execute on all functions in schema tests to anon, authenticated;
 
 -- ---------------------------------------------------------------------
@@ -156,9 +166,25 @@ select tests.ok('pedido cancelado notifica só a sua sessão',
 -- ---------------------------------------------------------------------
 -- 2. Pagamento confirmado: um aviso por sessão
 -- ---------------------------------------------------------------------
+-- Migração 1400: só se paga depois de entregue.
 select tests.login('ownerA'); set role authenticated;
+select tests.ok('pedido novo nasce com pagamento pendente',
+  (select payment_status from public.orders where id = tests.id('o3')) = 'pending');
+select tests.ok('não se marca como pago um pedido ainda não entregue (Pedidos)',
+  tests.error_hint(format('update public.orders set payment_status = %L where id = %L', 'paid', tests.id('o3'))) = 'payment_before_delivery');
+select tests.ok('pedido pronto mas não entregue também não pode ser pago',
+  tests.error_hint(format('update public.orders set payment_status = %L where id = %L', 'confirmed', tests.id('o1'))) = 'payment_before_delivery');
+select tests.ok('confirmar o pagamento em Pagamentos também é recusado antes da entrega',
+  tests.error_hint(format('insert into public.payments (restaurant_id, order_id, amount, method, status, transaction_reference) values (%L, %L, 500, %L, %L, %L)',
+    tests.id('restA1'), tests.id('o3'), 'cash', 'paid', '')) = 'payment_before_delivery'
+  and (select payment_status from public.orders where id = tests.id('o3')) = 'pending'
+  and not exists (select 1 from public.payments where order_id = tests.id('o3') and status = 'paid'));
+select public.update_order_status(tests.id('o1'), 'delivered');
+select public.update_order_status(tests.id('o3'), 'delivered');
 update public.orders set payment_status = 'paid' where id in (tests.id('o1'), tests.id('o3'));
 reset role;
+select tests.ok('depois de entregue, o pagamento pode ficar pago',
+  (select bool_and(payment_status = 'paid') from public.orders where id in (tests.id('o1'), tests.id('o3'))));
 select tests.ok('pagamento confirmado chega à sessão',
   tests.msgs('tokAna', 'payment.confirmed') >= 1 and tests.msgs('tokCarla', 'payment.confirmed') = 0);
 select tests.ok('vários pedidos pagos partilham o mesmo eventId (o telemóvel mostra um só aviso)',
@@ -209,10 +235,10 @@ alter function realtime.send(jsonb, text, text, boolean) rename to send_ok;
 create function realtime.send(payload jsonb, event text, topic text, private boolean default true)
 returns void language plpgsql as $$ begin raise exception 'Realtime indisponível'; end $$;
 select tests.login('ownerA'); set role authenticated;
-select public.update_order_status(tests.id('o3'), 'delivered');
+select public.update_order_status(tests.id('o2'), 'received');
 reset role;
 select tests.ok('com o Realtime em falha, o estado do pedido muda na mesma',
-  (select status from public.orders where id = tests.id('o3')) = 'delivered');
+  (select status from public.orders where id = tests.id('o2')) = 'received');
 drop function realtime.send(jsonb, text, text, boolean);
 alter function realtime.send_ok(jsonb, text, text, boolean) rename to send;
 

@@ -407,6 +407,8 @@ export interface Payment {
   orderId: string
   orderCode: string
   tableNumber?: string
+  /** Estado do pedido: o pagamento só pode ser confirmado depois de "delivered". */
+  orderStatus?: OrderStatus
   amount: number
   method: PaymentMethod
   status: PaymentStatus

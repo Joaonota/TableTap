@@ -65,8 +65,17 @@ const handleStatusChange = async (newStatus: OrderStatus) => {
   selectedOrder.value = updated
 }
 
+/** O pagamento só pode ficar "Pago" depois de o pedido ser entregue na mesa (migração 1400). */
+const canMarkPaid = computed(
+  () => !!selectedOrder.value && (selectedOrder.value.status === 'delivered' || selectedOrder.value.paymentStatus === 'paid')
+)
+
 const handlePaymentChange = async (newStatus: PaymentStatus) => {
   if (!selectedOrder.value) return
+  if (newStatus === 'paid' && !canMarkPaid.value) {
+    toastStore.warning('Pedido ainda não entregue', 'Marque o pedido como "Entregue na Mesa" antes de o marcar como pago.')
+    return
+  }
   const updated = await orderStore.updatePaymentStatus(selectedOrder.value.id, newStatus)
   selectedOrder.value = updated
   // Pago: se a mesa já não deve nada, perguntar se encerra a sessão.
@@ -372,6 +381,8 @@ const handlePrintReceipt = () => {
             <button
               class="pay-btn"
               :class="{ 'is-active': selectedOrder.paymentStatus === 'paid' }"
+              :disabled="!canMarkPaid"
+              :title="canMarkPaid ? undefined : 'Disponível depois de o pedido ser entregue na mesa'"
               @click="handlePaymentChange('paid')"
             >
               Pago
@@ -391,6 +402,7 @@ const handlePrintReceipt = () => {
               Reembolsado
             </button>
           </div>
+          <p v-if="!canMarkPaid" class="pay-hint">O pagamento fica pendente até o pedido ser entregue na mesa.</p>
         </div>
 
         <!-- Items Breakdown -->
@@ -872,6 +884,17 @@ const handlePrintReceipt = () => {
   font-size: 0.75rem;
   font-weight: 600;
   cursor: pointer;
+}
+
+.pay-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.pay-hint {
+  margin: 0.5rem 0 0;
+  font-size: 0.75rem;
+  color: var(--text-muted);
 }
 
 .pay-btn.is-active {

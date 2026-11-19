@@ -329,6 +329,8 @@ select tests.login('waiterA');
 set role authenticated;
 select public.update_order_status(tests.id('order1'), 'preparing', 'Na cozinha');
 select tests.ok('histórico do estado com autor', exists (select 1 from public.order_status_history where order_id = tests.id('order1') and status = 'preparing' and updated_by = 'Garçom A'));
+-- Migração 1400: o pagamento só fica pago depois de o pedido ser entregue.
+select public.update_order_status(tests.id('order1'), 'delivered');
 update public.payments set status = 'paid' where order_id = tests.id('order1');
 select tests.ok('confirmar pagamento atualiza o pedido', (select payment_status = 'paid' from public.orders where id = tests.id('order1')));
 select public.update_order_status(tests.id('order1'), 'cancelled');
