@@ -1,4 +1,5 @@
 import { repositories } from '@/repositories'
+import { toAbsoluteUrl } from '@/domain/publicUrl'
 import type {
   TableInput,
   StartSessionInput,
@@ -203,7 +204,7 @@ export const establishmentService = {
   },
   /** Convite de acesso: o responsável define a palavra-passe ao abrir o link. */
   invite(invitationId: string, delivery: InviteDelivery): Promise<InviteResult> {
-    return establishmentRepo.invite(invitationId, delivery, `${window.location.origin}/convite`)
+    return establishmentRepo.invite(invitationId, delivery, toAbsoluteUrl('/convite'))
   },
   update(
     id: string,

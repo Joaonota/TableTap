@@ -3,6 +3,7 @@ import { ref, computed } from 'vue'
 import type { User, UserRole } from '@/types'
 import { authService } from '@/services'
 import { isSupabaseConfigured } from '@/lib/supabase'
+import { toAbsoluteUrl } from '@/domain/publicUrl'
 
 /**
  * Sessão real (Supabase Auth). O papel e os restaurantes vêm da ligação do
@@ -123,7 +124,7 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   const sendPasswordReset = (email: string) =>
-    authService.sendPasswordReset(email, `${window.location.origin}/redefinir-palavra-passe`)
+    authService.sendPasswordReset(email, toAbsoluteUrl('/redefinir-palavra-passe'))
 
   const updatePassword = (password: string) => authService.updatePassword(password)
 
