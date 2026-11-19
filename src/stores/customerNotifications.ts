@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import type { Order } from '@/types'
-import { subscribeToCustomerChannel, type CustomerChannelStatus } from '@/services'
+import { subscribeToCustomerChannel, publicTableService, type CustomerChannelStatus } from '@/services'
 import { customerNotificationService, type BrowserNotificationPermission } from '@/services/customerNotifications'
 import {
   describeCustomerEvent,
@@ -31,6 +31,7 @@ const seenKey = (sessionId: string) => `tapmenu_seen_events_${sessionId}`
 const statusKey = (sessionId: string) => `tapmenu_order_statuses_${sessionId}`
 const SOUND_KEY = 'tapmenu_customer_sound'
 const PERMISSION_PROMPT_KEY = 'tapmenu_notification_prompt_dismissed'
+const INSTALL_HINT_KEY = 'tapmenu_install_hint_dismissed'
 
 function readJson<T>(key: string, fallback: T): T {
   try {
@@ -57,8 +58,12 @@ export const useCustomerNotificationStore = defineStore('customerNotifications',
   const soundEnabled = ref(readJson<boolean>(SOUND_KEY, true))
   const permission = ref<BrowserNotificationPermission>(customerNotificationService.getPermission())
   const permissionPromptDismissed = ref(readJson<boolean>(PERMISSION_PROMPT_KEY, false))
+  const installHintDismissed = ref(readJson<boolean>(INSTALL_HINT_KEY, false))
+  /** Este dispositivo recebe Web Push (avisos com o ecrã bloqueado). */
+  const pushActive = ref(false)
 
   let sessionId: string | null = null
+  let participantToken: string | null = null
   let seen = new Set<string>()
   let knownStatuses: Record<string, string> = {}
   let stopChannel: (() => void) | null = null
@@ -71,6 +76,33 @@ export const useCustomerNotificationStore = defineStore('customerNotifications',
   const canOfferPermission = computed(
     () => permission.value === 'default' && !permissionPromptDismissed.value && customerNotificationService.isBrowserNotificationSupported()
   )
+
+  /**
+   * iPhone no Safari: os avisos com o ecrã bloqueado só existem com o
+   * TapMenu no ecrã principal — explicar como, uma vez.
+   */
+  const showInstallHint = computed(
+    () => customerNotificationService.getWebPushState() === 'needs_install' && !installHintDismissed.value
+  )
+
+  /** Liga a subscrição Web Push deste dispositivo à sessão (sem perguntar nada ao cliente). */
+  const syncPush = async () => {
+    if (!sessionId || !participantToken || permission.value !== 'granted') return
+    const currentSession = sessionId
+    const keys = await customerNotificationService.subscribeToWebPush()
+    if (!keys || sessionId !== currentSession || !participantToken) return
+    try {
+      await publicTableService.registerPushSubscription({
+        sessionId: currentSession,
+        participantToken,
+        ...keys,
+        pageUrl: window.location.href.split('#')[0]
+      })
+      pushActive.value = true
+    } catch {
+      pushActive.value = false
+    }
+  }
 
   const persist = () => {
     if (!sessionId) return
@@ -169,6 +201,7 @@ export const useCustomerNotificationStore = defineStore('customerNotifications',
     if (sessionId === input.sessionId && stopChannel) return
     stop()
     sessionId = input.sessionId
+    participantToken = input.participantToken
     seen = new Set(readJson<string[]>(seenKey(input.sessionId), []))
     knownStatuses = readJson<Record<string, string>>(statusKey(input.sessionId), {})
     stopChannel = subscribeToCustomerChannel(
@@ -181,12 +214,15 @@ export const useCustomerNotificationStore = defineStore('customerNotifications',
         channelStatus.value = status
       }
     )
+    void syncPush()
   }
 
   const stop = () => {
     stopChannel?.()
     stopChannel = null
     sessionId = null
+    participantToken = null
+    pushActive.value = false
     channelStatus.value = 'closed'
     items.value = []
     timers.forEach(t => window.clearTimeout(t))
@@ -203,12 +239,18 @@ export const useCustomerNotificationStore = defineStore('customerNotifications',
   const requestPermission = async () => {
     permission.value = await customerNotificationService.requestPermission()
     if (permission.value !== 'default') dismissPermissionPrompt()
+    if (permission.value === 'granted') await syncPush()
     return permission.value
   }
 
   const dismissPermissionPrompt = () => {
     permissionPromptDismissed.value = true
     writeJson(PERMISSION_PROMPT_KEY, true)
+  }
+
+  const dismissInstallHint = () => {
+    installHintDismissed.value = true
+    writeJson(INSTALL_HINT_KEY, true)
   }
 
   return {
@@ -218,6 +260,8 @@ export const useCustomerNotificationStore = defineStore('customerNotifications',
     soundEnabled,
     permission,
     canOfferPermission,
+    showInstallHint,
+    pushActive,
     start,
     stop,
     handleEvent,
@@ -225,6 +269,7 @@ export const useCustomerNotificationStore = defineStore('customerNotifications',
     dismiss,
     setSoundEnabled,
     requestPermission,
-    dismissPermissionPrompt
+    dismissPermissionPrompt,
+    dismissInstallHint
   }
 })

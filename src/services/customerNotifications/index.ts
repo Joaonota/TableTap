@@ -17,7 +17,7 @@ import {
   showBrowserNotification,
   type BrowserNotificationPermission
 } from './browserNotifications'
-import { getWebPushState, isWebPushSupported, subscribeToWebPush, type WebPushState } from './webPush'
+import { getWebPushState, isWebPushSupported, registerServiceWorker, subscribeToWebPush, type WebPushState } from './webPush'
 
 export type { BrowserNotificationPermission, WebPushState }
 
@@ -47,6 +47,7 @@ export const customerNotificationService = {
 
   isWebPushSupported,
   getWebPushState,
+  registerServiceWorker,
   subscribeToWebPush,
 
   /**

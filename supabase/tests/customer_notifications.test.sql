@@ -268,6 +268,70 @@ drop function realtime.send(jsonb, text, text, boolean);
 alter function realtime.send_ok(jsonb, text, text, boolean) rename to send;
 
 -- ---------------------------------------------------------------------
+-- 6. Web Push (migração 1700): ecrã bloqueado / página fechada
+-- ---------------------------------------------------------------------
+-- Substitutos do Vault e do pg_net (não existem no PostgreSQL de testes).
+create schema if not exists vault;
+create table if not exists vault.decrypted_secrets (name text, decrypted_secret text);
+create schema if not exists net;
+create table tests.http (url text, body jsonb, headers jsonb);
+create function net.http_post(url text, body jsonb default '{}', params jsonb default '{}',
+                              headers jsonb default '{}', timeout_milliseconds int default 5000)
+returns bigint language sql as $$ insert into tests.http values (url, body, headers); select 1::bigint $$;
+
+select tests.login(null);
+select public.register_push_subscription(tests.id('s2'), tests.id('tokCarla'),
+  'https://fcm.googleapis.com/fcm/send/abc123', 'BOr1p256dhKeyBase64Url_abcdefghijklmnop', 'authSecret123', 'https://app.test/m/a/mesa-02');
+select tests.ok('cliente regista a subscrição push do seu telemóvel',
+  (select count(*) = 1 and bool_and(page_url = 'https://app.test/m/a/mesa-02') from public.push_subscriptions where session_id = tests.id('s2')));
+select public.register_push_subscription(tests.id('s2'), tests.id('tokCarla'),
+  'https://fcm.googleapis.com/fcm/send/abc123', 'BOr1p256dhKeyBase64Url_abcdefghijklmnop', 'authSecret456');
+select tests.ok('registar de novo o mesmo telemóvel não duplica',
+  (select count(*) = 1 from public.push_subscriptions where endpoint = 'https://fcm.googleapis.com/fcm/send/abc123'));
+select tests.ok('token de outra sessão não regista push nesta sessão',
+  tests.error_hint(format($q$select public.register_push_subscription(%L, %L, 'https://x.test/e1', 'BOr1p256dhKeyBase64Url_abcdefghijklmnop', 'authSecret123')$q$,
+    tests.id('s2'), tests.id('tokDino'))) = 'invalid_session');
+select tests.ok('sessão encerrada não aceita subscrições',
+  tests.error_hint(format($q$select public.register_push_subscription(%L, %L, 'https://x.test/e2', 'BOr1p256dhKeyBase64Url_abcdefghijklmnop', 'authSecret123')$q$,
+    tests.id('s1'), tests.id('tokAna'))) = 'invalid_session');
+select tests.ok('clientes não leem as subscrições (endpoints) de ninguém',
+  tests.error_hint('set local role anon; select count(*) from public.push_subscriptions') = '42501');
+
+-- Sem segredos no Vault: push desligado, o resto funciona.
+select tests.login('ownerA'); set role authenticated;
+select public.update_order_status(tests.id('o2'), 'preparing');
+reset role;
+select tests.ok('sem configuração, nenhum push é pedido (e o estado muda na mesma)',
+  (select count(*) = 0 from tests.http) and (select status from public.orders where id = tests.id('o2')) = 'preparing');
+
+insert into vault.decrypted_secrets values
+  ('tapmenu_push_url', 'https://ref.supabase.co/functions/v1/send-customer-push'),
+  ('tapmenu_push_secret', 'segredo-de-teste');
+select tests.login('ownerA'); set role authenticated;
+select public.update_order_status(tests.id('o2'), 'ready');
+select public.update_order_status(tests.id('oVat'), 'preparing');
+reset role;
+select tests.ok('estado alterado → push pedido à Edge Function para a sessão, com o segredo',
+  (select count(*) = 1 from tests.http)
+  and (select bool_and(url = 'https://ref.supabase.co/functions/v1/send-customer-push'
+                       and body ->> 'sessionId' = tests.id('s2')::text
+                       and body -> 'event' ->> 'status' = 'ready'
+                       and headers ->> 'x-tapmenu-push-secret' = 'segredo-de-teste') from tests.http));
+select tests.ok('sessão sem telemóveis subscritos não gera pedidos de push',
+  not exists (select 1 from tests.http where body ->> 'sessionId' = tests.id('s3')::text));
+
+select tests.login(null);
+select public.unregister_push_subscription(tests.id('tokDino'), 'https://fcm.googleapis.com/fcm/send/abc123');
+select tests.ok('outro cliente não remove a subscrição alheia',
+  exists (select 1 from public.push_subscriptions where endpoint = 'https://fcm.googleapis.com/fcm/send/abc123'));
+select tests.login('ownerA'); set role authenticated;
+select public.close_table_session(tests.id('s2'));
+reset role;
+select tests.ok('fim da sessão apaga as subscrições push (e não envia push)',
+  not exists (select 1 from public.push_subscriptions where session_id = tests.id('s2'))
+  and (select count(*) = 1 from tests.http));
+
+-- ---------------------------------------------------------------------
 -- Resultado
 -- ---------------------------------------------------------------------
 \pset format unaligned

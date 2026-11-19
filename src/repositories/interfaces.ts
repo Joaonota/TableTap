@@ -424,6 +424,18 @@ export interface IPublicMenuRepository {
   getSessionClosure(sessionId: string, participantToken: string, deviceType?: ReviewDeviceType): Promise<SessionClosure>
   /** Regista o clique ou o encaminhamento para o Google. Nunca indica avaliação publicada. */
   trackReviewRequest(requestId: string, participantToken: string, event: ReviewTrackEvent): Promise<string>
+  /** Web Push (migração 1700): liga a subscrição deste dispositivo à sessão. */
+  registerPushSubscription(input: PushSubscriptionInput): Promise<void>
+  unregisterPushSubscription(participantToken: string, endpoint: string): Promise<void>
+}
+
+export interface PushSubscriptionInput {
+  sessionId: string
+  participantToken: string
+  endpoint: string
+  p256dh: string
+  auth: string
+  pageUrl?: string
 }
 
 // =====================================================================

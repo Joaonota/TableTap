@@ -55,6 +55,7 @@ import type {
   InviteDelivery,
   InviteResult,
   PreRegisterCompanyInput,
+  PushSubscriptionInput,
   ICategoryRepository,
   ICompanyRepository,
   IMediaRepository,
@@ -1137,6 +1138,21 @@ export class SupabasePublicMenuRepository implements IPublicMenuRepository {
 
   trackReviewRequest(requestId: string, participantToken: string, event: ReviewTrackEvent): Promise<string> {
     return rpc<string>('track_review_request', { p_request_id: requestId, p_participant_token: participantToken, p_event: event })
+  }
+
+  async registerPushSubscription(input: PushSubscriptionInput): Promise<void> {
+    await rpc('register_push_subscription', {
+      p_session_id: input.sessionId,
+      p_participant_token: input.participantToken,
+      p_endpoint: input.endpoint,
+      p_p256dh: input.p256dh,
+      p_auth: input.auth,
+      p_page_url: input.pageUrl ?? null
+    })
+  }
+
+  async unregisterPushSubscription(participantToken: string, endpoint: string): Promise<void> {
+    await rpc('unregister_push_subscription', { p_participant_token: participantToken, p_endpoint: endpoint })
   }
 }
 

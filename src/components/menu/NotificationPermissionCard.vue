@@ -1,12 +1,16 @@
 <script setup lang="ts">
 import { ref } from 'vue'
-import { BellRing, X } from 'lucide-vue-next'
+import { BellRing, Share, X } from 'lucide-vue-next'
 
 /**
  * Convite para notificações do navegador — apresentado só depois de o
  * cliente fazer um pedido (nunca ao abrir o menu). A permissão só é pedida
  * quando o cliente toca em "Ativar".
+ *
+ * mode "install" (iPhone no Safari): os avisos com o ecrã bloqueado só
+ * funcionam com o TapMenu no ecrã principal — explica como.
  */
+withDefaults(defineProps<{ mode?: 'enable' | 'install' }>(), { mode: 'enable' })
 const emit = defineEmits<{ (e: 'enable'): void; (e: 'dismiss'): void }>()
 const busy = ref(false)
 
@@ -19,9 +23,19 @@ const enable = () => {
 <template>
   <aside class="npc" role="region" aria-label="Notificações do pedido">
     <div class="npc-icon"><BellRing :size="18" /></div>
-    <div class="npc-body">
+    <div v-if="mode === 'install'" class="npc-body">
+      <strong>Avisos com o ecrã bloqueado</strong>
+      <p>
+        No iPhone, toque em <Share :size="13" class="npc-inline" /> <b>Partilhar</b> e depois em
+        <b>Adicionar ao ecrã principal</b>. Abra o TapMenu a partir do ícone e ative as notificações.
+      </p>
+      <div class="npc-actions">
+        <button type="button" class="npc-btn" @click="emit('dismiss')">Entendi</button>
+      </div>
+    </div>
+    <div v-else class="npc-body">
       <strong>Quer ser avisado?</strong>
-      <p>Receba atualizações do seu pedido mesmo quando não estiver a visualizar esta página.</p>
+      <p>Receba atualizações do seu pedido, com som, mesmo com o telemóvel bloqueado.</p>
       <div class="npc-actions">
         <button type="button" class="npc-btn primary" :disabled="busy" @click="enable">Ativar</button>
         <button type="button" class="npc-btn" @click="emit('dismiss')">Agora não</button>
@@ -65,6 +79,10 @@ const enable = () => {
   margin: 0.15rem 0 0.55rem;
   font-size: 0.8rem;
   line-height: 1.4;
+}
+
+.npc-inline {
+  vertical-align: -2px;
 }
 
 .npc-actions {

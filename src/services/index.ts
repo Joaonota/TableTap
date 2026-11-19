@@ -7,6 +7,7 @@ import type {
   AuthAccount,
   CreateCompanyInput,
   PreRegisterCompanyInput,
+  PushSubscriptionInput,
   InviteDelivery,
   InviteResult,
   PlaceOrderInput,
@@ -306,6 +307,12 @@ export const publicTableService = {
   },
   trackReviewRequest(requestId: string, participantToken: string, event: ReviewTrackEvent): Promise<string> {
     return publicMenuRepo.trackReviewRequest(requestId, participantToken, event)
+  },
+  registerPushSubscription(input: PushSubscriptionInput): Promise<void> {
+    return publicMenuRepo.registerPushSubscription(input)
+  },
+  unregisterPushSubscription(participantToken: string, endpoint: string): Promise<void> {
+    return publicMenuRepo.unregisterPushSubscription(participantToken, endpoint)
   }
 }
 
