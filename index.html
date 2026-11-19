@@ -10,6 +10,14 @@
     <meta name="theme-color" content="#1e40af" />
     <meta name="description" content="TapMenu - Plataforma SaaS Multi-Tenant de Menus Digitais, Pedidos e Atendimento Inteligente por NFC e QR Code para Restaurantes, Bares e Hotéis." />
     <link rel="manifest" href="/manifest.json" />
+    <script>
+      // Mesa (/m/restaurante/mesa): manifest próprio — no iPhone, "Adicionar ao ecrã principal"
+      // abre ESTA mesa (start_url "./" relativo a /m/restaurante/mesa/manifest.webmanifest).
+      (function () {
+        var m = location.pathname.match(/^\/m\/[^/]+\/[^/]+/)
+        if (m) document.querySelector('link[rel="manifest"]').setAttribute('href', m[0] + '/manifest.webmanifest')
+      })()
+    </script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">

@@ -1,6 +1,7 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "rewrites": [
+    { "source": "/m/:restaurant/:table/manifest.webmanifest", "destination": "/table-manifest.json" },
     { "source": "/(.*)", "destination": "/index.html" }
   ]
 }

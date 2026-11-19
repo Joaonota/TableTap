@@ -390,33 +390,22 @@ const pollSession = async () => {
 /**
  * "Adicionar ao ecrã principal" (necessário no iPhone para os avisos com o
  * ecrã bloqueado): o ícone deve abrir ESTA mesa, não a página inicial.
+ * Manifest servido em /m/{restaurante}/{mesa}/manifest.webmanifest (vercel.json)
+ * com start_url "./". O index.html já o define ao carregar; isto cobre a
+ * navegação dentro da aplicação.
  */
 let originalManifestHref: string | null = null
 const useTableManifest = () => {
   const link = document.querySelector<HTMLLinkElement>('link[rel="manifest"]')
-  if (!link) return
+  const match = window.location.pathname.match(/^\/m\/[^/]+\/[^/]+/)
+  if (!link || !match) return
   originalManifestHref ??= link.getAttribute('href')
-  const origin = window.location.origin
-  const manifest = {
-    name: restaurant.value?.name ? `${restaurant.value.name} · TapMenu` : 'TapMenu',
-    short_name: restaurant.value?.name || 'TapMenu',
-    start_url: window.location.href.split('#')[0],
-    scope: `${origin}/`,
-    display: 'standalone',
-    background_color: '#0f172a',
-    theme_color: '#1e40af',
-    icons: [
-      { src: `${origin}/logo/logo-icon-192.png`, sizes: '192x192', type: 'image/png' },
-      { src: `${origin}/logo/logo-icon-512.png`, sizes: '512x512', type: 'image/png' }
-    ]
-  }
-  link.setAttribute('href', `data:application/manifest+json,${encodeURIComponent(JSON.stringify(manifest))}`)
+  link.setAttribute('href', `${match[0]}/manifest.webmanifest`)
 }
 const restoreManifest = () => {
   const link = document.querySelector<HTMLLinkElement>('link[rel="manifest"]')
-  if (link && originalManifestHref) link.setAttribute('href', originalManifestHref)
+  if (link && originalManifestHref && !originalManifestHref.startsWith('/m/')) link.setAttribute('href', originalManifestHref)
 }
-watch(() => restaurant.value?.name, () => useTableManifest())
 
 let stopAudioUnlock: (() => void) | undefined
 onMounted(() => {
