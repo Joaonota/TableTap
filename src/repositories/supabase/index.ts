@@ -13,6 +13,7 @@ import { DomainError } from '@/domain/errors'
 import { normalizePlanEntitlements } from '@/domain/planLimits'
 import type { ReviewDeviceType, ReviewTrackEvent } from '@/domain/reviews'
 import type { SessionBill } from '@/domain/groupBill'
+import type { CompanyAlert, CompanyOverview, MenuCopyReport } from '@/domain/companyInsights'
 import type {
   Category,
   Company,
@@ -59,6 +60,7 @@ import type {
   PushSubscriptionInput,
   CloseSessionOptions,
   CreateSessionPaymentInput,
+  ICompanyInsightsRepository,
   ICategoryRepository,
   ICompanyRepository,
   IMediaRepository,
@@ -1263,6 +1265,105 @@ export class SupabasePublicMenuRepository implements IPublicMenuRepository {
 // =====================================================================
 // Avaliações (painel do proprietário)
 // =====================================================================
+const num0 = (v: unknown) => Number(v ?? 0)
+
+export class SupabaseCompanyInsightsRepository implements ICompanyInsightsRepository {
+  async getOverview(companyId: string, from: Date, to: Date): Promise<CompanyOverview> {
+    const j = await rpc<Json>('get_company_overview', { p_company_id: companyId, p_from: from.toISOString(), p_to: to.toISOString() })
+    const t = j.totals ?? {}
+    return {
+      from: j.from,
+      to: j.to,
+      totals: {
+        revenue: num0(t.revenue),
+        orders: num0(t.orders),
+        cancelled: num0(t.cancelled),
+        paid: num0(t.paid),
+        refunds: num0(t.refunds),
+        prevRevenue: num0(t.prevRevenue),
+        prevOrders: num0(t.prevOrders),
+        averageTicket: num0(t.averageTicket)
+      },
+      restaurants: ((j.restaurants ?? []) as Json[]).map(r => ({
+        id: r.id,
+        name: r.name,
+        isActive: !!r.isActive,
+        revenue: num0(r.revenue),
+        orders: num0(r.orders),
+        cancelled: num0(r.cancelled),
+        paid: num0(r.paid),
+        refunds: num0(r.refunds),
+        prevRevenue: num0(r.prevRevenue),
+        prevOrders: num0(r.prevOrders),
+        averageTicket: num0(r.averageTicket),
+        cancellationRate: num0(r.cancellationRate)
+      })),
+      products: ((j.products ?? []) as Json[]).map(p => ({
+        name: p.name,
+        quantity: num0(p.quantity),
+        revenue: num0(p.revenue),
+        byRestaurant: ((p.byRestaurant ?? []) as Json[]).map(b => ({
+          restaurantId: b.restaurantId,
+          quantity: num0(b.quantity),
+          revenue: num0(b.revenue)
+        }))
+      })),
+      daily: ((j.daily ?? []) as Json[]).map(d => ({ day: d.day, restaurantId: d.restaurantId, revenue: num0(d.revenue) }))
+    }
+  }
+
+  async getAlerts(companyId: string, from: Date, to: Date): Promise<CompanyAlert[]> {
+    const rows = await rpc<Json[]>('get_company_alerts', { p_company_id: companyId, p_from: from.toISOString(), p_to: to.toISOString() })
+    return (rows ?? []).map(a => ({
+      kind: a.kind,
+      severity: a.severity,
+      restaurantId: a.restaurantId,
+      restaurantName: a.restaurantName ?? undefined,
+      actor: a.actor ?? undefined,
+      count: num0(a.count),
+      amount: a.amount === null || a.amount === undefined ? undefined : num0(a.amount),
+      rate: a.rate === null || a.rate === undefined ? undefined : num0(a.rate),
+      orderCodes: a.orderCodes ?? undefined
+    }))
+  }
+
+  async copyMenu(sourceRestaurantId: string, targetRestaurantIds: string[], categoryIds: string[] | null, updateExisting: boolean): Promise<MenuCopyReport[]> {
+    const r = await rpc<Json>('copy_menu_to_restaurants', {
+      p_source_restaurant_id: sourceRestaurantId,
+      p_target_restaurant_ids: targetRestaurantIds,
+      p_category_ids: categoryIds && categoryIds.length ? categoryIds : null,
+      p_update_existing: updateExisting
+    })
+    return ((r.targets ?? []) as Json[]).map(t => ({
+      restaurantId: t.restaurantId,
+      name: t.name,
+      categoriesCreated: num0(t.categoriesCreated),
+      productsCreated: num0(t.productsCreated),
+      productsUpdated: num0(t.productsUpdated),
+      productsSkipped: num0(t.productsSkipped)
+    }))
+  }
+
+  async applyPromotion(companyId: string, productNames: string[], discountPercent: number, restaurantIds: string[] | null): Promise<number> {
+    const r = await rpc<Json>('apply_company_promotion', {
+      p_company_id: companyId,
+      p_product_names: productNames,
+      p_discount_percent: discountPercent,
+      p_restaurant_ids: restaurantIds && restaurantIds.length ? restaurantIds : null
+    })
+    return num0(r.updated)
+  }
+
+  async endPromotion(companyId: string, productNames: string[], restaurantIds: string[] | null): Promise<number> {
+    const r = await rpc<Json>('end_company_promotion', {
+      p_company_id: companyId,
+      p_product_names: productNames,
+      p_restaurant_ids: restaurantIds && restaurantIds.length ? restaurantIds : null
+    })
+    return num0(r.updated)
+  }
+}
+
 export class SupabaseReviewRepository implements IReviewRepository {
   async getDashboard(query: ReviewDashboardQuery): Promise<ReviewDashboard> {
     const r = await rpc<Json>('get_review_dashboard', {

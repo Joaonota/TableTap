@@ -78,7 +78,7 @@ const handleRestaurantChange = async (e: Event) => {
 }
 
 /** Páginas ao nível da empresa, que funcionam sem estabelecimento selecionado. */
-const COMPANY_LEVEL_PATHS = ['/app/estabelecimentos', '/app/meu-plano']
+const COMPANY_LEVEL_PATHS = ['/app/empresa', '/app/estabelecimentos', '/app/meu-plano']
 const needsEstablishment = computed(
   () =>
     tenantStore.hasLoaded &&
@@ -354,6 +354,17 @@ onMounted(async () => {
 
           <div class="sidebar-nav-group">
             <div class="nav-label">GESTÃO & RELATÓRIOS</div>
+
+            <router-link
+              v-if="authStore.can('manage_company')"
+              to="/app/empresa"
+              class="nav-link"
+              :class="{ 'is-active': route.path === '/app/empresa' }"
+              @click="isMobileSidebarOpen = false"
+            >
+              <Building2 :size="18" />
+              <span>Empresa</span>
+            </router-link>
 
             <router-link
               v-if="authStore.can('manage_company')"

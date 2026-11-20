@@ -91,6 +91,7 @@ const routes: RouteRecordRaw[] = [
       { path: 'pedidos', name: 'admin-orders', component: () => import('@/pages/orders/OrdersPage.vue'), meta: { permission: 'manage_orders' } },
       { path: 'atendimento', name: 'admin-service', component: () => import('@/pages/service/ServiceRequestsPage.vue'), meta: { permission: 'service_requests' } },
       { path: 'mesas', name: 'admin-tables', component: () => import('@/pages/tables/TablesPage.vue') },
+      { path: 'empresa', name: 'admin-company', component: () => import('@/pages/company/CompanyPage.vue'), meta: { permission: 'manage_company' } },
       { path: 'estabelecimentos', name: 'admin-establishments', component: () => import('@/pages/establishments/EstablishmentsPage.vue'), meta: { permission: 'manage_company' } },
       { path: 'menu/produtos', name: 'admin-products', component: () => import('@/pages/products/ProductsPage.vue'), meta: { permission: 'manage_catalog' } },
       { path: 'menu/categorias', name: 'admin-categories', component: () => import('@/pages/categories/CategoriesPage.vue'), meta: { permission: 'manage_catalog' } },

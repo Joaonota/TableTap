@@ -36,6 +36,7 @@ import type {
 } from '@/types'
 import type { ReviewDeviceType, ReviewTrackEvent } from '@/domain/reviews'
 import type { ItemSelection, SessionBill, SplitMode } from '@/domain/groupBill'
+import type { CompanyAlert, CompanyOverview, MenuCopyReport } from '@/domain/companyInsights'
 
 /** Empresa registada pelo Super Admin (o dono é convidado por email). */
 export interface CreateCompanyInput {
@@ -479,6 +480,15 @@ export interface ReviewDashboardQuery {
   /** Omitido = agora, pela hora do servidor (evita erros de relógio do dispositivo). */
   to?: Date
   recentLimit?: number
+}
+
+/** Empresa com vários estabelecimentos (migração 1900) — só o proprietário. */
+export interface ICompanyInsightsRepository {
+  getOverview(companyId: string, from: Date, to: Date): Promise<CompanyOverview>
+  getAlerts(companyId: string, from: Date, to: Date): Promise<CompanyAlert[]>
+  copyMenu(sourceRestaurantId: string, targetRestaurantIds: string[], categoryIds: string[] | null, updateExisting: boolean): Promise<MenuCopyReport[]>
+  applyPromotion(companyId: string, productNames: string[], discountPercent: number, restaurantIds: string[] | null): Promise<number>
+  endPromotion(companyId: string, productNames: string[], restaurantIds: string[] | null): Promise<number>
 }
 
 export interface IReviewRepository {

@@ -335,6 +335,27 @@ export const publicTableService = {
 }
 
 // ================= Avaliações =================
+// ================= Empresa com vários estabelecimentos (proprietário) =================
+export const companyInsightsService = {
+  getOverview(companyId: string, from: Date, to: Date) {
+    return repositories.companyInsights.getOverview(companyId, from, to)
+  },
+  getAlerts(companyId: string, from: Date, to: Date) {
+    return repositories.companyInsights.getAlerts(companyId, from, to)
+  },
+  /** Copia categorias e produtos (com variantes e adicionais) para outras localizações. */
+  copyMenu(sourceRestaurantId: string, targetRestaurantIds: string[], categoryIds: string[] | null, updateExisting = false) {
+    return repositories.companyInsights.copyMenu(sourceRestaurantId, targetRestaurantIds, categoryIds, updateExisting)
+  },
+  /** Campanha de preço: -X% nos produtos com estes nomes, em todas (ou nas escolhidas) localizações. */
+  applyPromotion(companyId: string, productNames: string[], discountPercent: number, restaurantIds: string[] | null = null) {
+    return repositories.companyInsights.applyPromotion(companyId, productNames, discountPercent, restaurantIds)
+  },
+  endPromotion(companyId: string, productNames: string[], restaurantIds: string[] | null = null) {
+    return repositories.companyInsights.endPromotion(companyId, productNames, restaurantIds)
+  }
+}
+
 export const reviewService = {
   /** Pedidos de avaliação feitos pelo TapMenu (não são avaliações publicadas). */
   getDashboard(query: ReviewDashboardQuery): Promise<ReviewDashboard> {
