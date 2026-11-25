@@ -15,6 +15,15 @@ import type { ReviewDeviceType, ReviewTrackEvent } from '@/domain/reviews'
 import type { SessionBill } from '@/domain/groupBill'
 import type { CompanyAlert, CompanyOverview, MenuCopyReport } from '@/domain/companyInsights'
 import type {
+  AssignmentEvent,
+  AssignmentRole,
+  DutyStatus,
+  ServiceAction,
+  TableAssignment,
+  TableOperation,
+  TableOperationsSnapshot
+} from '@/domain/tableOperations'
+import type {
   Category,
   Company,
   CompanyDeletionPreview,
@@ -61,6 +70,7 @@ import type {
   CloseSessionOptions,
   CreateSessionPaymentInput,
   ICompanyInsightsRepository,
+  ITableOperationsRepository,
   ICategoryRepository,
   ICompanyRepository,
   IMediaRepository,
@@ -942,9 +952,155 @@ export class SupabaseServiceRequestRepository implements IServiceRequestReposito
     ).map(mapServiceRequest)
   }
 
-  async updateStatus(id: string, status: ServiceRequestStatus, assignedToUserId?: string, assignedToName?: string): Promise<ServiceRequest> {
-    const row = clean({ status, assigned_to_user_id: assignedToUserId, assigned_to_name: assignedToName })
-    return mapServiceRequest(unwrapOne(await supabase.from('service_requests').update(row).eq('id', id).select('*').single()))
+  /**
+   * A equipa já não escreve diretamente nas chamadas (migração 2000): o
+   * servidor valida quem é responsável e regista quem tratou.
+   */
+  async updateStatus(id: string, status: ServiceRequestStatus): Promise<ServiceRequest> {
+    const action: ServiceAction = status === 'completed' ? 'complete' : status === 'cancelled' ? 'cancel' : status === 'in_progress' ? 'start' : 'acknowledge'
+    return this.handle(id, action)
+  }
+
+  async handle(id: string, action: ServiceAction, onBehalfOfStaffId?: string): Promise<ServiceRequest> {
+    return mapServiceRequest(
+      await rpc<Json>('handle_service_request', { p_request_id: id, p_action: action, p_staff_id: onBehalfOfStaffId ?? null })
+    )
+  }
+}
+
+const optStr = (v: unknown) => (v === null || v === undefined || v === '' ? undefined : String(v))
+
+const mapAssignment = (a: Json): TableAssignment => ({
+  id: a.id,
+  tableId: a.tableId,
+  staffId: a.staffId,
+  staffName: a.staffName ?? '',
+  role: a.role,
+  dutyStatus: a.dutyStatus ?? 'off_duty',
+  hasAccount: !!a.hasAccount,
+  expiresAt: optStr(a.expiresAt),
+  assignedAt: a.assignedAt,
+  assignedByName: optStr(a.assignedByName)
+})
+
+const mapTableOperation = (t: Json): TableOperation => {
+  const o = t.orders ?? {}
+  const n = (v: unknown) => Number(v ?? 0)
+  return {
+    id: t.id,
+    number: t.number,
+    name: t.name ?? '',
+    area: t.area ?? '',
+    capacity: n(t.capacity),
+    status: t.status,
+    session: t.session
+      ? {
+          id: t.session.id,
+          startedAt: t.session.startedAt,
+          customerName: optStr(t.session.customerName),
+          partySize: t.session.partySize ?? undefined,
+          billRequestedAt: optStr(t.session.billRequestedAt),
+          participants: n(t.session.participants)
+        }
+      : undefined,
+    orders: {
+      count: n(o.count),
+      received: n(o.received),
+      confirmed: n(o.confirmed),
+      preparing: n(o.preparing),
+      ready: n(o.ready),
+      delivered: n(o.delivered),
+      unpaid: n(o.unpaid),
+      total: n(o.total),
+      oldestReadyAt: optStr(o.oldestReadyAt)
+    },
+    requests: ((t.requests ?? []) as Json[]).map(mapServiceRequest),
+    assignments: ((t.assignments ?? []) as Json[]).map(mapAssignment)
+  }
+}
+
+export class SupabaseTableOperationsRepository implements ITableOperationsRepository {
+  async getSnapshot(restaurantId: string): Promise<TableOperationsSnapshot> {
+    const j = await rpc<Json>('get_table_operations', { p_restaurant_id: restaurantId })
+    const me = j.me ?? {}
+    return {
+      tables: ((j.tables ?? []) as Json[]).map(mapTableOperation),
+      staff: ((j.staff ?? []) as Json[]).map(s => ({
+        id: s.id,
+        name: s.name,
+        role: s.role,
+        dutyStatus: s.dutyStatus ?? 'off_duty',
+        dutyStatusAt: optStr(s.dutyStatusAt),
+        hasAccount: !!s.hasAccount,
+        tables: Number(s.tables ?? 0)
+      })),
+      me: {
+        staffId: optStr(me.staffId),
+        name: me.name ?? '',
+        role: optStr(me.role),
+        dutyStatus: me.dutyStatus ?? undefined,
+        scope: me.scope === 'assigned' ? 'assigned' : 'all',
+        canManage: !!me.canManage,
+        canActForOthers: !!me.canActForOthers
+      },
+      serverTime: j.serverTime
+    }
+  }
+
+  async assign(tableIds: string[], staffId: string, role: AssignmentRole, expiresAt?: Date | null, reason?: string): Promise<number> {
+    const r = await rpc<Json>('assign_table_staff', {
+      p_table_ids: tableIds,
+      p_staff_id: staffId,
+      p_role: role,
+      p_expires_at: expiresAt ? expiresAt.toISOString() : null,
+      p_reason: reason?.trim() || null
+    })
+    return Number(r.assigned ?? 0)
+  }
+
+  async remove(assignmentId: string, reason?: string): Promise<void> {
+    await rpc('remove_table_staff', { p_assignment_id: assignmentId, p_reason: reason?.trim() || null })
+  }
+
+  async transferTable(tableId: string, toStaffId: string, reason?: string, fromStaffId?: string): Promise<void> {
+    await rpc('transfer_table', {
+      p_table_id: tableId,
+      p_to_staff_id: toStaffId,
+      p_reason: reason?.trim() || null,
+      p_from_staff_id: fromStaffId ?? null
+    })
+  }
+
+  async transferStaffTables(restaurantId: string, toStaffId: string, reason?: string, fromStaffId?: string): Promise<number> {
+    const r = await rpc<Json>('transfer_staff_tables', {
+      p_restaurant_id: restaurantId,
+      p_to_staff_id: toStaffId,
+      p_reason: reason?.trim() || null,
+      p_from_staff_id: fromStaffId ?? null
+    })
+    return Number(r.transferred ?? 0)
+  }
+
+  async setDutyStatus(status: DutyStatus, staffId?: string): Promise<{ dutyStatus: DutyStatus; openTables: number }> {
+    const r = await rpc<Json>('set_staff_duty_status', { p_status: status, p_staff_id: staffId ?? null })
+    return { dutyStatus: r.dutyStatus, openTables: Number(r.openTables ?? 0) }
+  }
+
+  async getHistory(tableId: string): Promise<AssignmentEvent[]> {
+    const rows = await rpc<Json[]>('get_table_assignment_history', { p_table_id: tableId, p_limit: 50 })
+    return (rows ?? []).map(e => ({
+      id: e.id,
+      event: e.event,
+      staffId: optStr(e.staffId),
+      staffName: optStr(e.staffName),
+      fromStaffId: optStr(e.fromStaffId),
+      fromStaffName: optStr(e.fromStaffName),
+      role: e.role ?? undefined,
+      reason: optStr(e.reason),
+      actorName: e.actorName ?? '',
+      sessionId: optStr(e.sessionId),
+      createdAt: e.createdAt
+    }))
   }
 }
 

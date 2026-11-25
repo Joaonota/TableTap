@@ -136,13 +136,30 @@ const handleStatusChange = async (req: ServiceRequest, newStatus: ServiceRequest
 
           <p v-if="req.notes" class="request-notes">"{{ req.notes }}"</p>
 
-          <div v-if="req.assignedToName" class="assigned-row">
+          <div v-if="req.responsibleName" class="assigned-row">
+            <UserCheck :size="14" />
+            <span>Responsável da mesa: <strong>{{ req.responsibleName }}</strong></span>
+          </div>
+          <div v-if="req.acknowledgedAt && req.status === 'new'" class="assigned-row">
+            <CheckCircle2 :size="14" />
+            <span>Recebido por {{ req.acknowledgedByName || 'equipa' }}</span>
+          </div>
+          <div v-if="req.assignedToName && req.assignedToName !== req.responsibleName" class="assigned-row">
             <UserCheck :size="14" />
             <span>Assumido por: <strong>{{ req.assignedToName }}</strong></span>
           </div>
         </div>
 
         <div class="card-actions">
+          <AppButton
+            v-if="req.status === 'new' && !req.acknowledgedAt"
+            variant="outline"
+            size="sm"
+            @click="serviceStore.acknowledgeRequest(req.id)"
+          >
+            Recebido
+          </AppButton>
+
           <AppButton
             v-if="req.status === 'new'"
             variant="primary"

@@ -107,12 +107,26 @@ export const useServiceRequestStore = defineStore('serviceRequest', () => {
     }
   }
 
+  /** "Recebido": o garçom viu a chamada (continua por atender). */
+  const acknowledgeRequest = async (requestId: string) => {
+    try {
+      const updated = await serviceRequestService.handle(requestId, 'acknowledge')
+      const index = requests.value.findIndex(r => r.id === requestId)
+      if (index !== -1) requests.value[index] = updated
+      toastStore.success('Chamada recebida', `Mesa ${updated.tableNumber}`)
+      return updated
+    } catch (e) {
+      toastStore.error('Erro ao atualizar atendimento', (e as Error).message)
+    }
+  }
+
   return {
     requests,
     isLoading,
     loadRequests,
     subscribeRealtime,
     createCustomerRequest,
-    updateRequestStatus
+    updateRequestStatus,
+    acknowledgeRequest
   }
 })

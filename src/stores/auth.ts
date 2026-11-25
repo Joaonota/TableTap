@@ -68,6 +68,11 @@ export const useAuthStore = defineStore('auth', () => {
         return isKitchenStaff.value || isManager.value
       case 'service_requests':
         return isWaiter.value || isManager.value || currentUser.value.role === 'receptionist'
+      // Sala: mesas e garçons responsáveis (o servidor limita o garçom às suas mesas).
+      case 'table_operations':
+        return isWaiter.value || isManager.value || currentUser.value.role === 'receptionist'
+      case 'assign_tables':
+        return isManager.value
       default:
         return false
     }

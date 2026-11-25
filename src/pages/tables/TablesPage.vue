@@ -18,7 +18,7 @@ import TableStatusBadge from '@/components/tables/TableStatusBadge.vue'
 import TableFormModal from '@/components/tables/TableFormModal.vue'
 import TableDetailDrawer from '@/components/tables/TableDetailDrawer.vue'
 import NfcTagStatusBadge from '@/components/nfc-tags/NfcTagStatusBadge.vue'
-import { LayoutGrid, Rows3, Plus, Search, Armchair, Loader2 } from 'lucide-vue-next'
+import { LayoutGrid, Rows3, Plus, Search, Armchair, Loader2, UserCog } from 'lucide-vue-next'
 
 const tableStore = useTableStore()
 const tenantStore = useTenantStore()
@@ -120,6 +120,9 @@ const saveTable = async (input: TableInput) => {
             <Rows3 :size="15" /> <span>Lista</span>
           </button>
         </div>
+        <router-link to="/app/sala?tab=atribuicao" class="assign-link">
+          <UserCog :size="15" /> <span>Atribuição de garçons</span>
+        </router-link>
         <AppButton variant="primary" :disabled="tablesLimit.isReached.value" :title="tablesLimit.message.value || undefined" @click="openCreate">
           <template #icon-left><Plus :size="16" /></template>
           Nova mesa
@@ -274,6 +277,25 @@ const saveTable = async (input: TableInput) => {
   display: flex;
   flex-direction: column;
   gap: 1.25rem;
+}
+
+.assign-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  height: 40px;
+  padding: 0 0.9rem;
+  border: 1px solid var(--border-medium);
+  border-radius: var(--radius-md);
+  background: var(--bg-surface);
+  color: var(--color-primary-700);
+  font-size: 0.85rem;
+  font-weight: 700;
+  text-decoration: none;
+  white-space: nowrap;
+}
+.assign-link:hover {
+  background: var(--color-primary-50);
 }
 
 .page-header {

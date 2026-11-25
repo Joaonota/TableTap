@@ -460,6 +460,14 @@ export interface ServiceRequest {
   assignedTo?: string
   assignedToUserId?: string
   assignedToName?: string
+  /** Garçom responsável pela mesa no momento da chamada (migração 2000). */
+  responsibleStaffId?: string
+  responsibleName?: string
+  /** Quem está a tratar (pode não ter conta: o gerente regista por ele). */
+  handledByStaffId?: string
+  /** "Recebido" — o garçom viu a chamada. */
+  acknowledgedAt?: string
+  acknowledgedByName?: string
   createdAt: string
   resolvedAt?: string
 }

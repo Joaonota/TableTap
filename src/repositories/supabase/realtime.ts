@@ -1,7 +1,7 @@
 import { supabase, isSupabaseConfigured } from '@/lib/supabase'
 
-/** Tabelas publicadas no Realtime (ver migration 0400). */
-export type RealtimeTable = 'orders' | 'service_requests' | 'notifications' | 'dining_tables' | 'table_sessions'
+/** Tabelas publicadas no Realtime (ver migrações 0400 e 2000). */
+export type RealtimeTable = 'orders' | 'service_requests' | 'notifications' | 'dining_tables' | 'table_sessions' | 'table_staff_assignments'
 
 /**
  * Escuta alterações (insert/update/delete) de um restaurante numa tabela.

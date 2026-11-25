@@ -31,7 +31,8 @@ import {
   SupabaseMediaRepository,
   SupabaseEstablishmentRepository,
   SupabaseReviewRepository,
-  SupabaseCompanyInsightsRepository
+  SupabaseCompanyInsightsRepository,
+  SupabaseTableOperationsRepository
 } from './supabase'
 import type {
   IAuthRepository,
@@ -58,7 +59,8 @@ import type {
   IMediaRepository,
   IEstablishmentRepository,
   IReviewRepository,
-  ICompanyInsightsRepository
+  ICompanyInsightsRepository,
+  ITableOperationsRepository
 } from './interfaces'
 
 export interface RepositoryRegistry {
@@ -87,6 +89,7 @@ export interface RepositoryRegistry {
   establishments: IEstablishmentRepository
   reviews: IReviewRepository
   companyInsights: ICompanyInsightsRepository
+  tableOperations: ITableOperationsRepository
 }
 
 export const repositories: RepositoryRegistry = {
@@ -114,5 +117,6 @@ export const repositories: RepositoryRegistry = {
   media: new SupabaseMediaRepository(),
   establishments: new SupabaseEstablishmentRepository(),
   reviews: new SupabaseReviewRepository(),
-  companyInsights: new SupabaseCompanyInsightsRepository()
+  companyInsights: new SupabaseCompanyInsightsRepository(),
+  tableOperations: new SupabaseTableOperationsRepository()
 }

@@ -584,6 +584,11 @@ export const mapServiceRequest = (r: Row): ServiceRequest => ({
   notes: opt(r.notes),
   assignedToUserId: opt(r.assigned_to_user_id ?? r.assignedToUserId),
   assignedToName: opt(r.assigned_to_name ?? r.assignedToName),
+  responsibleStaffId: opt(r.responsible_staff_id ?? r.responsibleStaffId),
+  responsibleName: opt(r.responsible_name ?? r.responsibleName),
+  handledByStaffId: opt(r.handled_by_staff_id ?? r.handledByStaffId),
+  acknowledgedAt: opt(r.acknowledged_at ?? r.acknowledgedAt),
+  acknowledgedByName: opt(r.acknowledged_by_name ?? r.acknowledgedByName),
   createdAt: r.created_at ?? r.createdAt,
   resolvedAt: opt(r.resolved_at ?? r.resolvedAt)
 })

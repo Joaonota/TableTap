@@ -90,6 +90,7 @@ const routes: RouteRecordRaw[] = [
       { path: 'dashboard', name: 'admin-dashboard', component: () => import('@/pages/dashboard/DashboardPage.vue') },
       { path: 'pedidos', name: 'admin-orders', component: () => import('@/pages/orders/OrdersPage.vue'), meta: { permission: 'manage_orders' } },
       { path: 'atendimento', name: 'admin-service', component: () => import('@/pages/service/ServiceRequestsPage.vue'), meta: { permission: 'service_requests' } },
+      { path: 'sala', name: 'admin-table-ops', component: () => import('@/pages/tables/TableOperationsPage.vue'), meta: { permission: 'table_operations' } },
       { path: 'mesas', name: 'admin-tables', component: () => import('@/pages/tables/TablesPage.vue') },
       { path: 'empresa', name: 'admin-company', component: () => import('@/pages/company/CompanyPage.vue'), meta: { permission: 'manage_company' } },
       { path: 'estabelecimentos', name: 'admin-establishments', component: () => import('@/pages/establishments/EstablishmentsPage.vue'), meta: { permission: 'manage_company' } },

@@ -23,6 +23,7 @@ import type {
   ReviewDashboardQuery
 } from '@/repositories/interfaces'
 import type { ReviewDeviceType, ReviewTrackEvent } from '@/domain/reviews'
+import type { AssignmentRole, DutyStatus, ServiceAction } from '@/domain/tableOperations'
 import { countTables } from '@/domain/tableRules'
 import type {
   CompanyDeletionPreview,
@@ -463,6 +464,37 @@ export const serviceRequestService = {
   },
   async updateStatus(id: string, status: ServiceRequestStatus, assignedToUserId?: string, assignedToName?: string): Promise<ServiceRequest> {
     return serviceRequestRepo.updateStatus(id, status, assignedToUserId, assignedToName)
+  },
+  /** Recebido / em atendimento / concluído / assumir (o gerente pode agir por quem não tem conta). */
+  async handle(id: string, action: ServiceAction, onBehalfOfStaffId?: string): Promise<ServiceRequest> {
+    return serviceRequestRepo.handle(id, action, onBehalfOfStaffId)
+  }
+}
+
+// ================= Operação de sala: garçons responsáveis pelas mesas =================
+export const tableOperationsService = {
+  getSnapshot(restaurantId: string) {
+    return repositories.tableOperations.getSnapshot(restaurantId)
+  },
+  assign(tableIds: string[], staffId: string, role: AssignmentRole = 'primary', expiresAt?: Date | null, reason?: string) {
+    return repositories.tableOperations.assign(tableIds, staffId, role, expiresAt, reason)
+  },
+  remove(assignmentId: string, reason?: string) {
+    return repositories.tableOperations.remove(assignmentId, reason)
+  },
+  /** Muda só o responsável; pedidos, sessão e pagamentos ficam iguais. */
+  transferTable(tableId: string, toStaffId: string, reason?: string, fromStaffId?: string) {
+    return repositories.tableOperations.transferTable(tableId, toStaffId, reason, fromStaffId)
+  },
+  /** "Transferir minhas mesas" no fim do turno (ou o gerente por outro funcionário). */
+  transferStaffTables(restaurantId: string, toStaffId: string, reason?: string, fromStaffId?: string) {
+    return repositories.tableOperations.transferStaffTables(restaurantId, toStaffId, reason, fromStaffId)
+  },
+  setDutyStatus(status: DutyStatus, staffId?: string) {
+    return repositories.tableOperations.setDutyStatus(status, staffId)
+  },
+  getHistory(tableId: string) {
+    return repositories.tableOperations.getHistory(tableId)
   }
 }
 

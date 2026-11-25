@@ -37,6 +37,7 @@ import type {
 import type { ReviewDeviceType, ReviewTrackEvent } from '@/domain/reviews'
 import type { ItemSelection, SessionBill, SplitMode } from '@/domain/groupBill'
 import type { CompanyAlert, CompanyOverview, MenuCopyReport } from '@/domain/companyInsights'
+import type { AssignmentEvent, AssignmentRole, DutyStatus, ServiceAction, TableOperationsSnapshot } from '@/domain/tableOperations'
 
 /** Empresa registada pelo Super Admin (o dono é convidado por email). */
 export interface CreateCompanyInput {
@@ -222,6 +223,8 @@ export interface IPaymentRepository {
 export interface IServiceRequestRepository {
   getByRestaurant(restaurantId: string): Promise<ServiceRequest[]>
   updateStatus(id: string, status: ServiceRequestStatus, assignedToUserId?: string, assignedToName?: string): Promise<ServiceRequest>
+  /** Recebido / em atendimento / concluído / assumir — validado no servidor. */
+  handle(id: string, action: ServiceAction, onBehalfOfStaffId?: string): Promise<ServiceRequest>
 }
 
 export interface IStaffRepository {
@@ -480,6 +483,17 @@ export interface ReviewDashboardQuery {
   /** Omitido = agora, pela hora do servidor (evita erros de relógio do dispositivo). */
   to?: Date
   recentLimit?: number
+}
+
+/** Garçons responsáveis pelas mesas (migração 2000). */
+export interface ITableOperationsRepository {
+  getSnapshot(restaurantId: string): Promise<TableOperationsSnapshot>
+  assign(tableIds: string[], staffId: string, role: AssignmentRole, expiresAt?: Date | null, reason?: string): Promise<number>
+  remove(assignmentId: string, reason?: string): Promise<void>
+  transferTable(tableId: string, toStaffId: string, reason?: string, fromStaffId?: string): Promise<void>
+  transferStaffTables(restaurantId: string, toStaffId: string, reason?: string, fromStaffId?: string): Promise<number>
+  setDutyStatus(status: DutyStatus, staffId?: string): Promise<{ dutyStatus: DutyStatus; openTables: number }>
+  getHistory(tableId: string): Promise<AssignmentEvent[]>
 }
 
 /** Empresa com vários estabelecimentos (migração 1900) — só o proprietário. */

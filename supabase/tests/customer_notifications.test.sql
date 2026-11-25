@@ -222,7 +222,7 @@ select tests.ok('vários pedidos pagos partilham o mesmo eventId (o telemóvel m
 select tests.login(null);
 select tests.put('sr1', (public.create_service_request(tests.id('tA101'), 'water', tests.id('s1'), tests.id('tokAna')) ->> 'id')::uuid);
 select tests.login('ownerA'); set role authenticated;
-update public.service_requests set status = 'in_progress' where id = tests.id('sr1');
+select public.handle_service_request(tests.id('sr1'), 'start');
 select public.close_table_session(tests.id('s1'), true, 'Teste: fecho com valores em aberto');
 reset role;
 select tests.ok('atendimento em curso notifica a sessão',

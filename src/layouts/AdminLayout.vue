@@ -28,6 +28,7 @@ import {
   Settings,
   ShieldCheck,
   Building2,
+  LayoutPanelTop,
   Store,
   Menu,
   X,
@@ -285,6 +286,17 @@ onMounted(async () => {
               <span v-if="activeServiceRequestsCount > 0" class="nav-counter warning">
                 {{ activeServiceRequestsCount }}
               </span>
+            </router-link>
+
+            <router-link
+              v-if="authStore.can('table_operations')"
+              to="/app/sala"
+              class="nav-link"
+              :class="{ 'is-active': route.path === '/app/sala' }"
+              @click="isMobileSidebarOpen = false"
+            >
+              <LayoutPanelTop :size="18" />
+              <span>Sala e garçons</span>
             </router-link>
 
             <router-link
